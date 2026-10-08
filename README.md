@@ -14,3 +14,5 @@ This repository is a **build-only, public snapshot** of PvPPokeGo **0.5.26 Stand
 Go to **Actions → Build PvPPokeGo 0.5.26 Standard APK → Run workflow**, or use the automatically triggered build on the initial commit. Download the APK from the workflow artifacts after all tests pass.
 
 This build mirror is isolated from the original repository. Fixes must be made in the private canonical project and explicitly copied here after review.
+
+The first build is triggered by commits to `main`. If no run appears, use the **Run workflow** control in the Actions tab.
