@@ -2213,7 +2213,7 @@ class BattleOverlayService : Service(), BattleOverlayView.Callbacks {
         private const val FRAME_INTERVAL_MS = 105L
         private const val OCR_INTERVAL_MS = 520L
         private const val RESERVE_OCR_INTERVAL_MS = 280L
-        private const val TEAM_OCR_INTERVAL_MS = 700L
+        private const val TEAM_OCR_INTERVAL_MS = 1_550L
         private const val LEAGUE_OCR_INTERVAL_MS = 1_900L
         private const val BATTLE_VISIBILITY_GRACE_MS = 3_800L
         private const val SWITCH_CHOICE_PROMPT_GRACE_MS = 2_400L

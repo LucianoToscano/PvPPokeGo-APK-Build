@@ -208,10 +208,53 @@ class BattleOcrDetector(
                     detected
                 }
             }
-            jobs.mapNotNull { it.await() }
+            val fromSlots = jobs.mapNotNull { it.await() }
+            if (fromSlots.size >= 3) fromSlots else {
+                // 0.5.17 scanned the full team-selection area. Restore it as a
+                // fallback for different Samsung aspect ratios and team layouts.
+                // Never let an incomplete broad OCR reorder trusted slot evidence.
+                val legacy = detectOwnTeamBroad(frame)
+                if (legacy.size == 3 && legacy.all { it.cp != null }) legacy else fromSlots
+            }
         } finally {
             textRois.forEach { it.recycle() }
             portraitRois.forEach { it.recycle() }
+        }
+    }
+
+    /**
+     * Legacy 0.5.17 team-layout OCR, used only if the three per-slot scans
+     * couldn't identify a full team. Accept only three distinct name+PC pairs
+     * to prevent other game screens from redefining the player's lineup.
+     */
+    private suspend fun detectOwnTeamBroad(frame: Bitmap): List<DetectedPokemon> {
+        val roi = crop(frame, TEAM_LEGACY_LEFT, TEAM_LEGACY_TOP, TEAM_LEGACY_RIGHT, TEAM_LEGACY_BOTTOM)
+        return try {
+            val raw = recognize(roi)
+            val lines = raw.lines().map(String::trim).filter(String::isNotBlank)
+            val paired = linkedMapOf<String, DetectedPokemon>()
+            lines.forEachIndexed { index, line ->
+                val nearby = buildString {
+                    append(line)
+                    lines.getOrNull(index + 1)?.let { append(' ').append(it) }
+                }
+                val cp = CP_REGEX.find(nearby)?.groupValues?.getOrNull(1)?.toIntOrNull()
+                    ?.takeIf { it in 10..10000 } ?: return@forEachIndexed
+                val name = repo.canonicalPokemonName(
+                    nearby.replace(CP_REGEX, " ")
+                        .replace(Regex("[^\\p{L}♀♂' .-]+"), " ")
+                        .replace(Regex("\\s+"), " ").trim()
+                ) ?: return@forEachIndexed
+                val identity = repo.pokemon(name) ?: return@forEachIndexed
+                val key = identity.speciesId.lowercase() + ":" + cp
+                if (key !in paired) paired[key] = DetectedPokemon(
+                    name = identity.speciesName, cp = cp,
+                    confidence = 0.91f, rawText = raw
+                )
+            }
+            paired.values.take(3).takeIf { it.size == 3 }.orEmpty()
+        } finally {
+            roi.recycle()
         }
     }
 
@@ -331,6 +374,16 @@ class BattleOcrDetector(
             )
         }
 
+        // 0.5.17 accepted a real name + PC from OCR without demanding a portrait
+        // match. A missing visual fingerprint is NOT evidence that OCR is wrong.
+        if (AllyOcrRecoveryPolicy.allowNameAndCp(ocr.name, ocr.cp, ocr.confidence)) {
+            return DetectedPokemon(
+                name = ocr.name!!,
+                cp = ocr.cp,
+                confidence = ocr.confidence,
+                rawText = ocr.raw
+            )
+        }
         return null
     }
 
@@ -454,6 +507,11 @@ class BattleOcrDetector(
         private const val TEAM_PORTRAIT_2_RIGHT = 0.605f
         private const val TEAM_PORTRAIT_3_LEFT = 0.685f
         private const val TEAM_PORTRAIT_3_RIGHT = 0.895f
+        // Wide team-selection region from 0.5.17, secondary to exact slot ROIs.
+        private const val TEAM_LEGACY_LEFT = 0.04f
+        private const val TEAM_LEGACY_TOP = 0.10f
+        private const val TEAM_LEGACY_RIGHT = 0.96f
+        private const val TEAM_LEGACY_BOTTOM = 0.93f
 
         // Lobby/rules text can appear across a large central portion of the screen.
         private const val LEAGUE_LEFT_FRAC = 0.04f

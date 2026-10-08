@@ -657,8 +657,13 @@ class BattleEngine(private val repo: GameDataRepository) {
         reserveSpeciesStreak.fill(0)
     }
 
+    // Do not stop team OCR after collecting three low-confidence guesses.
     fun needsOwnTeamScan(): Boolean =
-        ownTeamSlots.size < 3 || ownTeamSlots.any { it.cp == null }
+        ownTeamSlots.size < 3 || ownTeamSlots.any {
+            it.cp == null ||
+                it.speciesId.isNullOrBlank() ||
+                it.identityConfidence < IdentityThresholds.MIN_STABLE_TEAM_CONFIDENCE
+        }
     internal fun battleCorrespondenceContext(
         inactiveForMs: Long,
         sessionAgeMs: Long
