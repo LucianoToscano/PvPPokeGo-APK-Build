@@ -868,6 +868,20 @@ class BattleOverlayView(
         }
     }
 
+    private fun stableBattleAdvice(nowMs: Long = System.currentTimeMillis()): BattleAssistAdvisor.Advice? {
+        val candidate = BattleAssistAdvisor.advise(state, gameRepo)
+        val key = candidate?.let {
+            AdviceStabilityGate.Key(it.title, it.detail, it.priority)
+        }
+        val accepted = adviceStabilityGate.update(key, nowMs)
+        if (accepted == null) {
+            stableAdvice = null
+        } else if (candidate != null && accepted == key) {
+            stableAdvice = candidate
+        }
+        return stableAdvice
+    }
+
     private fun drawBattleAssist(canvas: Canvas) {
         if (switchChoicePromptVisible) return
         val advice = stableBattleAdvice() ?: return
