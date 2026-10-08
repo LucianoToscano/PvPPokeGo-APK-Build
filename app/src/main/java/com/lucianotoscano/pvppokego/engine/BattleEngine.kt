@@ -2140,7 +2140,7 @@ class BattleEngine(private val repo: GameDataRepository) {
             MatchupState.UNFAVORABLE -> -.35
             else -> 0.0
         }
-        val hpAdjustment = hpRatio?.let { (it.coerceIn(0f, 1f) - .5f) * .34 } ?: 0f
+        val hpAdjustment: Double = hpRatio?.let { (it.coerceIn(0f, 1f).toDouble() - 0.5) * 0.34 } ?: 0.0
         val cheapestCharge = listOfNotNull(resolvedC1, resolvedC2)
             .map { it.chargedCost }
             .filter { it > 0 }

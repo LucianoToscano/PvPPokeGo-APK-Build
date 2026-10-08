@@ -322,7 +322,7 @@ class BattleFrameEventDetector {
         val bottomFrac = if (slot == 0) .617f else .713f
         val top = (frame.height * topFrac).toInt().coerceAtLeast(0)
         val bottom = (frame.height * bottomFrac).toInt().coerceAtMost(frame.height)
-        if (right <= left || bottom <= top) return false
+        if (right <= left || bottom <= top) return null
 
         val roiW = right - left
         val row = IntArray(roiW)

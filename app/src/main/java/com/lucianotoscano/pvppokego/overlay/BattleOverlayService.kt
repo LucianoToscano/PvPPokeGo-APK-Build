@@ -36,6 +36,7 @@ import com.lucianotoscano.pvppokego.capture.ScreenFrameRecorder
 import com.lucianotoscano.pvppokego.data.BattleLeagueMode
 import com.lucianotoscano.pvppokego.data.BattleHistoryRecorder
 import com.lucianotoscano.pvppokego.data.BattleUiState
+import com.lucianotoscano.pvppokego.data.CaptureHealth
 import com.lucianotoscano.pvppokego.data.MoveKnowledgeConfidence
 import com.lucianotoscano.pvppokego.data.BattleHistoryRepository
 import com.lucianotoscano.pvppokego.data.BattleDetection
