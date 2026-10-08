@@ -1,4 +1,4 @@
-name: Build PvPPokeGo 0.5.27 Standard APK
+name: Build PvPPokeGo 0.5.28 Standard APK
 
 on:
   push:
@@ -43,8 +43,8 @@ jobs:
       - name: Verify source version and launcher resources
         run: |
           set -euo pipefail
-          grep -q 'versionName = "0.5.27"' app/build.gradle.kts
-          grep -q 'versionCode = 32' app/build.gradle.kts
+          grep -q 'versionName = "0.5.28"' app/build.gradle.kts
+          grep -q 'versionCode = 33' app/build.gradle.kts
           test -s app/src/main/res/drawable-nodpi/pvppokego_launcher.png
           test -s app/src/main/res/mipmap-anydpi/ic_launcher.xml
           test -s app/src/main/res/mipmap-anydpi/ic_launcher_round.xml
@@ -82,15 +82,15 @@ jobs:
           unzip -Z1 "$APK" | grep -q '^assets/pokemon_icon_atlas.png$'
           unzip -Z1 "$APK" | grep -q '^assets/pokemon_icon_atlas.json$'
           unzip -Z1 "$APK" | grep -q 'pvppokego_launcher.png'
-          cp "$APK" delivery/PvPPokeGo-0.5.27-QA-debug.apk
+          cp "$APK" delivery/PvPPokeGo-0.5.28-QA-debug.apk
           sha256sum delivery/*.apk | tee delivery/SHA256SUMS.txt
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
-          "$APKSIGNER" verify --verbose delivery/PvPPokeGo-0.5.27-QA-debug.apk | tee delivery/signature-verification.txt
+          "$APKSIGNER" verify --verbose delivery/PvPPokeGo-0.5.28-QA-debug.apk | tee delivery/signature-verification.txt
 
       - name: Upload installable QA APK
         uses: actions/upload-artifact@v4
         with:
-          name: PvPPokeGo-0.5.27-QA-debug
+          name: PvPPokeGo-0.5.28-QA-debug
           path: delivery/
           retention-days: 30
           if-no-files-found: error
