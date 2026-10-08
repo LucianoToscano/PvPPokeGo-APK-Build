@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">PvPPokeGo</string>
+    <string name="notification_channel">PvPPokeGo Overlay</string>
+    <string name="notification_title">PvPPokeGo ativo</string>
+    <string name="notification_text">Análise visual da batalha em execução</string>
+    <string name="accessibility_capture_description">Compatibilidade de captura do PvPPokeGo para continuar a análise quando outro gravador de tela estiver ativo. Não lê conteúdo de acessibilidade nem executa toques.</string>
+</resources>

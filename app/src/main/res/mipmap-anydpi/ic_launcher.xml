@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Legacy launcher fallback for API < 26; Android 8+ uses mipmap-anydpi-v26 adaptive icons. -->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/pvppokego_launcher"
+    android:gravity="fill"
+    android:antialias="true"
+    android:filter="true" />
