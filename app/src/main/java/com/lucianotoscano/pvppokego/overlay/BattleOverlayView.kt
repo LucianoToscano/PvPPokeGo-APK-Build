@@ -326,7 +326,13 @@ class BattleOverlayView(
         if (settings.showEnemyMoves) withBlockAlpha(BLOCK_ENEMY_MOVES) { drawMoveTriangle(canvas) }
         if (state.chargedIncoming && settings.showEnemyMoves && !settings.battleAssistEnabled) drawShieldAdvice(canvas)
         if (settings.analyzeReserves) {
-            if (switchChoicePromptVisible) drawSwitchChoiceIndicators(canvas) else drawReserves(canvas)
+            if (switchChoicePromptVisible && state.reserves.take(2).size == 2 &&
+                state.reserves.take(2).all { it.cardMappingConfirmed }) {
+                drawSwitchChoiceIndicators(canvas)
+            } else {
+                // Keep stable reserve widgets when native switch cards are ambiguous.
+                drawReserves(canvas)
+            }
         }
         if (settings.battleAssistEnabled) withBlockAlpha(BLOCK_BATTLE_ASSIST) { drawBattleAssist(canvas) }
         if (settings.showEnemyHistory) withBlockAlpha(BLOCK_ENEMY_HISTORY) { drawEnemyHistory(canvas) }
@@ -851,6 +857,17 @@ class BattleOverlayView(
             val cardCenterY = ry(cardRefY)
             val identityReady = reserve.identityConfirmed
             val matchup = if (identityReady) reserve.matchup else MatchupState.UNKNOWN
+            val card = RectF(indicatorX - 12f * u() * bs,
+                cardCenterY - 34f * u() * bs,
+                (indicatorX + rx(178f) * bs).coerceAtMost(width - 4f * u()),
+                cardCenterY + 34f * u() * bs)
+            paint.style = Paint.Style.FILL
+            paint.color = hudColor(Color.rgb(13, 22, 34), .76f)
+            canvas.drawRoundRect(card, 9f * u() * bs, 9f * u() * bs, paint)
+            stroke.style = Paint.Style.STROKE
+            stroke.strokeWidth = 1f * u() * bs
+            stroke.color = hudColor(Color.rgb(177, 196, 217), .38f)
+            canvas.drawRoundRect(card, 9f * u() * bs, 9f * u() * bs, stroke)
 
             // Matchup badge belongs to the stable team identity, not to the still-unknown
             // upper/lower native card mapping.
@@ -859,11 +876,11 @@ class BattleOverlayView(
                 indicatorX,
                 cardCenterY,
                 matchup,
-                13.5f * u() * bs
+                10f * u() * bs
             )
 
-            val iconCenterX = indicatorX + rx(43f) * bs
-            val iconRadius = 23f * u() * bs
+            val iconCenterX = indicatorX + rx(40f) * bs
+            val iconRadius = 18f * u() * bs
             drawReservePokemonIcon(
                 canvas = canvas,
                 index = index,
@@ -875,51 +892,61 @@ class BattleOverlayView(
             )
 
             if (settings.showHudText) {
-                val textX = indicatorX + rx(105f) * bs
-                val title = buildString {
-                    append(reserveName)
-                    reserve.cp?.let { append(" PC ").append(it) }
-                }
-                paint.textAlign = Paint.Align.CENTER
+                val textX = indicatorX + rx(68f) * bs
+                val maxWidth = (card.right - textX - 5f * u() * bs).coerceAtLeast(12f * u())
+                paint.style = Paint.Style.FILL
+                paint.textAlign = Paint.Align.LEFT
                 paint.typeface = Typeface.DEFAULT_BOLD
-                paint.textSize = 10.0f * u() * bs
-                paint.color = hudColor(Color.WHITE, .95f)
-                paint.setShadowLayer(2.8f, 0f, 1f, Color.BLACK)
-                canvas.drawText(shortReserveTitle(title), textX, cardCenterY - 8f * u() * bs, paint)
+                paint.textSize = 10.4f * u() * bs
+                paint.color = hudColor(Color.WHITE, .96f)
+                canvas.drawText(fitReserveText(reserveName, maxWidth),
+                    textX, cardCenterY - 15f * u() * bs, paint)
+                paint.typeface = Typeface.DEFAULT
+                paint.color = hudColor(Color.rgb(220, 228, 238), .92f)
+                paint.textSize = 9.5f * u() * bs
+                canvas.drawText(fitReserveText(reserve.cp?.let { "PC $it" } ?: "PC --", maxWidth),
+                    textX, cardCenterY - 1f * u() * bs, paint)
 
                 val matchupText = when {
                     !identityReady -> "ANALISANDO"
                     matchup == MatchupState.UNKNOWN -> "ANALISANDO"
                     else -> reserveMatchupLabel(matchup)
                 }
-                val recommendation = reserve.recommendation
-                    ?.takeIf { identityReady && (it == "MELHOR" || it == "EVITAR") }
-                val hpLabel = if (settings.showHpAssist) {
-                    reserve.hpRatio?.let { "HP " + (it.coerceIn(0f, 1f) * 100f).toInt() + "%" }
-                } else null
-                val lifeLabel = if (
-                    reserve.status == com.lucianotoscano.pvppokego.data.TeamPokemonStatus.FAINTED
-                ) "DESMAIADO" else null
-                val status = listOfNotNull(lifeLabel, matchupText, recommendation, hpLabel)
-                    .distinct()
-                    .joinToString(" • ")
-
-                paint.textSize = 9.1f * u() * bs
+                val status = when {
+                    reserve.status == com.lucianotoscano.pvppokego.data.TeamPokemonStatus.FAINTED -> "DESMAIADO"
+                    !identityReady -> "ANALISANDO"
+                    reserve.recommendation == "MELHOR" -> "MELHOR"
+                    reserve.recommendation == "EVITAR" -> "EVITAR"
+                    else -> matchupText
+                }
+                paint.textSize = 8.8f * u() * bs
                 paint.color = hudColor(
-                    if (identityReady) reserveMatchupColor(matchup) else Color.rgb(190, 194, 201),
-                    .96f
-                )
-                canvas.drawText(status, textX, cardCenterY + 10f * u() * bs, paint)
-                paint.clearShadowLayer()
+                    if (identityReady) reserveMatchupColor(matchup) else Color.rgb(190, 194, 201), .96f)
+                canvas.drawText(fitReserveText(status, maxWidth),
+                    textX, cardCenterY + 12f * u() * bs, paint)
+                if (settings.showHpAssist) reserve.hpRatio?.let { hp ->
+                    val bar = RectF(textX, cardCenterY + 20f * u() * bs,
+                        card.right - 6f * u() * bs, cardCenterY + 24f * u() * bs)
+                    paint.color = hudColor(Color.rgb(85, 98, 113), .72f)
+                    canvas.drawRoundRect(bar, 2f * u(), 2f * u(), paint)
+                    paint.color = hudColor(when {
+                        hp < .25f -> Color.rgb(238, 82, 83)
+                        hp < .5f -> Color.rgb(243, 186, 65)
+                        else -> Color.rgb(67, 202, 143)
+                    }, .96f)
+                    canvas.drawRoundRect(RectF(bar.left, bar.top,
+                        bar.left + bar.width() * hp.coerceIn(0f, 1f), bar.bottom),
+                        2f * u(), 2f * u(), paint)
+                }
             }
 
             if (settings.showReserveTypes && reserve.types.isNotEmpty() && identityReady) {
-                val typeRadius = 10.5f * u() * bs
-                val spacing = rx(27f) * bs
-                val centerX = indicatorX + rx(105f) * bs
+                val typeRadius = 7.4f * u() * bs
+                val spacing = rx(19f) * bs
+                val centerX = iconCenterX
                 var x = centerX - if (reserve.types.size > 1) spacing / 2f else 0f
                 reserve.types.take(2).forEach { type ->
-                    drawTypeChip(canvas, x, cardCenterY + 31f * u() * bs, type, typeRadius)
+                    drawTypeChip(canvas, x, cardCenterY + 23f * u() * bs, type, typeRadius)
                     x += spacing
                 }
             }
@@ -927,10 +954,8 @@ class BattleOverlayView(
             drawEditSelection(
                 canvas,
                 block,
-                indicatorX + rx(72f) * bs,
-                cardCenterY,
-                132f * u() * bs,
-                52f * u() * bs
+                card.centerX(), cardCenterY,
+                card.width() / 2f, card.height() / 2f
             )
             blockAlphaMultiplier = oldAlpha
         }
@@ -947,7 +972,9 @@ class BattleOverlayView(
     ) {
         paint.style = Paint.Style.FILL
         paint.color = hudColor(Color.rgb(20, 24, 31), .72f)
-        canvas.drawCircle(centerX, centerY, radius + 2.0f * u(), paint)
+        val iconRect = RectF(centerX - radius, centerY - radius, centerX + radius, centerY + radius)
+        val corner = radius * .42f
+        canvas.drawRoundRect(iconRect, corner, corner, paint)
 
         stroke.style = Paint.Style.STROKE
         stroke.strokeWidth = 1.7f * u()
@@ -955,7 +982,7 @@ class BattleOverlayView(
             if (reserve.identityConfirmed) reserveMatchupColor(reserve.matchup) else Color.WHITE,
             .92f
         )
-        canvas.drawCircle(centerX, centerY, radius + 1.0f * u(), stroke)
+        canvas.drawRoundRect(iconRect, corner, corner, stroke)
 
         val def = gameRepo.pokemon(reserve.speciesId ?: fallbackName)
         val destination = RectF(
@@ -990,7 +1017,7 @@ class BattleOverlayView(
             } else null
             val portrait = stableTeamPortrait ?: mappedCardPortrait
             if (portrait != null) {
-                val clip = Path().apply { addCircle(centerX, centerY, radius, Path.Direction.CW) }
+                val clip = Path().apply { addRoundRect(iconRect, corner, corner, Path.Direction.CW) }
                 canvas.save()
                 canvas.clipPath(clip)
                 val previousAlpha = paint.alpha
@@ -1028,8 +1055,14 @@ class BattleOverlayView(
         MatchupState.UNKNOWN -> Color.rgb(155, 160, 169)
     }
 
-    private fun shortReserveTitle(value: String): String =
-        if (value.length <= 23) value else value.take(22) + "…"
+    private fun fitReserveText(value: String, width: Float): String {
+        if (paint.measureText(value) <= width) return value
+        val tail = "…"
+        val max = (width - paint.measureText(tail)).coerceAtLeast(0f)
+        var end = value.length
+        while (end > 0 && paint.measureText(value.substring(0, end)) > max) end--
+        return if (end == 0) tail else value.substring(0, end).trimEnd() + tail
+    }
 
     /**
      * During Pokémon GO's switch chooser, keep the two confirmed card positions visible
