@@ -8,6 +8,9 @@ import com.lucianotoscano.pvppokego.data.CaptureHealth
 import com.lucianotoscano.pvppokego.data.DamageForecast
 import com.lucianotoscano.pvppokego.data.DamageForecastConfidence
 import com.lucianotoscano.pvppokego.data.DetectedPokemon
+import com.lucianotoscano.pvppokego.data.ManualTeamRoster
+import com.lucianotoscano.pvppokego.data.ManualTeamPolicy
+import com.lucianotoscano.pvppokego.data.ManualTeamMatchPolicy
 import com.lucianotoscano.pvppokego.data.EnergyConfidence
 import com.lucianotoscano.pvppokego.data.GameDataRepository
 import com.lucianotoscano.pvppokego.data.MatchupState
@@ -93,6 +96,7 @@ class BattleEngine(private val repo: GameDataRepository) {
 
     private val ownTeam = linkedMapOf<String, Int?>()
     private val ownTeamSlots = mutableListOf<OwnTeamSlot>()
+    private var selectedManualTeam: List<Pair<String, Int>>? = null
     private val reserveSlotVisible = arrayOfNulls<Boolean>(2)
     private val reserveCardHpRatios = arrayOfNulls<Float>(2)
     private val reserveMissingStreak = IntArray(2)
@@ -172,6 +176,7 @@ class BattleEngine(private val repo: GameDataRepository) {
         ownCharge2 = null
         ownTeam.clear()
         ownTeamSlots.clear()
+        selectedManualTeam = null
         reserveSlotVisible.fill(null)
         reserveCardHpRatios.fill(null)
         reserveMissingStreak.fill(0)
@@ -215,6 +220,83 @@ class BattleEngine(private val repo: GameDataRepository) {
         enemyStates.clearBattle()
         ownStates.clearBattle()
     }
+
+    /**
+     * Manual team is the currently selected roster, NOT an OCR identification of the
+     * active battler. The active slot is determined from CP/species observations.
+     * Changes take effect without touching the enemy, damage or capture pipeline.
+     */
+    fun selectManualTeam(roster: ManualTeamRoster?) {
+        val selected = roster?.let(ManualTeamPolicy::sanitize)
+            ?.takeIf { ManualTeamPolicy.canPrepare(it, null) }
+            ?.slots
+            ?.map { it.speciesId to it.cp!! }
+        if (selected == selectedManualTeam) return
+
+        val previous = selectedManualTeam
+        selectedManualTeam = selected
+        ownTeam.clear()
+        ownTeamSlots.clear()
+        clearReserveCardIdentity()
+
+        if (selected == null) {
+            // AUTO: allow the next pre-battle scan to learn actual teammates again.
+            if (previous != null) {
+                playerName?.let { rememberOwnPokemon(it, playerCp, playerSpeciesId) }
+            }
+            return
+        }
+
+        val valid = roster!!.slots
+        valid.forEachIndexed { index, member ->
+            val def = repo.pokemon(member.speciesId)
+            val name = def?.speciesName ?: member.speciesName
+            ownTeamSlots += OwnTeamSlot(
+                slot = index, name = name, cp = member.cp,
+                speciesId = member.speciesId, dex = def?.dex?.takeIf { it > 0 },
+                identityConfidence = 1f
+            )
+            ownTeam[name] = member.cp
+        }
+
+        // A replaced team cannot inherit the old active Pokémon's calculated energy.
+        val currentMatches = ownTeamSlots.any { slot ->
+            samePokemonIdentity(slot.name, slot.speciesId, playerName, playerSpeciesId) &&
+                (playerCp == null || slot.cp == playerCp)
+        }
+        if (!currentMatches && playerName != null) {
+            playerName = null
+            playerSpeciesId = null
+            playerCp = null
+            playerCpTracker.reset()
+            ownTracker.reset()
+            ownActiveState = null
+            ownFast = null
+            ownCharge1 = null
+            ownCharge2 = null
+            lastHpRatio = null
+            ownStates.clearBattle()
+        } else {
+            rebindOwnActiveStateToStableSlot()
+        }
+    }
+
+    fun hasManualTeamSelected(): Boolean = selectedManualTeam != null
+
+    private fun manualSlotForPlayer(detected: DetectedPokemon): OwnTeamSlot? {
+        val configured = selectedManualTeam ?: return null
+        val reliableVisualId = detected.visualSpeciesId?.takeIf {
+            (detected.visualConfidence ?: 0f) >= IdentityThresholds.ACTIVE_VISUAL_MIN_CONFIDENCE
+        }
+        val matchedIndex = ManualTeamMatchPolicy.memberIndex(
+            members = configured,
+            visualSpeciesId = reliableVisualId,
+            cp = detected.cp,
+            ocrSpeciesId = repo.pokemon(detected.name)?.speciesId
+        )
+        return ownTeamSlots.firstOrNull { it.slot == matchedIndex }
+    }
+
 
     fun onBattleConfidence(value: Float) {
         lastBattleConfidence = value.coerceIn(0f, 1f)
@@ -274,9 +356,11 @@ class BattleEngine(private val repo: GameDataRepository) {
         val oldEnemy = enemyName
         val oldEnemySpeciesId = enemySpeciesId
 
-        d.player?.let { detected ->
+        d.player?.takeIf { selectedManualTeam == null || manualSlotForPlayer(it) != null }?.let { detected ->
             val ocrCanonical = repo.canonicalPokemonName(detected.name) ?: detected.name
-            val cpPinnedSlot = detected.cp?.let { rawCp ->
+            val cpPinnedSlot = if (selectedManualTeam != null) {
+                manualSlotForPlayer(detected)
+            } else detected.cp?.let { rawCp ->
                 ownTeamSlots.filter { slot -> slot.cp == rawCp }.singleOrNull()
             }
             val visualDef = detected.visualSpeciesId
@@ -294,7 +378,7 @@ class BattleEngine(private val repo: GameDataRepository) {
                 ?: resolvedDef?.dex?.takeIf { it > 0 }
             val stableCp = playerCpTracker.observe(
                 normalize(speciesId ?: canonical),
-                detected.cp
+                detected.cp ?: if (selectedManualTeam != null) cpPinnedSlot?.cp else null
             )
 
             rememberOwnPokemon(
@@ -356,6 +440,7 @@ class BattleEngine(private val repo: GameDataRepository) {
     }
 
     fun onOwnTeamDetected(team: List<DetectedPokemon>) {
+        if (selectedManualTeam != null) return // Never overwrite the explicitly selected team.
         val candidates = team
             .mapNotNull(::resolveTeamIdentityCandidate)
             // Same species can exist on both sides. Only discard an exact opponent card,
@@ -574,6 +659,7 @@ class BattleEngine(private val repo: GameDataRepository) {
         }
 
         fun learnMissingMember(index: Int, evidence: ReserveCardEvidence) {
+            if (selectedManualTeam != null) return // Preserve manually selected identities.
             val stableSpeciesId = reserveCardSpeciesIds[index]
             val stableDex = reserveCardDexes[index] ?: evidence.visualDex
             val def = repo.pokemonForVisualIdentity(stableSpeciesId, stableDex ?: 0) ?: return
@@ -659,11 +745,11 @@ class BattleEngine(private val repo: GameDataRepository) {
 
     // Do not stop team OCR after collecting three low-confidence guesses.
     fun needsOwnTeamScan(): Boolean =
-        ownTeamSlots.size < 3 || ownTeamSlots.any {
+        selectedManualTeam == null && (ownTeamSlots.size < 3 || ownTeamSlots.any {
             it.cp == null ||
                 it.speciesId.isNullOrBlank() ||
                 it.identityConfidence < IdentityThresholds.MIN_STABLE_TEAM_CONFIDENCE
-        }
+        })
     internal fun battleCorrespondenceContext(
         inactiveForMs: Long,
         sessionAgeMs: Long
