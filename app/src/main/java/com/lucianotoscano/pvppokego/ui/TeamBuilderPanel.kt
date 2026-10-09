@@ -1,10 +1,12 @@
 package com.lucianotoscano.pvppokego.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -22,7 +24,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -33,6 +38,9 @@ import com.lucianotoscano.pvppokego.data.ManualTeamPolicy
 import com.lucianotoscano.pvppokego.data.MoveDef
 import com.lucianotoscano.pvppokego.data.PokemonDef
 import com.lucianotoscano.pvppokego.data.TeamSetupRepository
+import com.lucianotoscano.pvppokego.overlay.PokemonIconAtlas
+import android.graphics.Paint
+import android.graphics.RectF
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
@@ -91,6 +99,15 @@ fun TeamBuilderPanel(
     var loadError by remember { mutableStateOf<String?>(null) }
     var feedback by remember { mutableStateOf("") }
     var leagueMenu by remember { mutableStateOf(false) }
+    var atlas by remember { mutableStateOf<PokemonIconAtlas?>(null) }
+    val spritePaint = remember { Paint(Paint.ANTI_ALIAS_FLAG).apply { isFilterBitmap = true } }
+    val hasSelectedPokemon = saved.slots.any { it.speciesId.isNotBlank() }
+
+    LaunchedEffect(hasSelectedPokemon) {
+        if (hasSelectedPokemon && atlas == null) {
+            atlas = withContext(Dispatchers.IO) { runCatching { PokemonIconAtlas(context) }.getOrNull() }
+        }
+    }
 
     LaunchedEffect(opened) {
         if (opened && catalog == null && loadError == null) {
@@ -135,9 +152,26 @@ fun TeamBuilderPanel(
                             }
                         }
                     ) {
-                        Text(if (pokemon.speciesId.isBlank()) "${i + 1} · +" else
-                            "${i + 1} · ${pokemon.cp ?: "PC?"}",
-                            style = MaterialTheme.typography.bodySmall)
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("${i + 1}", style = MaterialTheme.typography.bodySmall)
+                            if (pokemon.speciesId.isNotBlank() && atlas?.isAvailable == true) {
+                                Canvas(Modifier.size(64.dp)) {
+                                    drawIntoCanvas { canvas ->
+                                        atlas?.draw(
+                                            canvas.nativeCanvas,
+                                            pokemon.speciesId, null,
+                                            RectF(0f, 0f, size.width, size.height),
+                                            spritePaint
+                                        )
+                                    }
+                                }
+                            }
+                            Text(if (pokemon.speciesName.isBlank()) "Adicionar" else
+                                pokemon.speciesName.take(13),
+                                style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                            Text(if (pokemon.cp == null) "PC —" else "PC ${pokemon.cp}",
+                                style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                        }
                     }
                 }
             }
