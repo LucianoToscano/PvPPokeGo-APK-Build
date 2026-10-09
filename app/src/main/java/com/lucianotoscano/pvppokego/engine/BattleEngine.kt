@@ -2305,6 +2305,7 @@ class BattleEngine(private val repo: GameDataRepository) {
             team = members,
             activeName = playerName,
             activeCp = playerCp,
+            activeSpeciesId = playerSpeciesId,
             cardCps = reserveCardCps.toList(),
             cardDexes = reserveCardDexes.toList(),
             cardSpeciesIds = reserveCardSpeciesIds.toList()

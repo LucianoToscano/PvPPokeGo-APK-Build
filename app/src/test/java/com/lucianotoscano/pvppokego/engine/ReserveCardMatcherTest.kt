@@ -149,4 +149,44 @@ class ReserveCardMatcherTest {
     }
 
 
+
+    @Test
+    fun activeFormPinsCorrectReserveWhenBothHaveSameDisplayNameAndCpUnreadable() {
+        val sameLabelForms = listOf(
+            ReserveCardMatcher.Member(0, "Ninetales", null, 38, "ninetales"),
+            ReserveCardMatcher.Member(1, "Ninetales", null, 38, "ninetales_alolan"),
+            ReserveCardMatcher.Member(2, "Azumarill", 1498, 184, "azumarill")
+        )
+        val r = ReserveCardMatcher.resolve(
+            team = sameLabelForms,
+            activeName = "Ninetales",
+            activeCp = null,
+            activeSpeciesId = "ninetales_alolan",
+            cardCps = listOf(null, 1498),
+            cardSpeciesIds = listOf("ninetales", "azumarill")
+        )
+        assertEquals("ninetales", r[0].member.speciesId)
+        assertEquals(0, r[0].member.slot)
+        assertEquals("azumarill", r[1].member.speciesId)
+        assertEquals(listOf(true, true), r.map { it.confirmed })
+    }
+
+    @Test
+    fun unknownActiveFormStillFallsBackWithoutFabricatingConfirmedIdentity() {
+        val sameLabelForms = listOf(
+            ReserveCardMatcher.Member(0, "Ninetales", 1490, 38, "ninetales"),
+            ReserveCardMatcher.Member(1, "Ninetales", 1488, 38, "ninetales_alolan"),
+            ReserveCardMatcher.Member(2, "Azumarill", 1498, 184, "azumarill")
+        )
+        val result = ReserveCardMatcher.resolve(
+            team = sameLabelForms,
+            activeName = "Ninetales",
+            activeCp = null,
+            activeSpeciesId = "nonexistent_form",
+            cardCps = listOf(null, null)
+        )
+        assertFalse(result.any { it.member.slot == 0 })
+        assertFalse(result.all { it.confirmed })
+    }
+
 }

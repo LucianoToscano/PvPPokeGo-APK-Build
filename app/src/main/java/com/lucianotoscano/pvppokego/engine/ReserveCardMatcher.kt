@@ -36,11 +36,18 @@ internal object ReserveCardMatcher {
         activeCp: Int?,
         cardCps: List<Int?>,
         cardDexes: List<Int?> = emptyList(),
-        cardSpeciesIds: List<String?> = emptyList()
+        cardSpeciesIds: List<String?> = emptyList(),
+        activeSpeciesId: String? = null
     ): List<Match> {
         if (team.isEmpty()) return emptyList()
 
-        val active = team.firstOrNull {
+        // Exact stable form is stronger than a display name shared by regional variants.
+        // Without it, preserve the existing name+CP fallback for older team snapshots.
+        val active = activeSpeciesId?.takeIf(String::isNotBlank)?.let { exact ->
+            team.singleOrNull {
+                !it.speciesId.isNullOrBlank() && normalize(it.speciesId) == normalize(exact)
+            }
+        } ?: team.firstOrNull {
             it.name.equals(activeName, ignoreCase = true) &&
                 (activeCp == null || it.cp == null || it.cp == activeCp)
         } ?: team.firstOrNull { it.name.equals(activeName, ignoreCase = true) }
