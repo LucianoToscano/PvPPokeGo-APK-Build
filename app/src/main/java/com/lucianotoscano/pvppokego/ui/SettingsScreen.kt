@@ -110,6 +110,8 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
+                ArenaDashboard(history = history)
+
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -417,8 +419,6 @@ fun SettingsScreen(
                     "Inclui configurações, posições, histórico, confiança/origem dos eventos e dados do aparelho.",
                     style = MaterialTheme.typography.bodySmall
                 )
-
-                ArenaDashboard(history = history)
 
                 SectionTitle("Histórico de batalhas")
                 Text(
