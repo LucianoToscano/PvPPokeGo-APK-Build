@@ -1,5 +1,8 @@
 package com.lucianotoscano.pvppokego.ui
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -37,21 +41,32 @@ import com.lucianotoscano.pvppokego.data.ManualTeamPokemon
 import com.lucianotoscano.pvppokego.data.ManualTeamPolicy
 import com.lucianotoscano.pvppokego.data.MoveDef
 import com.lucianotoscano.pvppokego.data.PokemonDef
+import com.lucianotoscano.pvppokego.data.TeamScanHistoryRepository
+import com.lucianotoscano.pvppokego.data.TeamPvpTools
+import com.lucianotoscano.pvppokego.data.IvLeagueResult
+import com.lucianotoscano.pvppokego.detect.TeamScanKind
+import com.lucianotoscano.pvppokego.detect.TeamScreenshotResult
+import com.lucianotoscano.pvppokego.detect.TeamScreenshotScanner
 import com.lucianotoscano.pvppokego.data.TeamSetupRepository
 import com.lucianotoscano.pvppokego.data.TeamRecognitionMode
 import com.lucianotoscano.pvppokego.overlay.PokemonIconAtlas
 import android.graphics.Paint
 import android.graphics.RectF
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.Json
 import java.text.Normalizer
 
 private data class TeamCatalog(
     val species: List<PokemonDef>,
     val moves: Map<String, MoveDef>,
-    val namesPtBr: Map<String, String>
+    val namesPtBr: Map<String, String>,
+    val cpms: List<Double>
 ) {
     fun displayMove(id: String): String = namesPtBr[id] ?: moves[id]?.name ?: id
     fun moveOptions(ids: List<String>): List<String> =
@@ -72,7 +87,13 @@ private data class TeamCatalog(
                 species = master.pokemon.filter { it.speciesId.isNotBlank() && it.dex > 0 }
                     .distinctBy { it.speciesId }.sortedBy { it.speciesName },
                 moves = master.moves.associateBy { it.moveId },
-                namesPtBr = portuguese
+                namesPtBr = portuguese,
+                cpms = runCatching {
+                    context.assets.open("pvpoke_cpms.json").bufferedReader().use {
+                        json.parseToJsonElement(it.readText()).jsonObject["cpms"]?.jsonArray
+                            ?.mapNotNull { value -> value.jsonPrimitive.content.toDoubleOrNull() }
+                    }.orEmpty()
+                }.getOrDefault(emptyList())
             )
         }
     }
@@ -92,6 +113,15 @@ fun TeamBuilderPanel(
     onLeagueChange: (BattleLeagueMode) -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val scanHistoryStore = remember(context) { TeamScanHistoryRepository(context) }
+    var scanHistory by remember { mutableStateOf(scanHistoryStore.load()) }
+    var scanKind by remember { mutableStateOf(TeamScanKind.DETAIL) }
+    var scanTargetSlot by remember { mutableStateOf(0) }
+    var scanResult by remember { mutableStateOf<TeamScreenshotResult?>(null) }
+    var scanBusy by remember { mutableStateOf(false) }
+    var scanApplied by remember { mutableStateOf(false) }
+    var ivRanking by remember { mutableStateOf<IvLeagueResult?>(null) }
     var saved by remember { mutableStateOf(store.load()) }
     var recognitionMode by remember { mutableStateOf(store.recognitionMode) }
     var opened by remember { mutableStateOf(false) }
@@ -105,6 +135,53 @@ fun TeamBuilderPanel(
     var atlas by remember { mutableStateOf<PokemonIconAtlas?>(null) }
     val spritePaint = remember { Paint(Paint.ANTI_ALIAS_FLAG).apply { isFilterBitmap = true } }
     val hasSelectedPokemon = saved.slots.any { it.speciesId.isNotBlank() }
+    val scanPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri != null && !scanBusy) {
+            val requestedSlot = scanTargetSlot
+            val requestedKind = scanKind
+            val currentCatalog = catalog
+            if (currentCatalog == null) {
+                feedback = "Aguarde o carregamento do banco offline antes de escanear."
+            } else {
+                scanBusy = true
+                scanResult = null
+                scope.launch {
+                    val result = runCatching {
+                        TeamScreenshotScanner.scan(context, uri, requestedKind,
+                            currentCatalog.species, currentCatalog.moves.values.toList(),
+                            currentCatalog.namesPtBr)
+                    }
+                    scanBusy = false
+                    if (requestedSlot != editingSlot) {
+                        feedback = "A vaga mudou durante o scan. Selecione a vaga desejada e repita."
+                    } else {
+                        result.onSuccess {
+                            scanResult = it
+                            feedback = if (requestedKind == TeamScanKind.DETAIL)
+                                "Leitura concluída. Revise os campos antes de aplicar."
+                            else "Avaliação lida. Confirme os IVs ou informe-os manualmente."
+                        }.onFailure {
+                            feedback = "Não foi possível ler esta imagem: ${it.message ?: "formato não reconhecido"}"
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(draft.speciesId, draft.atkIv, draft.defIv, draft.hpIv,
+        league, autoLeagueCp, catalog) {
+        ivRanking = null
+        val found = catalog?.species?.firstOrNull { it.speciesId == draft.speciesId }
+        val cap = if (league == BattleLeagueMode.AUTO) autoLeagueCp else league.cpCap
+        if (found != null && cap != null && draft.atkIv != null &&
+            draft.defIv != null && draft.hpIv != null) {
+            ivRanking = withContext(Dispatchers.Default) {
+                TeamPvpTools.rank(found.baseStats, catalog?.cpms.orEmpty(), cap,
+                    draft.atkIv, draft.defIv, draft.hpIv)
+            }
+        }
+    }
 
     LaunchedEffect(hasSelectedPokemon) {
         if (hasSelectedPokemon && atlas == null) {
@@ -202,11 +279,15 @@ fun TeamBuilderPanel(
                                 draft = saved.slots[i]
                                 search = draft.speciesName
                                 feedback = ""
+                                scanResult = null
+                                scanApplied = false
                             } else {
                                 opened = true
                                 editingSlot = i
                                 draft = saved.slots[i]
                                 search = draft.speciesName
+                                scanResult = null
+                                scanApplied = false
                             }
                         }
                     ) {
@@ -264,10 +345,107 @@ fun TeamBuilderPanel(
             }
             if (opened) {
                 HorizontalDivider()
-                Text("Pokémon ${editingSlot + 1} — dados manuais",
+                Text("Pokémon ${editingSlot + 1} — dados manuais ou scanner",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold)
                 if (loadError != null) Text(loadError!!, color = MaterialTheme.colorScheme.error)
+                Text("Scanner: abra a ficha no Pokémon GO, faça uma captura e selecione-a aqui. " +
+                    "Use uma segunda imagem caso os golpes estejam fora da tela. " +
+                    "O app não salva a imagem nem altera a equipe sem sua confirmação.",
+                    style = MaterialTheme.typography.bodySmall)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(modifier = Modifier.weight(1f),
+                        enabled = !scanBusy && catalog != null,
+                        onClick = {
+                            scanKind = TeamScanKind.DETAIL
+                            scanTargetSlot = editingSlot
+                            scanPicker.launch("image/*")
+                        }) { Text("Escanear ficha") }
+                    OutlinedButton(modifier = Modifier.weight(1f),
+                        enabled = !scanBusy && catalog != null,
+                        onClick = {
+                            scanKind = TeamScanKind.APPRAISAL
+                            scanTargetSlot = editingSlot
+                            scanPicker.launch("image/*")
+                        }) { Text("Ler Avaliar") }
+                }
+                if (scanBusy) Text("Analisando captura...", style = MaterialTheme.typography.bodySmall)
+                scanResult?.let { scanned ->
+                    Card(colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                        Column(Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            Text("Prévia do scan • ${if (scanned.kind == TeamScanKind.DETAIL) "Ficha" else "Avaliação"}",
+                                fontWeight = FontWeight.Bold)
+                            val e = scanned.evidence
+                            Text("Espécie: ${e.speciesName ?: "não identificada"} • " +
+                                "PC: ${e.cp ?: "?"} • PS: ${e.maxHp ?: "?"}",
+                                style = MaterialTheme.typography.bodySmall)
+                            Text("Golpes: ${e.matchedMoveNames.joinToString().ifBlank { "não reconhecidos" }}",
+                                style = MaterialTheme.typography.bodySmall)
+                            scanned.suggestedIvs?.let { (a, d, h) ->
+                                Text("IV sugerido: $a / $d / $h • precisa de confirmação",
+                                    style = MaterialTheme.typography.bodySmall)
+                            }
+                            if (scanned.appraisalWarning.isNotBlank()) Text(scanned.appraisalWarning,
+                                style = MaterialTheme.typography.bodySmall)
+                            e.notes.take(3).forEach {
+                                Text("• $it", style = MaterialTheme.typography.bodySmall)
+                            }
+                            val conflict = e.speciesId != null && draft.speciesId.isNotBlank() &&
+                                e.speciesId != draft.speciesId
+                            if (conflict) Text("ESPÉCIE DIFERENTE da vaga atual. " +
+                                "Limpe a vaga antes de importar outro Pokémon.",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(enabled = !conflict && (e.hasData || scanned.suggestedIvs != null),
+                                    onClick = {
+                                        draft = draft.copy(
+                                            speciesId = e.speciesId ?: draft.speciesId,
+                                            speciesName = e.speciesName ?: draft.speciesName,
+                                            cp = e.cp ?: draft.cp,
+                                            maxHp = e.maxHp ?: draft.maxHp,
+                                            gender = e.gender ?: draft.gender,
+                                            fastMoveId = e.fastMoveId ?: draft.fastMoveId,
+                                            chargedMove1Id = e.chargedMove1Id ?: draft.chargedMove1Id,
+                                            chargedMove2Id = e.chargedMove2Id ?: draft.chargedMove2Id,
+                                            atkIv = scanned.suggestedIvs?.first ?: draft.atkIv,
+                                            defIv = scanned.suggestedIvs?.second ?: draft.defIv,
+                                            hpIv = scanned.suggestedIvs?.third ?: draft.hpIv
+                                        )
+                                        if (e.speciesName != null) search = e.speciesName
+                                        scanApplied = true
+                                        scanResult = null
+                                        feedback = "Dados aplicados à edição da vaga. " +
+                                            "Revise e toque Salvar Pokémon para confirmar."
+                                    }) { Text("Aplicar na vaga") }
+                                OutlinedButton(onClick = { scanResult = null }) { Text("Descartar") }
+                            }
+                        }
+                    }
+                }
+                if (scanHistory.isNotEmpty()) {
+                    var historyOpen by remember { mutableStateOf(false) }
+                    OutlinedButton(onClick = { historyOpen = !historyOpen }) {
+                        Text(if (historyOpen) "Ocultar histórico de scans" else
+                            "Histórico de scans (${scanHistory.size})")
+                    }
+                    if (historyOpen) {
+                        scanHistory.take(8).forEach { item ->
+                            OutlinedButton(modifier = Modifier.fillMaxWidth(),
+                                onClick = {
+                                    draft = item.pokemon
+                                    search = draft.speciesName
+                                    scanApplied = false
+                                    scanResult = null
+                                    feedback = "Histórico carregado na edição; salve para confirmar."
+                                }) {
+                                Text("${item.pokemon.speciesName} • PC ${item.pokemon.cp ?: "?"}")
+                            }
+                        }
+                    }
+                }
                 OutlinedTextField(
                     modifier = Modifier.fillMaxWidth(),
                     value = search,
@@ -322,6 +500,16 @@ fun TeamBuilderPanel(
                     NumberField("PS", draft.hpIv?.toString().orEmpty(),
                         Modifier.weight(1f), 2) { draft = draft.copy(hpIv = it.toIntOrNull()) }
                 }
+                ivRanking?.let { rank ->
+                    Text("Rank IV desta liga: #${rank.rank}/${rank.total} • " +
+                        "${"%.2f".format(rank.percentOfBest)}% do produto de atributos ideal • " +
+                        "Nível ${rank.level} • PC potencial ${rank.cp}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary)
+                    Text("PC estimado no nível 50: ${rank.maximumCpAtLevel50}. " +
+                        "Custo exato de poeira/doces requer dados de fortalecimento adicionais.",
+                        style = MaterialTheme.typography.bodySmall)
+                }
                 Text("Sexo e forma (marcação informativa)", style = MaterialTheme.typography.bodySmall)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                     FilterChip(selected = draft.gender == "MALE",
@@ -353,6 +541,19 @@ fun TeamBuilderPanel(
                     MoveChooser("Carregado 2", draft.chargedMove2Id,
                         charged.filter { it != draft.chargedMove1Id }, catalog,
                         Modifier.fillMaxWidth()) { draft = draft.copy(chargedMove2Id = it) }
+                    val fastDef = catalog?.moves?.get(draft.fastMoveId)
+                    listOf(draft.chargedMove1Id, draft.chargedMove2Id)
+                        .distinct().filter { it.isNotBlank() }.forEach { id ->
+                            val chargedDef = catalog?.moves?.get(id)
+                            if (fastDef != null && chargedDef != null) {
+                                TeamPvpTools.moveSummary(fastDef, chargedDef)?.let { summary ->
+                                    Text("${catalog?.displayMove(id)}: ${summary.chargedCost} energia • " +
+                                        "${summary.fastMovesNeeded} golpes ágeis para carregar • " +
+                                        "${summary.secondsNeeded}s • DPE ${"%.2f".format(summary.damagePerEnergy)}",
+                                        style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        }
                 } else {
                     Text("Selecione uma espécie para listar os golpes compatíveis.",
                         style = MaterialTheme.typography.bodySmall)
@@ -371,6 +572,11 @@ fun TeamBuilderPanel(
                             saved = updated
                             draft = updated.slots[editingSlot]
                             feedback = "Pokémon ${editingSlot + 1} salvo."
+                            if (scanApplied) {
+                                scanHistoryStore.remember(editingSlot, draft)
+                                scanHistory = scanHistoryStore.load()
+                                scanApplied = false
+                            }
                         }) { Text("Salvar Pokémon") }
                     OutlinedButton(modifier = Modifier.weight(1f), onClick = {
                         store.saveSlot(editingSlot, ManualTeamPokemon())
@@ -378,6 +584,8 @@ fun TeamBuilderPanel(
                         draft = ManualTeamPokemon()
                         search = ""
                         feedback = "Vaga ${editingSlot + 1} apagada."
+                        scanResult = null
+                        scanApplied = false
                     }) { Text("Limpar vaga") }
                 }
                 if (feedback.isNotBlank()) Text(feedback,
@@ -385,8 +593,9 @@ fun TeamBuilderPanel(
                 Text("As mudanças nesta vaga só ficam salvas ao tocar Salvar Pokémon. " +
                     "Não são enviadas ao jogo nem substituem automaticamente a detecção.",
                     style = MaterialTheme.typography.bodySmall)
-                Text("Rank competitivo, Mega/Sombroso permitidos e HP real ainda " +
-                    "dependem de validação. O HP máximo informado é opcional.",
+                Text("Rank IV calculado com o banco offline, não é ranking do meta. " +
+                    "Mega/Sombroso e HP em batalha continuam sujeitos à validação. " +
+                    "Leitura automática dos IVs da avaliação exige calibração visual.",
                     style = MaterialTheme.typography.bodySmall)
             }
         }

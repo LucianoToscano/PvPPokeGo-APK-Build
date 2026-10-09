@@ -389,7 +389,7 @@ class SettingsRepository(context: Context) {
             "show_current_indicator", "analyze_reserves", "show_reserve_types",
             "show_enemy_moves", "show_charged_counter", "show_energy_progress",
             "show_hud_text", "show_hp_assist", "show_hp_remaining_forecast", "show_enemy_history", "show_switch_timer", "debug_mode",
-            "layout_locked", "overlay_scale", "overlay_opacity", "top_hud_position_version", "layout_preset_version", "manual_team_v1", "team_recognition_mode_v1",
+            "layout_locked", "overlay_scale", "overlay_opacity", "top_hud_position_version", "layout_preset_version", "manual_team_v1", "team_recognition_mode_v1", "team_scan_history_v1",
             TrainerPreferencesRepository.KEY_LEVEL, TrainerPreferencesRepository.KEY_FACTION,
             TrainerPreferencesRepository.KEY_NAME, TrainerPreferencesRepository.KEY_DATE
         )
