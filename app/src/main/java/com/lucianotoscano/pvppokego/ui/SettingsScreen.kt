@@ -418,6 +418,8 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodySmall
                 )
 
+                ArenaDashboard(history = history)
+
                 SectionTitle("Histórico de batalhas")
                 Text(
                     "Cada batalha abre como uma conversa cronológica: você, inimigo e assistente em balões separados.",
