@@ -274,4 +274,26 @@ class BattleCorrespondenceTrackerTest {
             tracker.observe(context, first, 100_700))
     }
 
+
+    @Test
+    fun firstNewPairAfterGapCanConfirmEvenWhenEvidenceGapCloses() {
+        val tracker = BattleCorrespondenceTracker()
+        val firstContext = BattleCorrespondenceTracker.Context(
+            activePlayer = team[0], activeOpponent = id("Sneasel", 1465, "sneasel"),
+            ownTeam = team,
+            knownOpponents = listOf(id("Sneasel", 1465, "sneasel")),
+            inactiveForMs = 7_000, sessionAgeMs = 16_000
+        )
+        val pair = BattleCorrespondenceTracker.Observation(
+            player = id("Azumarill", 1498, "azumarill"),
+            opponent = id("Lanturn", 1497, "lanturn"),
+            pairedCards = true
+        )
+        assertEquals(BattleCorrespondenceTracker.Decision.INSUFFICIENT,
+            tracker.observe(firstContext, pair, 120_000))
+        assertEquals(true, tracker.hasPendingNewBattleCandidate)
+        assertEquals(BattleCorrespondenceTracker.Decision.NEW_BATTLE,
+            tracker.observe(firstContext.copy(inactiveForMs = 500), pair, 120_650))
+    }
+
 }

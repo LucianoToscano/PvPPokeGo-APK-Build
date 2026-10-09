@@ -211,29 +211,29 @@ internal class BattleCorrespondenceTracker {
             trustedTeam.none { sameIdentity(player, it) }
         val opponentNew = trustedEnemies.none { sameIdentity(opponent, it) }
 
-        // Candidate new match:
-        // 1) player is incompatible with the already-known team and opponent is new, or
-        // 2) after a meaningful visibility gap, both sides are new.
-        // Two unfamiliar cards can also appear during simultaneous switches.
-        // Never split a match on a CP/name pair alone while gameplay is continuous.
-        // Require a meaningful evidence gap PLUS repeated stable paired identities.
-        if (playerIncompatible && context.inactiveForMs < LONG_GAP_NEW_MATCH_MS) {
+        val signature = listOf(
+            player.stableKey().orEmpty(), opponent.stableKey().orEmpty()
+        ).joinToString("|")
+        // The service marks each newly observed pair as fresh battle evidence.
+        // Thus the reported inactivity gap closes on frame #2. Preserve the
+        // candidate that was STARTED after the gap, without permitting one
+        // continuous-combat false OCR pair to open a new match.
+        val continuingCandidate =
+            pendingNewSignature == signature &&
+                pendingNewFirstAtMs > 0L &&
+                nowMs - pendingNewFirstAtMs in 0..CANDIDATE_WINDOW_MS
+        val hadVisibilityGap = context.inactiveForMs >= LONG_GAP_NEW_MATCH_MS
+        if (!hadVisibilityGap && !continuingCandidate) {
             resetNewCandidateOnly()
-            return Decision.HOLD_CURRENT
+            return if (playerIncompatible) Decision.HOLD_CURRENT
+                else Decision.SWITCH_WITHIN_BATTLE
         }
-        val newCandidate =
-            context.inactiveForMs >= LONG_GAP_NEW_MATCH_MS && opponentNew &&
-                (playerIncompatible || !playerKnownTeam)
-
+        val newCandidate = opponentNew && (playerIncompatible || !playerKnownTeam)
         if (!newCandidate) {
             resetNewCandidateOnly()
-            return if (playerIncompatible) Decision.HOLD_CURRENT else Decision.SWITCH_WITHIN_BATTLE
+            return if (playerIncompatible) Decision.HOLD_CURRENT
+                else Decision.SWITCH_WITHIN_BATTLE
         }
-
-        val signature = listOf(
-            player.stableKey().orEmpty(),
-            opponent.stableKey().orEmpty()
-        ).joinToString("|")
 
         if (signature != pendingNewSignature || nowMs - pendingNewFirstAtMs > CANDIDATE_WINDOW_MS) {
             pendingNewSignature = signature
@@ -243,12 +243,9 @@ internal class BattleCorrespondenceTracker {
         }
 
         pendingNewCount++
-        val requiredFrames = if (
-            context.inactiveForMs >= LONG_GAP_NEW_MATCH_MS ||
-            context.sessionAgeMs >= MATURE_SESSION_MS
-        ) 2 else 3
-
-        if (pendingNewCount >= requiredFrames) {
+        // Every candidate can originate only after a verified visibility gap.
+        // Two distinct OCR cycles with the SAME form-aware pair are required.
+        if (pendingNewCount >= 2) {
             reset()
             return Decision.NEW_BATTLE
         }

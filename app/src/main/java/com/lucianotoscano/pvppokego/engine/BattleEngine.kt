@@ -682,6 +682,17 @@ class BattleEngine(private val repo: GameDataRepository) {
             }
 
             val stableCp = reserveCardCps[index]
+            // A native reserve card cannot introduce a Pokémon whose form/stats
+            // contradict that card's CP or a unique team slot pinned to that CP.
+            // Keep the established team intact until the card evidence is coherent.
+            if (!repo.isSpeciesCpPlausible(def.speciesId, stableCp)) return
+            val cpPinned = stableCp?.let { cp ->
+                ownTeamSlots.filter { it.cp == cp }.singleOrNull()
+            }
+            if (cpPinned != null && !samePokemonIdentity(
+                    cpPinned.name, cpPinned.speciesId, def.speciesName, def.speciesId
+                )
+            ) return
             val existing = findOwnSlot(def.speciesName, stableCp, def.speciesId)
             if (existing != null) {
                 if (stableCp != null) existing.cp = stableCp
