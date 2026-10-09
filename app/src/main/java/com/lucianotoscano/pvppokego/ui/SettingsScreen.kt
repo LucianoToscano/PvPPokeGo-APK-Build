@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.lucianotoscano.pvppokego.BuildConfig
 import com.lucianotoscano.pvppokego.data.BattleHistoryEntry
@@ -38,6 +39,7 @@ import com.lucianotoscano.pvppokego.data.BattleHistoryEvent
 import com.lucianotoscano.pvppokego.data.BattleHistoryRepository
 import com.lucianotoscano.pvppokego.data.BattleLeagueMode
 import com.lucianotoscano.pvppokego.data.SettingsRepository
+import com.lucianotoscano.pvppokego.data.TeamSetupRepository
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -63,6 +65,8 @@ fun SettingsScreen(
     onExportBattle: (Long) -> Unit,
     onToggleRecording: () -> Unit
 ) {
+    val context = LocalContext.current
+    val teamStore = remember(context) { TeamSetupRepository(context) }
     var overlay by remember { mutableStateOf(repository.overlayEnabled) }
     var auto by remember { mutableStateOf(repository.autoRecognition) }
     var assist by remember { mutableStateOf(repository.battleAssistEnabled) }
@@ -110,6 +114,15 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
+                TeamBuilderPanel(
+                    store = teamStore,
+                    league = league,
+                    autoLeagueCp = repository.lastDetectedLeagueCp,
+                    onLeagueChange = { selected ->
+                        league = selected
+                        repository.leagueMode = selected
+                    }
+                )
                 ArenaDashboard(history = history)
 
                 Card(
