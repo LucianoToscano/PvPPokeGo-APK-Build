@@ -32,8 +32,8 @@ android {
         applicationId = "com.lucianotoscano.pvppokego"
         minSdk = 29
         targetSdk = 36
-        versionCode = 35
-        versionName = "0.5.30"
+        versionCode = 36
+        versionName = "0.5.31"
     }
 
     buildFeatures {
