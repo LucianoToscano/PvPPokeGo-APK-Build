@@ -4,10 +4,10 @@ on:
   push:
     branches: ['preview/team-builder-0.5.31-20261008']
     paths:
-      - '.github/workflows/arena-tests.yml'
-      - 'app/src/main/java/com/lucianotoscano/pvppokego/arena/**'
+      - '.github/workflows/team-builder-tests.yml'
+      - 'app/src/main/java/com/lucianotoscano/pvppokego/data/TeamSetup*'
       - 'app/src/main/java/com/lucianotoscano/pvppokego/ui/**'
-      - 'app/src/test/java/com/lucianotoscano/pvppokego/arena/**'
+      - 'app/src/test/java/com/lucianotoscano/pvppokego/data/ManualTeamPolicyTest.kt'
       - 'app/build.gradle.kts'
   workflow_dispatch:
 
@@ -33,5 +33,5 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
-      - name: Compile app and run Arena unit tests
+      - name: Compile app and run manual team unit tests
         run: gradle --no-daemon --stacktrace :app:testStandardDebugUnitTest --tests 'com.lucianotoscano.pvppokego.data.ManualTeamPolicyTest'
