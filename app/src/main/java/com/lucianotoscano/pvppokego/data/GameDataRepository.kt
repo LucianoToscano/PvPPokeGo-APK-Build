@@ -111,6 +111,18 @@ class GameDataRepository(private val context: Context) {
 
     fun pokemon(nameOrId: String?): PokemonDef? = nameOrId?.let { pokemonByName[normalizeName(it)] }
 
+    /**
+     * Only rejects impossible identity+CP pairs when both the species and the
+     * offline Game Master/CPM are known. Unknown data is not an excuse to guess.
+     */
+    fun isSpeciesCpPlausible(nameOrId: String?, cp: Int?): Boolean {
+        if (cp == null) return true
+        val definition = pokemon(nameOrId)
+        if (definition == null) return cp in 10..10_000
+        return SpeciesCpPlausibilityPolicy.isPlausible(cp, definition.baseStats, cpMultipliers)
+    }
+
+
     fun pokemonForDex(dex: Int): List<PokemonDef> = pokemonByDex[dex].orEmpty()
 
     /**
