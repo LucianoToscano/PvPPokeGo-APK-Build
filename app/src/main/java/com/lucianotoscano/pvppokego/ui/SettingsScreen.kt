@@ -118,6 +118,7 @@ fun SettingsScreen(
                     store = teamStore,
                     league = league,
                     autoLeagueCp = repository.lastDetectedLeagueCp,
+                    automaticRecognitionEnabled = auto,
                     onLeagueChange = { selected ->
                         league = selected
                         repository.leagueMode = selected
