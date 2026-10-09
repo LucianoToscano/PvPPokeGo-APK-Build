@@ -91,7 +91,7 @@ internal class BattleCorrespondenceTracker {
             return Decision.INSUFFICIENT
         }
 
-        val trustedTeam = context.ownTeam.filter { it.usable }
+        val trustedTeam = context.ownTeam.filter { it.usable && it.confidence >= TEAM_ANCHOR_CONFIDENCE }
         val trustedEnemies = context.knownOpponents.filter { it.usable }
         val playerSame = player != null && sameIdentity(player, context.activePlayer)
         val enemySame = opponent != null && sameIdentity(opponent, context.activeOpponent)
@@ -151,7 +151,7 @@ internal class BattleCorrespondenceTracker {
                 !observation.switchPrompt
             ) {
                 val signature = "simultaneous:" +
-                    player.stableKey().orEmpty() + "|" + opponent.stableKey().orEmpty()
+                    player?.stableKey().orEmpty() + "|" + opponent?.stableKey().orEmpty()
                 if (!confirmSwitchCandidate(signature, nowMs)) return Decision.HOLD_CURRENT
             }
             reset()
@@ -294,6 +294,7 @@ internal class BattleCorrespondenceTracker {
 
     companion object {
         private const val MIN_IDENTITY_CONFIDENCE = 0.78f
+        private const val TEAM_ANCHOR_CONFIDENCE = 0.90f
         private const val LONG_GAP_NEW_MATCH_MS = 5_500L
         private const val MATURE_SESSION_MS = 20_000L
         private const val CANDIDATE_WINDOW_MS = 3_500L
