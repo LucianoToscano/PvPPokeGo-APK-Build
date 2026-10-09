@@ -60,4 +60,40 @@ class BattleHistorySegmentMatcherTest {
         assertEquals(51_000L, charged.elapsedMs)
         assertEquals(1L, merged.id)
     }
+
+    @Test
+    fun identityFreeSegmentsNeverMergeEvenWhenMillisecondsApart() {
+        val first = battle(1, 10_000, 20_000, player="", enemy="",
+            startedMid=false, endReason="Sem evidência de batalha por 28s")
+        val second = battle(2, 20_400, 33_000, player="", enemy="",
+            startedMid=true, endReason="Nova partida")
+        assertFalse(BattleHistorySegmentMatcher.shouldMerge(first, second))
+        assertEquals(2, BattleHistorySegmentMatcher.repair(listOf(second, first)).size)
+    }
+
+    @Test
+    fun sameLeadInTwoFastMatchesCannotMergeWithoutProvenInterruption() {
+        val ended = battle(1, 10_000, 50_000, endReason="Encerramento solicitado")
+        val rematch = battle(2, 52_000, 87_000, startedMid=true)
+        assertFalse(BattleHistorySegmentMatcher.shouldMerge(ended, rematch))
+    }
+
+    @Test
+    fun longGapMustNotMergeEvenIfBothLeadsMatch() {
+        val previous = battle(1, 10_000, 30_000, endReason="Sem evidência de batalha por 28s")
+        val next = battle(2, 45_000, 62_000, startedMid=true)
+        assertFalse(BattleHistorySegmentMatcher.shouldMerge(previous, next))
+    }
+
+    @Test
+    fun noIdentityEvenWithChargedEventIsNotProofOfSameOpponent() {
+        val before = battle(1, 10_000, 20_000, player="", enemy="",
+            events=listOf(BattleHistoryEvent(2_000, "PARTIDA", "INÍCIO")))
+        val after = battle(2, 20_300, 33_000, player="", enemy="",
+            startedMid=true, events=listOf(
+                BattleHistoryEvent(0, "INIMIGO", "CARREGADO", "Ataque carregado (não identificado)")
+            ))
+        assertFalse(BattleHistorySegmentMatcher.shouldMerge(before, after))
+    }
+
 }

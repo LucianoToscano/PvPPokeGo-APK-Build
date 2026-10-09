@@ -211,29 +211,29 @@ internal class BattleCorrespondenceTracker {
             trustedTeam.none { sameIdentity(player, it) }
         val opponentNew = trustedEnemies.none { sameIdentity(opponent, it) }
 
-        // A completely new pair seen while the battle remains visible can be
-        // simultaneous faint/switch or a repeated OCR error, not proof of a new
-        // match. A true new session needs a visibility gap before the FIRST
-        // candidate; its following frame can arrive with the gap counter reset.
+        // Candidate new match:
+        // 1) player is incompatible with the already-known team and opponent is new, or
+        // 2) after a meaningful visibility gap, both sides are new.
+        // Two unfamiliar cards can also appear during simultaneous switches.
+        // Never split a match on a CP/name pair alone while gameplay is continuous.
+        // Require a meaningful evidence gap PLUS repeated stable paired identities.
+        if (playerIncompatible && context.inactiveForMs < LONG_GAP_NEW_MATCH_MS) {
+            resetNewCandidateOnly()
+            return Decision.HOLD_CURRENT
+        }
+        val newCandidate =
+            context.inactiveForMs >= LONG_GAP_NEW_MATCH_MS && opponentNew &&
+                (playerIncompatible || !playerKnownTeam)
+
+        if (!newCandidate) {
+            resetNewCandidateOnly()
+            return if (playerIncompatible) Decision.HOLD_CURRENT else Decision.SWITCH_WITHIN_BATTLE
+        }
+
         val signature = listOf(
             player.stableKey().orEmpty(),
             opponent.stableKey().orEmpty()
         ).joinToString("|")
-        val continuingCandidate = signature == pendingNewSignature &&
-            pendingNewFirstAtMs > 0L &&
-            nowMs - pendingNewFirstAtMs in 0..CANDIDATE_WINDOW_MS
-        val gapConfirmed = context.inactiveForMs >= LONG_GAP_NEW_MATCH_MS
-        val newCandidate = opponentNew &&
-            (gapConfirmed || continuingCandidate) &&
-            (!ownTeamEstablished || playerIncompatible)
-
-        if (!newCandidate) {
-            resetNewCandidateOnly()
-            // An unlisted ally must not override the existing roster just
-            // because the adversary also changed on the same live screen.
-            return if (playerIncompatible) Decision.HOLD_CURRENT
-                   else Decision.SWITCH_WITHIN_BATTLE
-        }
 
         if (signature != pendingNewSignature || nowMs - pendingNewFirstAtMs > CANDIDATE_WINDOW_MS) {
             pendingNewSignature = signature

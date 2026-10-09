@@ -11,6 +11,7 @@ package com.lucianotoscano.pvppokego.data
  */
 internal object BattleHistorySegmentMatcher {
     private const val MAX_MERGE_GAP_MS = 20_000L
+    private const val MAX_CONFIRMED_GAP_MS = 7_000L
     private const val STRONG_SHORT_GAP_MS = 3_500L
 
     fun shouldMerge(previous: BattleHistoryEntry, next: BattleHistoryEntry): Boolean {
@@ -41,19 +42,24 @@ internal object BattleHistorySegmentMatcher {
             next.opponentName, next.opponentCp
         )
 
-        val identityContinuity = ownOverlap || enemyOverlap || exactOwn || exactEnemy
-        // Identity continuity alone is not enough: two quick rematches can start with
-        // the exact same Pokémon. Merge only when one side also carries evidence that
-        // the previous segment was interrupted or the next segment began mid-battle.
-        if (identityContinuity && (next.startedMidBattle || previousLooksFragmented)) {
-            return true
-        }
+        // Mere proximity cannot connect unknown sessions. Otherwise an empty
+        // observation ending before the next match could silently merge two battles.
+        val ownContinuity = ownOverlap || exactOwn
+        val enemyContinuity = enemyOverlap || exactEnemy
+        if (!ownContinuity && !enemyContinuity) return false
 
-        // The historical symptom was an inactivity split followed by a Charged Move at 0s.
-        // Allow only a very short gap here; this avoids merging a legitimate fast rematch.
-        return previousLooksFragmented &&
-            next.startedMidBattle &&
+        // Interruption evidence must exist on both sides: a recorder gap and a
+        // fragment explicitly observed mid-battle. Without both, a fast rematch
+        // with the same lead would be irreversibly merged.
+        if (!previousLooksFragmented || !next.startedMidBattle) return false
+
+        // Short gaps with both participants verified are safer; one-sided
+        // continuity is permitted only for an almost immediate resumed frame.
+        return if (ownContinuity && enemyContinuity) {
+            gap <= MAX_CONFIRMED_GAP_MS
+        } else {
             gap <= STRONG_SHORT_GAP_MS
+        }
     }
 
     fun merge(previous: BattleHistoryEntry, next: BattleHistoryEntry): BattleHistoryEntry {

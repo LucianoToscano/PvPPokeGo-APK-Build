@@ -62,12 +62,9 @@ class BattleHistoryRepository(context: Context) {
     }.getOrDefault(emptyList())
 
     fun loadHistory(): List<BattleHistoryEntry> {
-        val raw = loadRawHistory()
-        val repaired = BattleHistorySegmentMatcher.repair(raw)
-        if (repaired != raw) {
-            prefs.edit().putString(KEY_HISTORY, json.encodeToString(repaired)).apply()
-        }
-        return repaired
+        // Reading history must not irreversibly rewrite records or erase boundaries.
+        // Conservative reconstruction is a display-only view of the raw segments.
+        return BattleHistorySegmentMatcher.repair(loadRawHistory())
     }
 
     /**
@@ -236,7 +233,8 @@ class BattleHistoryRepository(context: Context) {
     }
 
     fun append(entry: BattleHistoryEntry) {
-        val existing = BattleHistorySegmentMatcher.repair(loadRawHistory())
+        // Retain all previously saved raw segments; only match the incoming entry.
+        val existing = loadRawHistory().sortedByDescending { it.startedAtEpochMs }
         val previous = existing.firstOrNull()
         val next = if (previous != null && BattleHistorySegmentMatcher.shouldMerge(previous, entry)) {
             listOf(BattleHistorySegmentMatcher.merge(previous, entry)) + existing.drop(1)

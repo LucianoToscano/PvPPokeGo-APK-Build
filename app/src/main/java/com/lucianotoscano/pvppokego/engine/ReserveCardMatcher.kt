@@ -36,14 +36,24 @@ internal object ReserveCardMatcher {
         activeCp: Int?,
         cardCps: List<Int?>,
         cardDexes: List<Int?> = emptyList(),
-        cardSpeciesIds: List<String?> = emptyList()
+        cardSpeciesIds: List<String?> = emptyList(),
+        activeSpeciesId: String? = null
     ): List<Match> {
         if (team.isEmpty()) return emptyList()
 
-        val active = team.firstOrNull {
+        // With duplicate names/CP or regional forms, a firstOrNull would silently
+        // choose the wrong active slot and show the active as a reserve.
+        val activeByForm = activeSpeciesId?.let { species ->
+            team.filter { !it.speciesId.isNullOrBlank() &&
+                normalize(it.speciesId) == normalize(species) &&
+                (activeCp == null || it.cp == null || it.cp == activeCp)
+            }.singleOrNull()
+        }
+        val activeByName = team.filter {
             it.name.equals(activeName, ignoreCase = true) &&
                 (activeCp == null || it.cp == null || it.cp == activeCp)
-        } ?: team.firstOrNull { it.name.equals(activeName, ignoreCase = true) }
+        }.singleOrNull()
+        val active = activeByForm ?: activeByName
 
         val reserves = team.filter { it.slot != active?.slot }
         if (reserves.isEmpty()) return emptyList()
@@ -52,9 +62,39 @@ internal object ReserveCardMatcher {
         // reserve identity we still need to match it to card #2 if its CP/image says so.
         val result = arrayOfNulls<Match>(2)
         val used = mutableSetOf<Int>()
+        val conflicted = mutableSetOf<Int>()
+
+        fun contradicts(card: Int, member: Member): Boolean {
+            val observedCp = cardCps.getOrNull(card)
+            val observedForm = cardSpeciesIds.getOrNull(card)?.takeIf(String::isNotBlank)
+            val observedDex = cardDexes.getOrNull(card)
+            return (observedCp != null && member.cp != null && observedCp != member.cp) ||
+                (observedForm != null && !member.speciesId.isNullOrBlank() &&
+                    normalize(observedForm) != normalize(member.speciesId)) ||
+                (observedDex != null && member.dex != null && observedDex != member.dex)
+        }
+
+        // Incompatible stable CP/form/dex signals must not silently become a
+        // "confirmed" reserve. Wait for a fresh card scan to resolve the conflict.
+        result.indices.forEach { card ->
+            val cp = cardCps.getOrNull(card)
+            val form = cardSpeciesIds.getOrNull(card)?.takeIf(String::isNotBlank)
+            val dex = cardDexes.getOrNull(card)
+            val cpMember = cp?.let { value -> reserves.filter { it.cp == value }.singleOrNull() }
+            val formMember = form?.let { value -> reserves.filter {
+                it.speciesId?.let { id -> normalize(id) == normalize(value) } == true
+            }.singleOrNull() }
+            val dexMatches = dex?.let { value -> reserves.filter { it.dex == value } }.orEmpty()
+            if ((cpMember != null && contradicts(card, cpMember)) ||
+                (formMember != null && contradicts(card, formMember)) ||
+                (cpMember != null && formMember != null && cpMember.slot != formMember.slot) ||
+                (dexMatches.size == 1 && contradicts(card, dexMatches.single()))
+            ) conflicted += card
+        }
 
         // CP is the strongest identity signal because it comes from the same native card.
         result.indices.forEach { cardIndex ->
+            if (cardIndex in conflicted) return@forEach
             val cp = cardCps.getOrNull(cardIndex) ?: return@forEach
             val matches = reserves.filter { it.cp == cp && it.slot !in used }
             if (matches.size == 1) {
@@ -75,7 +115,7 @@ internal object ReserveCardMatcher {
         // Form-aware visual speciesId is stronger than dex-only evidence and can
         // distinguish regional/forms that share the same National Dex.
         result.indices.forEach { cardIndex ->
-            if (result[cardIndex] != null) return@forEach
+            if (result[cardIndex] != null || cardIndex in conflicted) return@forEach
             val speciesId = cardSpeciesIds.getOrNull(cardIndex)?.takeIf(String::isNotBlank)
                 ?: return@forEach
             val matches = reserves.filter {
@@ -101,7 +141,7 @@ internal object ReserveCardMatcher {
         // Visual evidence is independent of OCR. Only a unique dex among remaining
         // reserve members may confirm a card; ambiguous forms remain unconfirmed.
         result.indices.forEach { cardIndex ->
-            if (result[cardIndex] != null) return@forEach
+            if (result[cardIndex] != null || cardIndex in conflicted) return@forEach
             val dex = cardDexes.getOrNull(cardIndex) ?: return@forEach
             val matches = reserves.filter {
                 it.slot !in used && it.dex != null && it.dex == dex
@@ -124,7 +164,7 @@ internal object ReserveCardMatcher {
         // If one reserve is confirmed, the other card is fixed by elimination.
         if (reserves.size == 2 && used.size == 1) {
             val remainingMember = reserves.first { it.slot !in used }
-            val emptyIndex = result.indexOfFirst { it == null }
+            val emptyIndex = result.indices.firstOrNull { result[it] == null && it !in conflicted } ?: -1
             if (emptyIndex >= 0) {
                 result[emptyIndex] = Match(
                     member = remainingMember,
@@ -151,7 +191,7 @@ internal object ReserveCardMatcher {
                     cardSpeciesId = cardSpeciesIds.getOrNull(index),
                     confirmed = false,
                     cardIndex = index,
-                    source = "fallback"
+                    source = if (index in conflicted) "conflict" else "fallback"
                 )
                 used += remaining.slot
             }

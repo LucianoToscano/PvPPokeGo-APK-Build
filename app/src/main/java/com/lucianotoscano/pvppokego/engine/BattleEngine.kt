@@ -368,7 +368,6 @@ class BattleEngine(private val repo: GameDataRepository) {
             val visualDef = detected.visualSpeciesId
                 ?.takeIf(String::isNotBlank)
                 ?.takeIf { (detected.visualConfidence ?: 0f) >= IdentityThresholds.ACTIVE_VISUAL_MIN_CONFIDENCE }
-                ?.takeIf { repo.isSpeciesCpPlausible(it, detected.cp) }
                 ?.let(repo::pokemon)
             val ocrDef = repo.pokemon(ocrCanonical)
             val resolvedDef = cpPinnedSlot?.speciesId?.let(repo::pokemon)
@@ -527,14 +526,13 @@ class BattleEngine(private val repo: GameDataRepository) {
     private fun resolveTeamIdentityCandidate(pokemon: DetectedPokemon): TeamIdentityCandidate? {
         val ocrCanonical = repo.canonicalPokemonName(pokemon.name) ?: pokemon.name
         val ocrDef = repo.pokemon(ocrCanonical)
-            ?.takeIf { repo.isSpeciesCpPlausible(it.speciesId, pokemon.cp) }
         val visualDef = if (
             (pokemon.visualConfidence ?: 0f) >= IdentityThresholds.TEAM_VISUAL_MIN_CONFIDENCE
         ) {
             repo.pokemonForVisualIdentity(
                 pokemon.visualSpeciesId,
                 pokemon.visualDex ?: 0
-            )?.takeIf { repo.isSpeciesCpPlausible(it.speciesId, pokemon.cp) }
+            )
         } else {
             null
         }
@@ -779,7 +777,8 @@ class BattleEngine(private val repo: GameDataRepository) {
                     name = slot.name,
                     speciesId = slot.speciesId ?: slotDefinition(slot)?.speciesId,
                     cp = slot.cp,
-                    // Do not promote a provisional OCR team member into a trusted identity.
+                    // Never promote an OCR hypothesis into a trusted team member.
+                    // Manually selected slots are already initialized with confidence 1.
                     confidence = slot.identityConfidence
                 )
             }
@@ -823,22 +822,17 @@ class BattleEngine(private val repo: GameDataRepository) {
             } else {
                 null
             }
-            val verifiedVisual = pokemon.visualSpeciesId
-                ?.takeIf { (pokemon.visualConfidence ?: 0f) >= IdentityThresholds.ACTIVE_VISUAL_MIN_CONFIDENCE }
-                ?.takeIf { repo.isSpeciesCpPlausible(it, pokemon.cp) }
             val def = pinnedOwn?.speciesId?.let(repo::pokemon)
                 ?: pinnedOwn?.let(::slotDefinition)
-                ?: verifiedVisual?.let(repo::pokemon)
-                ?: repo.pokemon(pokemon.name)?.takeIf {
-                    repo.isSpeciesCpPlausible(it.speciesId, pokemon.cp)
-                }
+                ?: pokemon.visualSpeciesId?.let(repo::pokemon)
+                ?: repo.pokemon(pokemon.name)
             val confidence = maxOf(
                 pokemon.confidence,
                 pokemon.visualConfidence ?: 0f
             ).coerceIn(0f, 1f)
             return BattleCorrespondenceTracker.Identity(
                 name = def?.speciesName ?: pinnedOwn?.name ?: pokemon.name,
-                speciesId = pinnedOwn?.speciesId ?: def?.speciesId ?: verifiedVisual,
+                speciesId = pinnedOwn?.speciesId ?: def?.speciesId ?: pokemon.visualSpeciesId,
                 cp = pokemon.cp,
                 confidence = confidence
             )
@@ -2305,6 +2299,7 @@ class BattleEngine(private val repo: GameDataRepository) {
             team = members,
             activeName = playerName,
             activeCp = playerCp,
+            activeSpeciesId = playerSpeciesId,
             cardCps = reserveCardCps.toList(),
             cardDexes = reserveCardDexes.toList(),
             cardSpeciesIds = reserveCardSpeciesIds.toList()
