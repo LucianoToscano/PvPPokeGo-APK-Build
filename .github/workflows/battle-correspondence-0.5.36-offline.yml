@@ -1,0 +1,116 @@
+name: Preview Battle Correspondence 0.5.36 Offline Atlas APK
+
+on:
+  push:
+    branches: ['preview/battle-correspondence-offline-0.5.36-20261009']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: pvppokego-0536-offline-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Checkout isolated build snapshot
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Android SDK 36 with runner SDK manager
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -1)"
+          test -x "$SDKMANAGER"
+          "$SDKMANAGER" --install "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Set up Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Verify source version and launcher resources
+        run: |
+          set -euo pipefail
+          grep -q 'versionName = "0.5.36"' app/build.gradle.kts
+          grep -q 'versionCode = 41' app/build.gradle.kts
+          test -s app/src/main/res/drawable-nodpi/pvppokego_launcher.png
+          test -s app/src/main/res/mipmap-anydpi/ic_launcher.xml
+          test -s app/src/main/res/mipmap-anydpi/ic_launcher_round.xml
+          test -s app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          test -s app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+
+      - name: Package pinned offline PvPoke data
+        run: |
+          set -euo pipefail
+          python3 tools/package_offline_pvpoke_assets.py
+          test -s app/src/main/assets/gamemaster.json
+          test -s app/src/main/assets/pvpoke_snapshot.json
+          test -s app/src/main/assets/pvpoke_LICENSE.txt
+
+      - name: Restore SHA-verified offline atlas from previous successful PvPPokeGo build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p previous-apk app/src/main/assets
+          gh run download 37974565481 -R LucianoToscano/PvPPokeGo-APK-Build \
+            --name PvPPokeGo-0.5.35-QA-debug --dir previous-apk
+          PRIOR="previous-apk/PvPPokeGo-0.5.35-QA-debug.apk"
+          test -s "$PRIOR"
+          echo "4b52dc60ea7ee29da7363a3e061bb72d44aa1377cc1a1106d25b6a54f9257172  $PRIOR" | sha256sum -c -
+          unzip -t "$PRIOR" >/dev/null
+          for f in pokemon_visual_fingerprints.json pokemon_icon_atlas.png pokemon_icon_atlas.json; do
+            unzip -p "$PRIOR" "assets/$f" > "app/src/main/assets/$f"
+            test -s "app/src/main/assets/$f"
+          done
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path("app/src/main/assets")
+          bank=json.loads((root/"pokemon_visual_fingerprints.json").read_text())
+          icons=json.loads((root/"pokemon_icon_atlas.json").read_text())
+          assert len(bank["entries"])>=500, "Visual species/fingerprints incomplete"
+          assert len(icons["entries"])>=500, "Icon atlas incomplete"
+          assert all("speciesId" in e for e in bank["entries"])
+          print("Verified offline visual bank",len(bank["entries"]),"atlas icons",len(icons["entries"]))
+          PY
+
+      - name: Unit tests and Standard debug APK
+        run: gradle --no-daemon --stacktrace :app:testStandardDebugUnitTest :app:assembleStandardDebug
+
+      - name: Verify built APK and checksum
+        run: |
+          set -euo pipefail
+          mkdir -p delivery
+          APK="app/build/outputs/apk/standard/debug/app-standard-debug.apk"
+          test -s "$APK"
+          unzip -t "$APK" > /dev/null
+          unzip -Z1 "$APK" | grep -q '^assets/gamemaster.json$'
+          unzip -Z1 "$APK" | grep -q '^assets/pokemon_icon_atlas.png$'
+          unzip -Z1 "$APK" | grep -q '^assets/pokemon_icon_atlas.json$'
+          unzip -Z1 "$APK" | grep -q 'pvppokego_launcher.png'
+          cp "$APK" delivery/PvPPokeGo-0.5.36-QA-debug.apk
+          sha256sum delivery/*.apk | tee delivery/SHA256SUMS.txt
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
+          "$APKSIGNER" verify --verbose delivery/PvPPokeGo-0.5.36-QA-debug.apk | tee delivery/signature-verification.txt
+
+      - name: Upload installable QA APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PvPPokeGo-0.5.36-QA-debug
+          path: delivery/
+          retention-days: 30
+          if-no-files-found: error
