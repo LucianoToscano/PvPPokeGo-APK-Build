@@ -569,7 +569,10 @@ class BattleHistoryRecorder(private val repository: BattleHistoryRepository) {
         details: Map<String, String> = emptyMap()
     ) {
         val a = active ?: return
-        val elapsed = (nowMs - a.startedAt).coerceAtLeast(0L)
+        val rawElapsed = (nowMs - a.startedAt).coerceAtLeast(0L)
+        // Collection is append-ordered; asynchronous OCR timestamps must not move history backwards.
+        val elapsed = maxOf(rawElapsed, a.events.lastOrNull()?.elapsedMs ?: 0L)
+        if (elapsed != rawElapsed) AppDiagnosticLog.record("history", "nonmonotonic_timestamp_clamped")
         a.events += BattleHistoryEvent(
             elapsed, actor, category, moveName, count, pokemon, confidence, source, reason, details
         )
@@ -606,6 +609,7 @@ class BattleHistoryRecorder(private val repository: BattleHistoryRepository) {
         result: String? = null
     ) {
         val a = active ?: return
+        AppDiagnosticLog.record("session", "ended:" + reason.take(90))
         result?.takeIf(String::isNotBlank)?.let { a.result = it }
         addEvent(
             actor = "PARTIDA",
@@ -620,8 +624,17 @@ class BattleHistoryRecorder(private val repository: BattleHistoryRepository) {
         )
         active = null
         repository.clearActiveCheckpoint()
-        val useful = a.playerName != null || a.opponentName != null || a.events.isNotEmpty()
-        if (!useful) return
+        // START/END diagnostics alone do not prove that a PvP match was observed.
+        // Retain name-free sessions only if a real combat event was detected.
+        val hasCombatEvidence = a.events.any { event ->
+            event.category in setOf("CARREGADO", "RÁPIDO", "ESCUDO", "TROCA")
+        }
+        val useful = !a.playerName.isNullOrBlank() ||
+            !a.opponentName.isNullOrBlank() || hasCombatEvidence
+        if (!useful) {
+            AppDiagnosticLog.record("history", "session_discarded_missing_identity_and_combat")
+            return
+        }
         repository.append(
             BattleHistoryEntry(
                 id = a.id,
