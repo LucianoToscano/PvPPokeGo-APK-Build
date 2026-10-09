@@ -88,7 +88,7 @@ class BattleHistorySegmentMatcherTest {
     @Test
     fun noIdentityEvenWithChargedEventIsNotProofOfSameOpponent() {
         val before = battle(1, 10_000, 20_000, player="", enemy="",
-            events=listOf(BattleHistoryEvent(2_000, "PARTIDA", "INÍCIO")))
+            events=listOf(BattleHistoryEvent(2_000, "SISTEMA", "PARTIDA", "INÍCIO")))
         val after = battle(2, 20_300, 33_000, player="", enemy="",
             startedMid=true, events=listOf(
                 BattleHistoryEvent(0, "INIMIGO", "CARREGADO", "Ataque carregado (não identificado)")

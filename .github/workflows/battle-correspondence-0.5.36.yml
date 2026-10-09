@@ -10,7 +10,7 @@ permissions:
 
 concurrency:
   group: pvppokego-0536-preview-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:
