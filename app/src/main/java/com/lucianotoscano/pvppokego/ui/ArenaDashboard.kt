@@ -57,6 +57,8 @@ fun ArenaDashboard(history: List<BattleHistoryEntry>) {
                 "Progresso, medalhas, ranking e campeonatos — fase inicial local.",
                 style = MaterialTheme.typography.bodySmall
             )
+            Text("Seu progresso: " + snapshot.tier + " • " + snapshot.activityXp + " XP",
+                style = MaterialTheme.typography.bodyMedium)
             OutlinedButton(
                 onClick = { expanded = !expanded },
                 modifier = Modifier.fillMaxWidth()
