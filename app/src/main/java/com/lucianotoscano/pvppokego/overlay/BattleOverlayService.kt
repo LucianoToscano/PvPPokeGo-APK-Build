@@ -44,6 +44,7 @@ import com.lucianotoscano.pvppokego.data.GameDataRepository
 import com.lucianotoscano.pvppokego.data.EnergyConfidence
 import com.lucianotoscano.pvppokego.data.MoveDef
 import com.lucianotoscano.pvppokego.data.SettingsRepository
+import com.lucianotoscano.pvppokego.data.TeamSetupRepository
 import com.lucianotoscano.pvppokego.detect.BattleFrameEventDetector
 import com.lucianotoscano.pvppokego.detect.BattleOcrDetector
 import com.lucianotoscano.pvppokego.detect.BattlePresenceTracker
@@ -69,6 +70,7 @@ import kotlin.math.min
 class BattleOverlayService : Service(), BattleOverlayView.Callbacks {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private lateinit var settingsRepo: SettingsRepository
+    private lateinit var teamSetupRepo: TeamSetupRepository
     private lateinit var gameRepo: GameDataRepository
     private lateinit var historyRepository: BattleHistoryRepository
     private lateinit var historyRecorder: BattleHistoryRecorder
@@ -128,6 +130,7 @@ class BattleOverlayService : Service(), BattleOverlayView.Callbacks {
     override fun onCreate() {
         super.onCreate()
         settingsRepo = SettingsRepository(this)
+        teamSetupRepo = TeamSetupRepository(this)
         settingsRepo.ensureTopHudSafeV4()
         settingsRepo.ensureApprovedLayoutV13()
         settingsRepo.ensureApprovedLayoutV15()
@@ -182,6 +185,7 @@ class BattleOverlayService : Service(), BattleOverlayView.Callbacks {
                 lastRecordedAdviceKey = null
                 lastReserveDiagnosticKey = null
                 engine?.resetBattle()
+                syncSelectedTeamForCurrentLeague()
                 frameDetector?.reset()
                 battleActive = false
                 presenceTracker.reset()
@@ -1163,6 +1167,7 @@ class BattleOverlayService : Service(), BattleOverlayView.Callbacks {
         lastReserveDiagnosticKey = null
         lastHistoryStateAtMs = 0L
         engine?.resetBattle()
+        syncSelectedTeamForCurrentLeague()
         frameDetector?.reset()
         presenceTracker.reset()
         battleCorrespondence.reset()
@@ -1239,6 +1244,13 @@ class BattleOverlayService : Service(), BattleOverlayView.Callbacks {
         EnergyConfidence.CONFIRMED -> "CONFIRMADO"
         EnergyConfidence.ESTIMATED -> "ESTIMADO"
         EnergyConfidence.RANGE -> "FAIXA"
+    }
+
+    /** Single source of truth shared by home controls and live OCR service. */
+    private fun syncSelectedTeamForCurrentLeague() {
+        val leagueCap = settingsRepo.configuredLeagueCp() ?: currentLeagueCp
+        val manual = teamSetupRepo.currentlySelectedTeam(leagueCap)
+        engine?.selectManualTeam(manual)
     }
 
     private fun startScanLoop() {
@@ -1333,6 +1345,7 @@ class BattleOverlayService : Service(), BattleOverlayView.Callbacks {
                             lastLeagueOcrAt = now
                         }
 
+                        syncSelectedTeamForCurrentLeague()
                         var e = engine
                         if (settingsRepo.autoRecognition && e != null) {
                             val event = frameDetector?.analyze(
