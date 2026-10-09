@@ -10,6 +10,7 @@ import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.lucianotoscano.pvppokego.data.BattleDetection
 import com.lucianotoscano.pvppokego.data.BattleLeagueTextDetector
 import com.lucianotoscano.pvppokego.data.DetectedPokemon
+import com.lucianotoscano.pvppokego.data.AppDiagnosticLog
 import com.lucianotoscano.pvppokego.data.GameDataRepository
 import com.lucianotoscano.pvppokego.data.ReserveCardEvidence
 import kotlinx.coroutines.async
@@ -93,7 +94,7 @@ class BattleOcrDetector(
             val playerJob = async { recognizeCard(playerRoi) }
             val opponentJob = async { recognizeCard(opponentRoi) }
             val battleJob = async { recognize(battleRoi) }
-            BattleDetection(playerJob.await(), opponentJob.await(), battleJob.await())
+            BattleDetection(verifiedCp(playerJob.await()), verifiedCp(opponentJob.await()), battleJob.await())
         } finally {
             playerRoi.recycle(); opponentRoi.recycle(); battleRoi.recycle()
         }
@@ -199,7 +200,7 @@ class BattleOcrDetector(
                 async {
                     val ocrJob = async { recognizeTeamSlotEvidence(textRois[index]) }
                     val visualJob = async { visualRecognizer.match(portraitRois[index]) }
-                    val detected = fuseTeamSlotEvidence(ocrJob.await(), visualJob.await())
+                    val detected = verifiedCp(fuseTeamSlotEvidence(ocrJob.await(), visualJob.await()))
                     // Cache only when this column produced real identity evidence. This prevents
                     // empty transition/battle frames from replacing a good team portrait.
                     if (detected != null && detected.confidence >= TEAM_PORTRAIT_MIN_CONFIDENCE) {
@@ -247,7 +248,7 @@ class BattleOcrDetector(
                 ) ?: return@forEachIndexed
                 val identity = repo.pokemon(name) ?: return@forEachIndexed
                 val key = identity.speciesId.lowercase() + ":" + cp
-                if (key !in paired) paired[key] = DetectedPokemon(
+                if (key !in paired && repo.isSpeciesCpPlausible(identity.speciesId, cp)) paired[key] = DetectedPokemon(
                     name = identity.speciesName, cp = cp,
                     confidence = 0.91f, rawText = raw
                 )
@@ -387,6 +388,17 @@ class BattleOcrDetector(
         return null
     }
 
+    /**
+     * Rejects demonstrably impossible species/CP pairs. Logs only an event code,
+     * never screenshot content, nicknames or any trainer identifier.
+     */
+    private fun verifiedCp(candidate: DetectedPokemon?): DetectedPokemon? {
+        if (candidate == null) return null
+        if (repo.isSpeciesCpPlausible(candidate.name, candidate.cp)) return candidate
+        AppDiagnosticLog.record("ocr", "species_cp_impossible")
+        return null
+    }
+
     private suspend fun recognizeCard(roi: Bitmap): DetectedPokemon? {
         // Try teal-text isolation first, but only accept it if the resulting text resolves
         // to a real known Pokemon. A few garbage OCR characters must not suppress the raw fallback.
@@ -410,7 +422,7 @@ class BattleOcrDetector(
             .filter { it.length in 3..30 && it.any(Char::isLetter) }
         val canonical = candidates.asSequence().mapNotNull(repo::canonicalPokemonName).firstOrNull()
             ?: return null
-        return DetectedPokemon(canonical, cp, 0.94f, raw)
+        return verifiedCp(DetectedPokemon(canonical, cp, 0.94f, raw))
     }
 
     private suspend fun recognize(bitmap: Bitmap): String {
