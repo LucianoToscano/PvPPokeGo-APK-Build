@@ -38,6 +38,7 @@ import com.lucianotoscano.pvppokego.data.ManualTeamPolicy
 import com.lucianotoscano.pvppokego.data.MoveDef
 import com.lucianotoscano.pvppokego.data.PokemonDef
 import com.lucianotoscano.pvppokego.data.TeamSetupRepository
+import com.lucianotoscano.pvppokego.data.TeamRecognitionMode
 import com.lucianotoscano.pvppokego.overlay.PokemonIconAtlas
 import android.graphics.Paint
 import android.graphics.RectF
@@ -87,10 +88,12 @@ fun TeamBuilderPanel(
     store: TeamSetupRepository,
     league: BattleLeagueMode,
     autoLeagueCp: Int,
+    automaticRecognitionEnabled: Boolean,
     onLeagueChange: (BattleLeagueMode) -> Unit
 ) {
     val context = LocalContext.current
     var saved by remember { mutableStateOf(store.load()) }
+    var recognitionMode by remember { mutableStateOf(store.recognitionMode) }
     var opened by remember { mutableStateOf(false) }
     var editingSlot by remember { mutableStateOf(0) }
     var draft by remember { mutableStateOf(saved.slots[0]) }
@@ -134,6 +137,53 @@ fun TeamBuilderPanel(
                 fontWeight = FontWeight.Bold)
             Text("Selecione, compare e prepare seus três Pokémon PvP.",
                 style = MaterialTheme.typography.bodySmall)
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = recognitionMode == TeamRecognitionMode.AUTOMATIC,
+                    onClick = {
+                        store.recognitionMode = TeamRecognitionMode.AUTOMATIC
+                        recognitionMode = TeamRecognitionMode.AUTOMATIC
+                    },
+                    label = { Text("Automático") },
+                    modifier = Modifier.weight(1f)
+                )
+                FilterChip(
+                    selected = recognitionMode == TeamRecognitionMode.MANUAL,
+                    onClick = {
+                        store.recognitionMode = TeamRecognitionMode.MANUAL
+                        recognitionMode = TeamRecognitionMode.MANUAL
+                        opened = true
+                    },
+                    label = { Text("Manual") },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            val manualReady = ManualTeamPolicy.canPrepare(saved, cpCap)
+            Text(
+                when (recognitionMode) {
+                    TeamRecognitionMode.AUTOMATIC ->
+                        if (automaticRecognitionEnabled) {
+                            "Modo automático: o sistema busca seu time pela imagem e pelos PCs."
+                        } else {
+                            "Reconhecimento automático geral está desligado nas configurações."
+                        }
+                    TeamRecognitionMode.MANUAL ->
+                        if (manualReady) {
+                            "✓ Este time está selecionado como ATUAL. " +
+                                "A imagem identifica quem está em campo e a posição das reservas."
+                        } else {
+                            "Manual selecionado: preencha e salve as três vagas dentro da liga. " +
+                                "Até lá, a leitura automática continua disponível."
+                        }
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = if (recognitionMode == TeamRecognitionMode.MANUAL && manualReady) {
+                    MaterialTheme.colorScheme.primary
+                } else MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 saved.slots.forEachIndexed { i, pokemon ->
                     OutlinedButton(
