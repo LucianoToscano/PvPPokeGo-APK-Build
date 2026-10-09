@@ -505,6 +505,8 @@ class BattleHistoryRecorder(private val repository: BattleHistoryRepository) {
     }
 
     fun recordDiagnostic(label: String, detail: String, nowMs: Long = System.currentTimeMillis()) {
+        // Code-only breadcrumb; never write arbitrary OCR text or trainer names to Logcat.
+        AppDiagnosticLog.record("engine", "diagnostic-event")
         addEvent("APP", "DIAGNÓSTICO", label, 1, nowMs, null, null, "engine", detail)
     }
 

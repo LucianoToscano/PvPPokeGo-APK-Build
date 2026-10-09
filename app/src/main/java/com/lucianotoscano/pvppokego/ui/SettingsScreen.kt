@@ -19,6 +19,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,6 +29,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -40,6 +42,7 @@ import com.lucianotoscano.pvppokego.data.BattleHistoryRepository
 import com.lucianotoscano.pvppokego.data.BattleLeagueMode
 import com.lucianotoscano.pvppokego.data.SettingsRepository
 import com.lucianotoscano.pvppokego.data.TeamSetupRepository
+import com.lucianotoscano.pvppokego.data.TrainerPreferencesRepository
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -67,6 +70,7 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val teamStore = remember(context) { TeamSetupRepository(context) }
+    val trainerStore = remember(context) { TrainerPreferencesRepository(context) }
     var overlay by remember { mutableStateOf(repository.overlayEnabled) }
     var auto by remember { mutableStateOf(repository.autoRecognition) }
     var assist by remember { mutableStateOf(repository.battleAssistEnabled) }
@@ -79,6 +83,7 @@ fun SettingsScreen(
     var counter by remember { mutableStateOf(repository.showChargedCounter) }
     var progress by remember { mutableStateOf(repository.showEnergyProgress) }
     var hpAssist by remember { mutableStateOf(repository.showHpAssist) }
+    var hpRemaining by remember { mutableStateOf(repository.showHpRemainingForecast) }
     var timer by remember { mutableStateOf(repository.showSwitchTimer) }
     var debug by remember { mutableStateOf(repository.debugMode) }
     var edit by remember { mutableStateOf(repository.editMode) }
@@ -125,6 +130,7 @@ fun SettingsScreen(
                     }
                 )
                 ArenaDashboard(history = history)
+                TrainerSettingsPanel(trainerStore = trainerStore, teamStore = teamStore)
 
                 Card(
                     modifier = Modifier
@@ -357,6 +363,18 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (hpAssist) {
+                    Toggle("Mostrar HP restante previsto", hpRemaining) {
+                        hpRemaining = it
+                        repository.showHpRemainingForecast = it
+                    }
+                    Text(
+                        "Exibe quanto HP poderá sobrar sem escudo, com intervalo e aviso de nocaute. " +
+                            "Só aparece com leitura de HP e estimativa de dano disponíveis.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 Toggle("Timer de troca", timer) {
                     timer = it
                     repository.showSwitchTimer = it
@@ -427,7 +445,7 @@ fun SettingsScreen(
                     onClick = onExportDiagnostics,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Exportar diagnóstico (.zip)")
+                    Text("Exportar diagnóstico + Logcat do app (.zip)")
                 }
                 Text(
                     "Inclui configurações, posições, histórico, confiança/origem dos eventos e dados do aparelho.",
@@ -974,11 +992,35 @@ private fun Toggle(
     value: Boolean,
     onChange: (Boolean) -> Unit
 ) {
-    Row(
-        Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
+    // OFF must be visibly grey rather than looking like a white enabled control.
+    // Keep the whole item readable in both light and dark Android themes.
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = if (value) MaterialTheme.colorScheme.primary.copy(alpha = .12f)
+                else Color(0xFF78818E).copy(alpha = .20f)
     ) {
-        Text(label, modifier = Modifier.weight(1f))
-        Switch(checked = value, onCheckedChange = onChange)
+        Row(
+            Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                label,
+                modifier = Modifier.weight(1f),
+                color = if (value) MaterialTheme.colorScheme.onSurface
+                        else MaterialTheme.colorScheme.onSurface.copy(alpha = .56f)
+            )
+            Switch(
+                checked = value,
+                onCheckedChange = onChange,
+                colors = SwitchDefaults.colors(
+                    checkedTrackColor = Color(0xFF078EB1),
+                    checkedThumbColor = Color.White,
+                    uncheckedTrackColor = Color(0xFF747B86),
+                    uncheckedThumbColor = Color(0xFFD7DADF),
+                    uncheckedBorderColor = Color(0xFF747B86)
+                )
+            )
+        }
     }
 }

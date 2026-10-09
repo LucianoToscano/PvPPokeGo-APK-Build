@@ -345,6 +345,12 @@ class QuickOverlayMenu(
                 settings.showHpAssist = !settings.showHpAssist
                 changed()
             }
+            if (settings.showHpAssist) {
+                addRow(parent, "HP+", "HP restante após golpe", settings.showHpRemainingForecast) {
+                    settings.showHpRemainingForecast = !settings.showHpRemainingForecast
+                    changed()
+                }
+            }
             addRow(parent, "↻", "Timer de troca", settings.showSwitchTimer) {
                 settings.showSwitchTimer = !settings.showSwitchTimer
                 changed()
@@ -411,12 +417,16 @@ class QuickOverlayMenu(
         val button = TextView(context).apply {
             text = item.icon
             gravity = Gravity.CENTER
-            setTextColor(Color.WHITE)
+            setTextColor(if (item.enabled == false) Color.rgb(161, 168, 176) else Color.WHITE)
             textSize = if (item.icon.length > 1) 12f else 17f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             setShadowLayer(1.6f, 0f, 1f, Color.BLACK)
             background = squareIconBackground(item.enabled)
-            contentDescription = item.label
+            contentDescription = item.label + when (item.enabled) {
+                true -> " ativado"
+                false -> " desativado"
+                null -> ""
+            }
             isClickable = true
             setOnClickListener { item.onTap() }
         }
@@ -456,14 +466,14 @@ class QuickOverlayMenu(
         row.addView(TextView(context).apply {
             text = icon
             gravity = Gravity.CENTER
-            setTextColor(Color.WHITE)
+            setTextColor(if (enabled == false) Color.rgb(166, 174, 184) else Color.WHITE)
             textSize = if (icon.length > 1) 12f else 16f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             background = squareIconBackground(enabled, danger)
         }, LinearLayout.LayoutParams(dp(34), dp(34)).apply { marginEnd = dp(9) })
         row.addView(TextView(context).apply {
             text = label
-            setTextColor(Color.WHITE)
+            setTextColor(if (enabled == false) Color.rgb(161, 168, 176) else Color.WHITE)
             textSize = 13.5f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             setShadowLayer(4f, 0f, 1.5f, Color.BLACK)
@@ -645,9 +655,9 @@ class QuickOverlayMenu(
         setColor(
             when {
                 danger -> Color.argb(235, 118, 92, 92)
-                enabled == true -> Color.argb(238, 112, 118, 113)
-                enabled == false -> Color.argb(218, 132, 136, 133)
-                else -> Color.argb(230, 122, 126, 123)
+                enabled == true -> Color.argb(238, 23, 139, 160)
+                enabled == false -> Color.argb(225, 74, 78, 86)
+                else -> Color.argb(220, 92, 101, 112)
             }
         )
         setStroke(dp(1), Color.argb(125, 245, 245, 245))

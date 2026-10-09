@@ -227,10 +227,12 @@ class BattleEngine(private val repo: GameDataRepository) {
      * Changes take effect without touching the enemy, damage or capture pipeline.
      */
     fun selectManualTeam(roster: ManualTeamRoster?) {
-        val selected = roster?.let(ManualTeamPolicy::sanitize)
-            ?.takeIf { ManualTeamPolicy.canPrepare(it, null) }
-            ?.slots
-            ?.map { it.speciesId to it.cp!! }
+        val validRoster = roster?.let(ManualTeamPolicy::sanitize)
+            ?.takeIf { candidate ->
+                ManualTeamPolicy.canPrepare(candidate, null) &&
+                    candidate.slots.all { repo.pokemon(it.speciesId) != null }
+            }
+        val selected = validRoster?.slots?.map { it.speciesId to it.cp!! }
         if (selected == selectedManualTeam) return
 
         val previous = selectedManualTeam
@@ -247,7 +249,7 @@ class BattleEngine(private val repo: GameDataRepository) {
             return
         }
 
-        val valid = roster!!.slots
+        val valid = validRoster!!.slots
         valid.forEachIndexed { index, member ->
             val def = repo.pokemon(member.speciesId)
             val name = def?.speciesName ?: member.speciesName
@@ -810,7 +812,11 @@ class BattleEngine(private val repo: GameDataRepository) {
 
             // For our side, a CP uniquely pinned to one already-known team slot is
             // stronger than a generic top-card OCR name and preserves regional/forms.
-            val pinnedOwn = if (ownPlayer && pokemon.cp != null) {
+            val pinnedOwn = if (ownPlayer && selectedManualTeam != null) {
+                // Keep continuity protection consistent with onDetection: a manual CP
+                // must never override a contradictory confident visual identity.
+                manualSlotForPlayer(pokemon) ?: return null
+            } else if (ownPlayer && pokemon.cp != null) {
                 ownTeamSlots.filter { it.cp == pokemon.cp }.singleOrNull()
             } else {
                 null

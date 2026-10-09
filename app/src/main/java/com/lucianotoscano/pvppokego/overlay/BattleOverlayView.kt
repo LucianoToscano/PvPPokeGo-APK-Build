@@ -420,11 +420,30 @@ class BattleOverlayView(
         if (!settings.showHpAssist) return
         val forecast = state.incomingDamagePreview ?: return
         val hp = state.playerHpRatio?.coerceIn(0f, 1f) ?: return
-        val yFraction = state.playerHpBarYFraction?.takeIf { it in 0f..1f } ?: return
         if (
             state.captureHealth == com.lucianotoscano.pvppokego.data.CaptureHealth.STALE ||
             state.captureHealth == com.lucianotoscano.pvppokego.data.CaptureHealth.PAUSED
         ) return
+
+        // If the native HP ROI is temporarily unavailable, show a compact estimate near
+        // the matchup icon instead of silently suppressing every remaining-HP forecast.
+        val yFraction = state.playerHpBarYFraction?.takeIf { it in 0f..1f }
+        if (yFraction == null) {
+            if (settings.showHpRemainingForecast && settings.showHudText && settings.showCurrentIndicator) {
+                val (posX, posY) = topPos(BLOCK_PLAYER_MATCHUP, PLAYER_MATCHUP_X)
+                val hpLow = (hp * 100f - forecast.maxPercent).coerceIn(0f, 100f)
+                val hpHigh = (hp * 100f - forecast.minPercent).coerceIn(0f, 100f)
+                paint.color = hudColor(Color.rgb(255, 207, 124), .95f)
+                paint.textAlign = Paint.Align.CENTER
+                paint.textSize = 8.4f * u() * settings.blockScale(BLOCK_PLAYER_MATCHUP)
+                paint.typeface = Typeface.DEFAULT_BOLD
+                paint.setShadowLayer(3f, 0f, 1f, Color.BLACK)
+                canvas.drawText("SEM ESC: HP ~%.0f-%.0f%%".format(hpLow, hpHigh),
+                    rx(posX), ry(posY) + 43f * u() * settings.blockScale(BLOCK_PLAYER_MATCHUP), paint)
+                paint.clearShadowLayer()
+            }
+            return
+        }
 
         // Same player HP ROI used by BattleFrameEventDetector. Draw above the native
         // bar so the preview never hides Pokemon GO current HP.
@@ -460,8 +479,9 @@ class BattleOverlayView(
             }
             val phase = if (predictiveOnly) "PREVIEW" else "IMPACTO"
             val noShield = "SEM ESC -" + "%.0f".format(forecast.minPercent) + "-" +
-                "%.0f".format(forecast.maxPercent) + "% →" + "%.0f".format(remainMin) + "-" +
-                "%.0f".format(remainMax) + "%"
+                "%.0f".format(forecast.maxPercent) + "%" +
+                (if (settings.showHpRemainingForecast) " • HP ~" + "%.0f".format(remainMin) + "-" +
+                    "%.0f".format(remainMax) + "%" else "")
             val withShield = when {
                 !state.ownShieldsKnown -> "COM ESC se disponível"
                 state.ownShieldsRemaining > 0 -> "COM ESC protegido"
@@ -472,13 +492,15 @@ class BattleOverlayView(
                 remainMin <= 0.5f -> " • KO POSSÍVEL"
                 else -> ""
             }
-            val label = phase + " • " + noShield + " • " + withShield + ko + " • " + source
+            val label = phase + " • " + noShield + ko + " • " + source
             paint.color = hudColor(Color.WHITE, .96f)
             paint.textAlign = Paint.Align.LEFT
             paint.textSize = 8.8f*u()
             paint.typeface = Typeface.DEFAULT_BOLD
             paint.setShadowLayer(3f, 0f, 1.2f, Color.BLACK)
-            canvas.drawText(label, left, y - 4f*u(), paint)
+            canvas.drawText(label, left, y - 13f*u(), paint)
+            paint.textSize = 8.2f*u()
+            canvas.drawText(withShield, left, y - 4f*u(), paint)
             paint.clearShadowLayer()
         }
     }

@@ -34,6 +34,7 @@ import com.lucianotoscano.pvppokego.capture.AccessibilityScreenCapture
 import com.lucianotoscano.pvppokego.capture.ScreenCapture
 import com.lucianotoscano.pvppokego.capture.ScreenFrameRecorder
 import com.lucianotoscano.pvppokego.data.BattleLeagueMode
+import com.lucianotoscano.pvppokego.data.AppDiagnosticLog
 import com.lucianotoscano.pvppokego.data.BattleHistoryRecorder
 import com.lucianotoscano.pvppokego.data.BattleUiState
 import com.lucianotoscano.pvppokego.data.CaptureHealth
@@ -129,6 +130,8 @@ class BattleOverlayService : Service(), BattleOverlayView.Callbacks {
 
     override fun onCreate() {
         super.onCreate()
+        AppDiagnosticLog.initialize(this)
+        AppDiagnosticLog.record("overlay", "service-created")
         settingsRepo = SettingsRepository(this)
         teamSetupRepo = TeamSetupRepository(this)
         settingsRepo.ensureTopHudSafeV4()
@@ -152,7 +155,10 @@ class BattleOverlayService : Service(), BattleOverlayView.Callbacks {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_STOP -> { historyRecorder.finish(); stopSelf(); return START_NOT_STICKY }
+            ACTION_STOP -> {
+                AppDiagnosticLog.record("overlay", "user-stop")
+                historyRecorder.finish(); stopSelf(); return START_NOT_STICKY
+            }
             ACTION_START_ACCESSIBILITY_CAPTURE -> {
                 if (BuildConfig.RECORDER_COMPAT) {
                     startAccessibilityCaptureMode()
@@ -181,6 +187,7 @@ class BattleOverlayService : Service(), BattleOverlayView.Callbacks {
                 return START_STICKY
             }
             ACTION_RESET -> {
+                AppDiagnosticLog.record("overlay", "manual-battle-reset")
                 historyRecorder.finish()
                 lastRecordedAdviceKey = null
                 lastReserveDiagnosticKey = null
@@ -1149,6 +1156,9 @@ class BattleOverlayService : Service(), BattleOverlayView.Callbacks {
         val hadSession = historyRecorder.hasActiveSession()
         historyRecorder.setBattleActive(isActive, currentLeagueCp, nowMs)
         val hasSession = historyRecorder.hasActiveSession()
+        if (hadSession != hasSession) {
+            AppDiagnosticLog.record("session", if (hasSession) "started" else "ended")
+        }
 
         if (!hadSession && hasSession && startedMidBattleEvidence) {
             historyRecorder.markStartedMidBattle()

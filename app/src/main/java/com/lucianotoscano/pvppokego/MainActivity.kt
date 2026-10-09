@@ -19,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.lucianotoscano.pvppokego.capture.AccessibilityScreenCapture
+import com.lucianotoscano.pvppokego.data.AppDiagnosticLog
 import com.lucianotoscano.pvppokego.data.BattleHistoryRepository
 import com.lucianotoscano.pvppokego.data.SettingsRepository
 import com.lucianotoscano.pvppokego.overlay.BattleOverlayService
@@ -67,6 +68,33 @@ class MainActivity : ComponentActivity() {
                         }
                         entry("settings.json", settingsRepo.exportBackupJson())
                         entry("battle_history.json", historyRepo.exportJson())
+                        entry("runtime-events.log", AppDiagnosticLog.exportRuntimeEvents())
+                        entry("logcat-app.txt", AppDiagnosticLog.exportOwnLogcat())
+                        // Non-destructive validation: never relabel unknown outcomes or
+                        // merge sessions here. Report suspicious timelines by position only.
+                        entry("integrity-warnings.txt", buildString {
+                            val sessions = historyRepo.loadHistory()
+                            appendLine("PvPPokeGo: auditoria de integridade (sem alterar histórico)")
+                            appendLine("Sessões: ${sessions.size}")
+                            sessions.forEachIndexed { index, session ->
+                                val inversions = session.events.zipWithNext().count { (a, b) ->
+                                    b.elapsedMs < a.elapsedMs
+                                }
+                                val seconds = (session.endedAtEpochMs - session.startedAtEpochMs)
+                                    .coerceAtLeast(0L) / 1000
+                                if (inversions > 0 || session.result.isNullOrBlank() ||
+                                    (seconds < 5 && session.result != null)
+                                ) {
+                                    appendLine(
+                                        "Sessão ${index + 1}: ${session.events.size} eventos, " +
+                                            "duração ${seconds}s, inversões ${inversions}, " +
+                                            "resultado ${if (session.result.isNullOrBlank()) "indeterminado" else "registrado"}"
+                                    )
+                                }
+                            }
+                            appendLine("Este relatório aponta anomalias; não comprova erro de OCR.")
+                        })
+
                         entry(
                             "device.txt",
                             buildString {
@@ -84,7 +112,9 @@ class MainActivity : ComponentActivity() {
                         entry(
                             "README.txt",
                             "Diagnóstico PvPPokeGo " + BuildConfig.VERSION_NAME + "\n" +
-                                "Inclui configurações, posições, histórico de batalhas, fontes/confiança dos eventos e dados do aparelho.\n"
+                                "Inclui configurações, posições, histórico, registro interno e Logcat limitado ao próprio processo.\n" +
+                                "Android pode bloquear Logcat; runtime-events.log continua disponível.\n" +
+                                "Não contém Logcat de outros apps/sistema. Revise dados pessoais antes de compartilhar.\n"
                         )
                     }
                 } ?: error("Não foi possível criar o ZIP")
@@ -175,6 +205,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AppDiagnosticLog.initialize(this)
+        AppDiagnosticLog.record("activity", "on-create")
         settingsRepo = SettingsRepository(this)
         historyRepo = BattleHistoryRepository(this)
         overlayGranted = Settings.canDrawOverlays(this)
@@ -309,6 +341,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun exportDiagnostics() {
+        AppDiagnosticLog.record("export", "diagnostics-requested")
         exportDiagnosticsLauncher.launch("PvPPokeGo-" + BuildConfig.VERSION_NAME + "-diagnostico.zip")
     }
 
