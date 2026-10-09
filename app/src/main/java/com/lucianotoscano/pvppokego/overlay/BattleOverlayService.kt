@@ -1504,7 +1504,16 @@ class BattleOverlayService : Service(), BattleOverlayView.Callbacks {
                         }
 
                         if (settingsRepo.autoRecognition && now - lastOcrAt >= OCR_INTERVAL_MS) {
-                            val d = detector?.detect(frame)
+                            val candidate = detector?.detect(frame)
+                            // A conflicting visual/OCR label below the matcher's confidence
+                            // floor must never bypass the gate by going straight into onDetection.
+                            val d = candidate?.copy(
+                                player = candidate.player?.takeIf { it.confidence >= 0.78f },
+                                opponent = candidate.opponent?.takeIf { it.confidence >= 0.78f }
+                            )
+                            if (candidate != null &&
+                                (d?.player != candidate.player || d?.opponent != candidate.opponent)
+                            ) AppDiagnosticLog.record("ocr", "identity_low_confidence_held")
                             e = engine
                             if (d != null && e != null) {
                                 if (settingsRepo.leagueMode == BattleLeagueMode.AUTO) {
