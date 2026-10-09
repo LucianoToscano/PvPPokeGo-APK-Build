@@ -1,0 +1,37 @@
+name: Team Builder 0.5.31 Kotlin unit tests
+
+on:
+  push:
+    branches: ['preview/team-builder-0.5.31-20261008']
+    paths:
+      - '.github/workflows/arena-tests.yml'
+      - 'app/src/main/java/com/lucianotoscano/pvppokego/arena/**'
+      - 'app/src/main/java/com/lucianotoscano/pvppokego/ui/**'
+      - 'app/src/test/java/com/lucianotoscano/pvppokego/arena/**'
+      - 'app/build.gradle.kts'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android SDK 36
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -1)"
+          "$SDKMANAGER" --install "platforms;android-36" "build-tools;36.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Compile app and run Arena unit tests
+        run: gradle --no-daemon --stacktrace :app:testStandardDebugUnitTest --tests 'com.lucianotoscano.pvppokego.data.ManualTeamPolicyTest'
