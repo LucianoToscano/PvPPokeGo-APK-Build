@@ -36,25 +36,25 @@ class BattleCorrespondenceTrackerTest {
     }
 
     @Test
-    fun ownKnownPokemonAndNewEnemyAreSwitches() {
+    fun simultaneousKnownAllyAndNewEnemyRequireTwoFrames() {
         val tracker = BattleCorrespondenceTracker()
-        val decision = tracker.observe(
-            BattleCorrespondenceTracker.Context(
-                activePlayer = team[0],
-                activeOpponent = id("Sneasel", 1465, "sneasel"),
-                ownTeam = team,
-                knownOpponents = listOf(id("Sneasel", 1465, "sneasel")),
-                inactiveForMs = 400,
-                sessionAgeMs = 30_000
-            ),
-            BattleCorrespondenceTracker.Observation(
-                player = team[2],
-                opponent = id("Magcargo", 1486, "magcargo"),
-                pairedCards = true
-            ),
-            20_000
+        val context = BattleCorrespondenceTracker.Context(
+            activePlayer = team[0],
+            activeOpponent = id("Sneasel", 1465, "sneasel"),
+            ownTeam = team,
+            knownOpponents = listOf(id("Sneasel", 1465, "sneasel")),
+            inactiveForMs = 400,
+            sessionAgeMs = 30_000
         )
-        assertEquals(BattleCorrespondenceTracker.Decision.SWITCH_WITHIN_BATTLE, decision)
+        val observation = BattleCorrespondenceTracker.Observation(
+            player = team[2],
+            opponent = id("Magcargo", 1486, "magcargo"),
+            pairedCards = true
+        )
+        assertEquals(BattleCorrespondenceTracker.Decision.HOLD_CURRENT,
+            tracker.observe(context, observation, 20_000))
+        assertEquals(BattleCorrespondenceTracker.Decision.SWITCH_WITHIN_BATTLE,
+            tracker.observe(context, observation, 20_650))
     }
 
     @Test
