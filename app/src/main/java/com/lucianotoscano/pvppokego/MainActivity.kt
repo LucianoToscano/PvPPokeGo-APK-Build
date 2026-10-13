@@ -23,7 +23,7 @@ import com.lucianotoscano.pvppokego.data.AppDiagnosticLog
 import com.lucianotoscano.pvppokego.data.BattleHistoryRepository
 import com.lucianotoscano.pvppokego.data.SettingsRepository
 import com.lucianotoscano.pvppokego.overlay.BattleOverlayService
-import com.lucianotoscano.pvppokego.ui.SettingsScreen
+import com.lucianotoscano.pvppokego.ui.AppShell
 
 class MainActivity : ComponentActivity() {
     private lateinit var settingsRepo: SettingsRepository
@@ -216,7 +216,7 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            SettingsScreen(
+            AppShell(
                 repository = settingsRepo,
                 historyRepository = historyRepo,
                 historyRevision = historyRevision,
