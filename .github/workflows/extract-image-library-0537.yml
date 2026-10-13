@@ -1,0 +1,108 @@
+name: Extract PvPPokeGo 0.5.37 APK image library
+
+on:
+  push:
+    branches:
+      - assets/biblioteca-imagens-0537-20261013
+    paths:
+      - .github/workflows/extract-image-library-0537.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  extract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download the verified original APK, do not rebuild app
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p previous
+          gh run download 38467721349 -R LucianoToscano/PvPPokeGo-APK-Build \
+            --name PvPPokeGo-0.5.37-QA-debug --dir previous
+          APK=previous/PvPPokeGo-0.5.37-QA-debug.apk
+          test -s "$APK"
+          echo "0aa431a86f66d3cd6392330444fd3f307ef39378a28be2872aee6ea21360710d  $APK" | sha256sum -c -
+          unzip -t "$APK" >/dev/null
+      - name: Install Pillow for lossless sprite cropping
+        run: python3 -m pip install --disable-pip-version-check pillow
+      - name: Export every PNG and the offline atlas into organized subfolders
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import zipfile, io, json, csv, hashlib, pathlib, shutil
+          from PIL import Image
+          apk=pathlib.Path("previous/PvPPokeGo-0.5.37-QA-debug.apk")
+          root=pathlib.Path("delivery/PvPPokeGo_Imagens_Extraidas_APK_0537")
+          (root/"00_INDICE").mkdir(parents=True,exist_ok=True)
+          with zipfile.ZipFile(apk) as z:
+              rasters=sorted(n for n in z.namelist() if n.lower().endswith((".png",".jpg",".jpeg",".webp",".gif",".bmp",".avif")))
+              assert len(rasters)==194,(len(rasters),rasters[:10])
+              for name in rasters:
+                  if name=="assets/pokemon_icon_atlas.png":
+                      target=root/"02_Sprites_Pokemon/Atlas_Original/pokemon_icon_atlas.png"
+                  elif name=="res/drawable-nodpi-v4/pvppokego_launcher.png":
+                      target=root/"01_Launcher/pvppokego_launcher_EXTRAIDO_DO_APK.png"
+                  else:
+                      target=root/"03_Raster_Android_Incluso_no_APK"/name
+                  target.parent.mkdir(parents=True,exist_ok=True)
+                  target.write_bytes(z.read(name))
+              atlas_index=root/"02_Sprites_Pokemon/Atlas_Original/pokemon_icon_atlas.json"
+              atlas_index.write_bytes(z.read("assets/pokemon_icon_atlas.json"))
+              j=json.loads(z.read("assets/pokemon_icon_atlas.json"))
+              img=Image.open(io.BytesIO(z.read("assets/pokemon_icon_atlas.png"))).convert("RGBA")
+              assert len(j["entries"])==1167
+              records=[]
+              for e in j["entries"]:
+                  species=e["speciesId"]
+                  assert all(c.isascii() and (c.isalnum() or c in "-_") for c in species)
+                  rel=pathlib.Path("02_Sprites_Pokemon/Sprites_Individuais")/species[0].upper()/(species+".png")
+                  target=root/rel
+                  target.parent.mkdir(parents=True,exist_ok=True)
+                  x,y,w,h=[e[k] for k in ("x","y","w","h")]
+                  assert w>0 and h>0 and 0<=x and 0<=y and x+w<=img.width and y+h<=img.height
+                  img.crop((x,y,x+w,y+h)).save(target,optimize=True)
+                  records.append({"speciesId":species,"dex":e.get("dex"),"png":str(rel),"w":w,"h":h})
+              for name in [
+                "res/drawable/ic_stat_pvppokego.xml",
+                "res/drawable/pvppokego_launcher_foreground.xml",
+                "res/mipmap-anydpi-v26/ic_launcher.xml",
+                "res/mipmap-anydpi-v26/ic_launcher_round.xml",
+              ]:
+                  if name in z.namelist():
+                      target=root/"04_Vetores_Android_Compilados"/pathlib.Path(name).name
+                      target.parent.mkdir(parents=True,exist_ok=True)
+                      target.write_bytes(z.read(name))
+          with (root/"00_INDICE/indice_pokemon.csv").open("w",encoding="utf-8-sig",newline="") as f:
+              writer=csv.DictWriter(f,fieldnames=["speciesId","dex","png","w","h"])
+              writer.writeheader()
+              writer.writerows(records)
+          (root/"00_INDICE/LEIA-ME.txt").write_text(
+              "PvPPokeGo 0.5.37: 194 imagens raster reais do APK e 1167 recortes de sprites do atlas PNG 48x48.\n"
+              "Logo e atlas mantidos em bytes originais, sem alterações.\n"
+              "Outros PNGs são componentes genéricos Android por densidade de tela.\n"
+              "Olho/cadeado e HUD podem ser desenhos Kotlin Canvas, não sprites PNG embutidos.\n"
+              "Os dois backgrounds originais enviados pelo jogador não estão embutidos no APK 0.5.37.\n"
+              "Esses backgrounds estão armazenados à parte na pasta de imagens oficial do Drive.\n"
+              "Não confundir mockups ou fundos externos com arquivos extraídos do APK.\n",
+              encoding="utf-8"
+          )
+          assert len(list((root/"02_Sprites_Pokemon/Sprites_Individuais").rglob("*.png")))==1167
+          assert len(list((root/"03_Raster_Android_Incluso_no_APK").rglob("*.*")))==192
+          print("Extracted",len(rasters),"APK bitmaps and",len(records),"individual Pokemon sprites.")
+          PY
+      - name: Produce integrity report
+        run: |
+          find delivery -type f -print0 | sort -z | xargs -0 sha256sum > delivery/SHA256-ARQUIVOS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PvPPokeGo-0.5.37-Todas-Imagens-APK
+          path: delivery/
+          retention-days: 30
+          if-no-files-found: error
