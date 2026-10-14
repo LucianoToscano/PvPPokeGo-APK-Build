@@ -1,0 +1,38 @@
+name: Build standalone Pokésearch Overlay APK
+on:
+  push:
+    branches: [pokesearch-overlay-alpha]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android SDK
+        run: |
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager | sort -V | tail -1)"
+          "$SDKMANAGER" --install "platforms;android-36" "build-tools;36.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Assemble installable debug APK
+        run: gradle --no-daemon --stacktrace :app:assembleDebug
+      - name: Validate APK
+        run: |
+          test -s app/build/outputs/apk/debug/app-debug.apk
+          unzip -t app/build/outputs/apk/debug/app-debug.apk >/dev/null
+          mkdir -p delivery
+          cp app/build/outputs/apk/debug/app-debug.apk delivery/PokeSearch-Overlay-0.1-alpha.apk
+          sha256sum delivery/*.apk > delivery/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PokeSearch-Overlay-0.1-alpha-APK
+          path: delivery/
+          retention-days: 30

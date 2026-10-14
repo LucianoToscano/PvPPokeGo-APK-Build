@@ -1,0 +1,78 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><style>
+*{box-sizing:border-box}html,body{margin:0;background:transparent;color:#fff;font-family:Roboto,Arial,sans-serif;font-size:12px;overflow:hidden}
+button{font:inherit;cursor:pointer;touch-action:manipulation}
+#panel{background:rgba(11,15,22,.43);border:1px solid #ffffff33;border-radius:17px;box-shadow:0 6px 26px #0006;overflow:hidden;width:100%}
+#top{display:flex;align-items:center;gap:3px;padding:7px 6px;touch-action:none;user-select:none}
+#top button{border:1px solid #ffffff26;background:#131821c7;border-radius:8px;padding:7px 6px;min-width:27px;color:#f8f8fc;font-size:11px;font-weight:700}
+#top button.active{background:#ed2848e0;border-color:#ed2848}#top button.shOn{color:#ffe4a0;border-color:#d8ae50;background:#48351abd}
+#top .push{flex:1}#status{padding:1px 10px 5px;color:#e6e6f0c2;font-size:10px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+#items{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;padding:5px 9px 9px;max-height:130px;overflow:auto}
+#items.rows{display:block;max-height:190px}
+.poke{background:#11151b80;border:1px solid #ffffff24;border-radius:10px;color:#fff;display:flex;align-items:center;justify-content:center;flex-direction:column;min-height:49px;padding:2px}
+.poke.sel{border-color:#ff4d69}.poke img{width:34px;height:34px;object-fit:contain}.poke .tag{font-size:9px;font-weight:700}
+.poke.row{flex-direction:row;justify-content:flex-start;margin-bottom:4px;gap:5px;min-height:40px;text-align:left}.text{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tiny{font-size:10px;color:#d8dbe2}
+#details{margin:2px 8px 8px;padding:8px 9px;border-radius:11px;background:#0a0d13dc;border:1px solid #ffffff28;max-height:230px;overflow:auto;font-size:11px}
+#details .head{display:flex;justify-content:space-between;gap:6px;align-items:center}#details .data{line-height:1.5;margin-top:5px;color:#dde1e8}
+#details button{background:#ed2948dc;border:0;color:white;width:100%;border-radius:9px;padding:8px;font-weight:bold;margin-top:6px}
+#empty{padding:6px 10px 11px;font-size:11px;color:#d7d8e3bc}
+#bubble{display:none;align-items:center;justify-content:center;width:54px;height:54px;border-radius:50%;border:1px solid #ffffff55;background:#181a21b5;box-shadow:0 2px 12px #0006;flex-direction:column;touch-action:none}#bubble b{font-size:19px}#bubble small{font-size:10px;color:#ff8393}
+</style></head><body>
+<div id="panel">
+ <div id="top">
+  <button id="iv" class="active" onclick="Native.select('iv')">100%</button>
+  <button id="gl" onclick="Native.select('gl')">GL#1</button>
+  <button id="sh" title="Shiny" onclick="Native.shiny()">✨</button>
+  <span class="push"></span>
+  <button title="Atualizar" onclick="Native.refresh()">↻</button>
+  <button id="view" title="Ícones / lista" onclick="Native.compact()">▦</button>
+  <button title="Minimizar" onclick="Native.minimize()">−</button>
+  <button title="Fechar" onclick="Native.close()">×</button>
+ </div>
+ <div id="status">Aguardando o site...</div><div id="items"></div><div id="details" style="display:none"></div>
+ <div id="empty">Faça login no PoGoCoordinates para carregar os resultados.</div>
+</div>
+<div id="bubble" onclick="Native.restore()"><b>◉</b><small id="count">0</small></div>
+<script>
+let cards=[],mode='iv',shiny=true,compact=true,selected=-1,info='';
+const safe=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const sprite=x=>/^https:\/\//.test(x.image||'')?'<img src="'+safe(x.image)+'">':'<span style="font-size:27px">◉</span>';
+function draw(){
+ document.querySelector('#iv').classList.toggle('active',mode==='iv');
+ document.querySelector('#gl').classList.toggle('active',mode==='gl');
+ document.querySelector('#sh').classList.toggle('shOn',shiny);
+ document.querySelector('#view').textContent=compact?'▦':'▤';
+ document.querySelector('#status').textContent=info;
+ document.querySelector('#count').textContent=cards.length;
+ const holder=document.querySelector('#items');
+ holder.className=compact?'':'rows';
+ holder.innerHTML=cards.map((x,i)=>'<button class="poke '+(compact?'':'row ')+(i===selected?'sel':'')+'" onclick="select('+i+')">'+sprite(x)+(compact?'<span class="tag">'+(mode==='iv'?'100%':'R1')+(x.shiny?' ✨':'')+'</span>':'<span class="text"><b>'+safe(x.name)+(x.shiny?' ✨':'')+'</b><br><span class="tiny">PC '+safe(x.cp)+' · Nv '+safe(x.level)+' · ⏱ '+safe(x.despawn)+'</span></span>')+'</button>').join('');
+ document.querySelector('#empty').style.display=cards.length?'none':'block';
+ const detail=document.querySelector('#details'),x=cards[selected];
+ if(!x){detail.style.display='none';}
+ else {
+  detail.style.display='block';
+  detail.innerHTML='<div class="head"><b>'+safe(x.name)+(x.shiny?' ✨':'')+'</b><small>'+safe(x.number)+' · '+safe(x.gender)+' · '+safe(x.size)+'</small></div>'+
+   '<div class="data">PC '+safe(x.cp)+' · Nv '+safe(x.level)+' · '+safe(x.iv||'Rank 1 GL')+
+   '<br>'+safe(x.moves)+'<br>📍 '+safe(x.location)+'<br>⏱ '+safe(x.despawn)+'</div>'+
+   '<button onclick="Native.coords('+selected+')">⌖ Get coords</button>';
+ }
+ setTimeout(()=>{if(document.querySelector('#panel').style.display!=='none')Native.resize(Math.ceil(document.querySelector('#panel').getBoundingClientRect().height)+2)},50);
+}
+function select(i){selected=selected===i?-1:i;draw();}
+window.onNativeData=function(items,text,m,s,c){
+ cards=Array.isArray(items)?items.slice(0,10):[];info=String(text||'');mode=m;shiny=!!s;compact=!!c;
+ if(selected>=cards.length)selected=-1;draw();
+};
+window.setMinimized=function(value){
+ document.querySelector('#panel').style.display=value?'none':'block';
+ document.querySelector('#bubble').style.display=value?'flex':'none';if(!value)draw();
+};
+let dragX=0,dragY=0;
+function drag(el){
+ el.addEventListener('touchstart',e=>{if(e.target.closest('button'))return;dragX=e.touches[0].clientX;dragY=e.touches[0].clientY},{passive:true});
+ el.addEventListener('touchmove',e=>{if(e.target.closest('button'))return;const t=e.touches[0];const dx=Math.round(t.clientX-dragX),dy=Math.round(t.clientY-dragY);
+ if(Math.abs(dx)+Math.abs(dy)>1){Native.move(dx,dy);dragX=t.clientX;dragY=t.clientY;e.preventDefault();}},{passive:false});
+}
+drag(document.querySelector('#top'));drag(document.querySelector('#bubble'));draw();
+</script></body></html>
