@@ -642,7 +642,7 @@ public class OverlayService extends Service {
         });}
         @JavascriptInterface public void changeSpriteSize(int direction){handler.post(()->{
             if(direction!=1&&direction!=-1)return;
-            int[] sizes={32,40,45,50,60},at=2;
+            int[] sizes={32,40,45,50,60}; int at=2;
             for(int j=0;j<sizes.length;j++)if(sizes[j]==spriteSize)at=j;
             int size=sizes[Math.max(0,Math.min(sizes.length-1,at+direction))];
             if(size==spriteSize)return;
