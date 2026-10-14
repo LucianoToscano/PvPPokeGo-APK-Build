@@ -26,7 +26,7 @@ public final class PixSupport {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(a,18),dp(a,8),dp(a,18),dp(a,10));
         TextView intro=new TextView(a);
-        intro.setText("Gostou do Pokésearch? A contribuição é totalmente voluntária, de qualquer valor.");
+        intro.setText("Gostou do aplicativo? Apoie o desenvolvedor com um café ☕. É opcional: você escolhe qualquer valor.");
         intro.setTextColor(Color.WHITE);intro.setTextSize(14);
         root.addView(intro);
         byte[] data=Base64.decode(QR_PNG,Base64.DEFAULT);
@@ -43,7 +43,7 @@ public final class PixSupport {
         receiver.setText("Destinatário do Pix:\nLUCIANO CARECHA SALDANHA\n\nConfira o nome antes de confirmar no banco.");
         receiver.setTextColor(Color.LTGRAY);receiver.setGravity(Gravity.CENTER_HORIZONTAL);
         root.addView(receiver);
-        new AlertDialog.Builder(a).setTitle("❤️ Contribuir via Pix")
+        new AlertDialog.Builder(a).setTitle("☕ Apoiar o desenvolvedor")
             .setView(root)
             .setPositiveButton("⧉ Copiar Pix",(dialog,which)->{
                 ClipboardManager clipboard=(ClipboardManager)a.getSystemService(Context.CLIPBOARD_SERVICE);

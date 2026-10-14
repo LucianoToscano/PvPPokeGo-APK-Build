@@ -41,15 +41,14 @@ public class MainActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(Color.rgb(17,18,22));
         TextView help=new TextView(this);
-        help.setText("POKÉSEARCH OVERLAY · ALPHA 0.28\nFaça login AQUI no PoGoCoordinates, mesmo que já tenha entrado pelo navegador.\nToque em INICIAR OVERLAY. Toque na engrenagem para abrir ou fechar o menu; segure e arraste a engrenagem para mover.");
+        help.setText("POKÉSEARCH OVERLAY · ALPHA 0.29\nFaça login AQUI no PoGoCoordinates, mesmo que já tenha entrado pelo navegador.\nToque em INICIAR OVERLAY. Toque na engrenagem para abrir ou fechar o menu; segure e arraste a engrenagem para mover.");
         help.setTextColor(Color.WHITE);help.setTextSize(13);help.setPadding(16,16,16,12);
         root.addView(help);
         Button start=new Button(this);start.setText("INICIAR OVERLAY");root.addView(start);
         start.setOnClickListener(v->startOverlay());
-        buildPreferences(root);
         buildWatchButton(root);
         Button pix=new Button(this);
-        pix.setText("❤️ Apoiar o aplicativo · Pix (qualquer valor)");
+        pix.setText("☕ Gostou do aplicativo? Apoie com um café!");
         root.addView(pix);
         pix.setOnClickListener(v->PixSupport.show(this));
         website=new WebView(this);
@@ -70,42 +69,45 @@ public class MainActivity extends Activity {
         website.loadUrl("https://pogocoordinates.com/search");
         if("com.lucianotoscano.pokesearchoverlay.EDIT_WATCH_LIST".equals(getIntent().getAction()))
             root.post(this::showWatchDialog);
+        if("com.lucianotoscano.pokesearchoverlay.OPEN_SETTINGS".equals(getIntent().getAction()))
+            root.post(this::showPreferencesDialog);
     }
     @Override protected void onNewIntent(Intent intent){
         super.onNewIntent(intent);
         setIntent(intent);
         if("com.lucianotoscano.pokesearchoverlay.EDIT_WATCH_LIST".equals(intent.getAction()))
             getWindow().getDecorView().post(this::showWatchDialog);
+        if("com.lucianotoscano.pokesearchoverlay.OPEN_SETTINGS".equals(intent.getAction()))
+            getWindow().getDecorView().post(this::showPreferencesDialog);
     }
     private int d(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
-    private void buildPreferences(LinearLayout parent){
+    private void showPreferencesDialog(){
+        ScrollView view=buildPreferences();
+        new AlertDialog.Builder(this)
+            .setTitle("⚙ Configurações e diagnóstico")
+            .setView(view)
+            .setPositiveButton("Concluído",null)
+            .show();
+    }
+    private ScrollView buildPreferences(){
         SharedPreferences prefs=getSharedPreferences("prefs",0);
-        Button toggle=new Button(this);
-        toggle.setText("⚙ Preferências, histórico e diagnóstico");
-        parent.addView(toggle);
         ScrollView sc=new ScrollView(this);
         sc.setFillViewport(false);
         LinearLayout body=new LinearLayout(this);
-        body.setOrientation(LinearLayout.VERTICAL);body.setPadding(d(12),0,d(12),d(6));
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(d(14),d(8),d(14),d(12));
         sc.addView(body);
-        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,0);
-        parent.addView(sc,lp);
-        toggle.setOnClickListener(v->{
-            boolean expand=sc.getLayoutParams().height==0;
-            LinearLayout.LayoutParams pp=(LinearLayout.LayoutParams)sc.getLayoutParams();
-            pp.height=expand?d(232):0;sc.setLayoutParams(pp);
-        });
         android.widget.TextView subtitle=new android.widget.TextView(this);
-        subtitle.setText("Tamanho do Pokémon · alterações aplicadas ao iniciar o overlay");
+        subtitle.setText("Tamanho do Pokémon · altere também por P / M / G no overlay");
         subtitle.setTextColor(Color.LTGRAY);body.addView(subtitle);
         Spinner sizes=new Spinner(this);
-        String[] sizeLabels={"32 × 32","40 × 40","45 × 45","50 × 50","60 × 60"};
+        String[] sizeLabels={"P · 35 × 35","M · 45 × 45","G · 55 × 55"};
         sizes.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,sizeLabels));
         int current=prefs.getInt("spriteSize",45);
-        sizes.setSelection(current==32?0:current==40?1:current==50?3:current==60?4:2);
+        sizes.setSelection(current==35?0:current==55?2:1);
         sizes.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){
             @Override public void onItemSelected(android.widget.AdapterView<?> p,android.view.View v,int pos,long id){
-                prefs.edit().putInt("spriteSize",new int[]{32,40,45,50,60}[pos]).apply();
+                prefs.edit().putInt("spriteSize",new int[]{35,45,55}[pos]).apply();
             }
             @Override public void onNothingSelected(android.widget.AdapterView<?> p){}
         });
@@ -127,7 +129,6 @@ public class MainActivity extends Activity {
         });
         body.addView(order);
         settingCheckbox(body,prefs,"showTimers","Mostrar tempo individual de despawn",false);
-        settingCheckbox(body,prefs,"markBorders","Bordas discretas por tipo de filtro",true);
         settingCheckbox(body,prefs,"alerts","Alertar novos Pokémon (notificação)",false);
         Button history=new Button(this);history.setText("Ver histórico recente");
         body.addView(history);
@@ -161,6 +162,7 @@ public class MainActivity extends Activity {
             new AlertDialog.Builder(this).setTitle("Diagnóstico do Pokésearch")
                 .setMessage(message).setPositiveButton("OK",null).show();
         });
+        return sc;
     }
     private void buildWatchButton(LinearLayout root){
         Button watch=new Button(this);

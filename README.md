@@ -1,7 +1,11 @@
-# Pokésearch Overlay v0.28 Alpha
+# Pokésearch Overlay 0.29 Alpha
 
-**Apoie via Pix:** botão voluntário na tela principal abre QR Pix estático gerado do código enviado pelo criador. Código validado por CRC-16/CCITT e aceito como Pix copia-e-cola, sem valor fixo. O usuário confere o destinatário antes de confirmar; nenhuma doação é obrigatória e o app não processa pagamentos.
-
-**Alertas monitorados estritos:** notificação sonora só quando for NOVO Pokémon da lista de procurados **e** tiver IV 15/15/15 (100%), ou rank explicitamente 1 no modo Grande Liga/Ultra Liga. Os resultados PvP também são filtrados para rank1. No modo PvP, exige confirmação dos controles Rank 1 e da liga selecionada no site antes de enviar qualquer alerta. Se IV/rank/liga não puder ser confirmado, não avisa — pode deixar resultados legítimos sem alerta em caso de mudança de DOM do PoGoCoordinates. A lista de procurados monitora resultados do modo atualmente selecionado; não busca todos os três modos ao mesmo tempo.
-
-**Auditoria:** QR validado e recompilação em GitHub Actions. Permanecem tamanho padrão 45x45, menu [+][-][◷][🔔], alerta e horários, refresh manual, por despawn e 5 min. Limitações: funcionamento do site, login e notificação sonora requerem teste real em Android com sessão autenticada.
+- Botão de preferências/histórico/diagnóstico retirado da tela inicial. Agora ficam dentro do menu flutuante ⚙: toque no novo ícone para abrir o aplicativo direto no diálogo de configurações (inclui histórico e diagnóstico).
+- Sprites sem bordas ou contornos, mantendo tamanho médio 45×45 CSS px em linhas de 46 px.
+- Um único controle P/M/G, com P=35×35, M=45×45 e G=55×55; toca para alternar, preserva no app e feedback via Toast.
+- 100% verde para modo IV100; Grande Liga #1 usa emblema de Pokébola azul + #1; Ultra Liga #1 emblema dourado + #1.
+- Botão fechar × vermelho. Botões minimizar e fechar ficam sempre na ponta mais distante da engrenagem, independente se submenu abre à esquerda ou à direita.
+- Sino e relógio são ícones vetoriais do mesmo estilo e tamanho; sino em cor normal quando ativo e opacidade reduzida quando pausado; relógio se ilumina quando ativado.
+- Texto do Pix ajustado para convite voluntário 'Gostou do aplicativo? Apoie com um café!' e valor livre.
+- Mantém lista de procurados, validação de IV100/rank1, atualização manual/por despawn/5min e integração PoGoCoordinates.
+- APK valida compilação no GitHub Actions; gestos e visualização ainda dependem de teste no aparelho.

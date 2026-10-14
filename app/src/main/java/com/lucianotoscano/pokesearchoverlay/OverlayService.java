@@ -43,7 +43,7 @@ public class OverlayService extends Service {
     private boolean menuExpanded=false,menuLeft=false,minimized=false,shiny=true,loaded=false,panelLoaded=false,detailLoaded=false,stopped=false;
     private int height=72,detailHeight=225,requestGeneration=0,selected=-1,intervalMinutes=5;
     private boolean searchInProgress=false;
-    private boolean showTimers=false,markBorders=true,alerts=false;
+    private boolean showTimers=false,alerts=false;
     private String sort="despawn";
     private long lastAlertAt=0L;
     private final java.util.Set<String> knownSpawns=new java.util.HashSet<>();
@@ -129,7 +129,7 @@ public class OverlayService extends Service {
     }
     private void update(){
         js(panel,panelLoaded,"window.onNativeData("+results+","+JSONObject.quote(status)+","+
-                JSONObject.quote(mode)+","+shiny+","+rowDp()+","+intervalMinutes+","+spriteSize+","+showTimers+","+markBorders+","+WatchAlerts.enabled(this)+")");
+                JSONObject.quote(mode)+","+shiny+","+rowDp()+","+intervalMinutes+","+spriteSize+","+showTimers+",false,"+WatchAlerts.enabled(this)+")");
         if(selected>=0)showDetails(selected);
     }
     private void status(String s){
@@ -657,14 +657,13 @@ public class OverlayService extends Service {
             getSharedPreferences("prefs",0).edit().putString("mode",mode).apply();
             results="[]";hideDetails();update();refresh();
         });}
-        @JavascriptInterface public void changeSpriteSize(int direction){handler.post(()->{
-            if(direction!=1&&direction!=-1)return;
-            int[] sizes={32,40,45,50,60}; int at=2;
+        @JavascriptInterface public void cycleSpriteSize(){handler.post(()->{
+            int[] sizes={35,45,55};
+            int at=1;
             for(int j=0;j<sizes.length;j++)if(sizes[j]==spriteSize)at=j;
-            int size=sizes[Math.max(0,Math.min(sizes.length-1,at+direction))];
-            if(size==spriteSize)return;
-            boolean keepMenu=menuExpanded;
-            if(keepMenu)menu(false);
+            int size=sizes[(at+1)%sizes.length];
+            boolean wasExpanded=menuExpanded;
+            if(wasExpanded)menu(false);
             spriteSize=size;
             getSharedPreferences("prefs",0).edit().putInt("spriteSize",size).apply();
             if(params!=null){
@@ -676,8 +675,9 @@ public class OverlayService extends Service {
                 updateWindow();
             }
             update();
-            if(keepMenu)menu(true);
-            android.widget.Toast.makeText(OverlayService.this,"Sprites: "+size+" × "+size,
+            if(wasExpanded)menu(true);
+            android.widget.Toast.makeText(OverlayService.this,
+                new String[]{"P","M","G"}[(at+1)%sizes.length]+" · "+size+" × "+size,
                 android.widget.Toast.LENGTH_SHORT).show();
         });}
         @JavascriptInterface public void toggleTimers(){handler.post(()->{
@@ -693,6 +693,13 @@ public class OverlayService extends Service {
             android.widget.Toast.makeText(OverlayService.this,
                 enabled?"Alertas de procurados ativados":"Alertas de procurados pausados",
                 android.widget.Toast.LENGTH_SHORT).show();
+        });}
+        @JavascriptInterface public void openSettings(){handler.post(()->{
+            Intent intent=new Intent(OverlayService.this,MainActivity.class);
+            intent.setAction("com.lucianotoscano.pokesearchoverlay.OPEN_SETTINGS");
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|
+                Intent.FLAG_ACTIVITY_SINGLE_TOP|Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            try{startActivity(intent);}catch(Exception ignored){}
         });}
         @JavascriptInterface public void openWatchList(){handler.post(()->{
             Intent i=new Intent(OverlayService.this,MainActivity.class);
@@ -774,9 +781,8 @@ public class OverlayService extends Service {
            intervalMinutes!=10&&intervalMinutes!=15&&intervalMinutes!=20)intervalMinutes=5;
         schedulePeriodic();
         spriteSize=pref.getInt("spriteSize",45);
-        if(spriteSize!=32&&spriteSize!=40&&spriteSize!=45&&spriteSize!=50&&spriteSize!=60)spriteSize=45;
+        if(spriteSize!=35&&spriteSize!=45&&spriteSize!=55)spriteSize=45;
         showTimers=pref.getBoolean("showTimers",false);
-        markBorders=pref.getBoolean("markBorders",true);
         alerts=pref.getBoolean("alerts",false);
         sort=pref.getString("sort","despawn");
         if(params!=null&&!menuExpanded){

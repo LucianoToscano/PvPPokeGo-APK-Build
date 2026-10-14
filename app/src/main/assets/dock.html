@@ -14,21 +14,25 @@ button{font:inherit;color:inherit;border:0;cursor:pointer;touch-action:manipulat
 body.menu-left #shell{margin-left:282px}
 body.menu-left #menu{left:0}
 #controls{width:278px;display:grid;grid-template-columns:40px 27px 22px 25px 23px 23px 26px 27px 23px 23px;gap:2px;padding:0;margin:0;align-items:center}
+body.menu-left #controls{direction:rtl}
+#controls button{direction:ltr}
 #controls button{height:25px;width:100%;min-width:0;padding:0;background:#151b26e6;border:1px solid #ffffff23;border-radius:5px;font-size:10px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:center;white-space:nowrap}
 #controls button.active{background:#db2d4bdb}
+#controls #cycle.ivOn{background:#136b3bdf;border-color:#69df97a6;color:#e9fff2}
+#controls #close{background:#971f2add;border-color:#ff738baa;color:white}
+#controls button svg{width:16px;height:16px;display:block;pointer-events:none}
+#controls #cycle{font-size:11px;font-weight:800}
+#controls #cycle .league{display:inline-flex;gap:2px;align-items:center;justify-content:center}
+#controls #cycle .league svg{width:16px;height:16px}
+#controls #size{font-size:12px!important;font-weight:800}
 #controls button.shinyOn{color:#ffe5a0;background:#564627e9}
 #actions{display:contents}
 #actions button{font-size:16px;font-weight:500}
 #period{font-size:11px!important}
 #watch.watchOn,#clock.timerOn{background:#76601ccf;border-color:#ffe5a04d;color:#ffe5a0}
-#sizeplus,#sizeminus{font-size:16px!important}
 #spawns{width:var(--dock);display:flex;flex-direction:column;align-items:center;gap:0;padding:0;margin:0}
 .spawn{width:var(--dock);height:var(--row);position:relative;min-height:var(--row);display:flex;align-items:center;justify-content:center;margin:0;padding:0;background:transparent;border:0;border-radius:4px}
-.spawn.iv.marked{outline:1px solid #f05269bb;outline-offset:-1px}
-.spawn.gl.marked{outline:1px solid #5b9df3b3;outline-offset:-1px}
-.spawn.ul.marked{outline:1px solid #b88cf3b3;outline-offset:-1px}
-.spawn.shiny.marked{outline:1px solid #e8bb3fda;outline-offset:-1px}
-.spawn.active{outline:2px solid #ff718bdb;outline-offset:-2px}
+.spawn.active .sprite{filter:drop-shadow(0 0 3px #ffffff77)}
 .timer{position:absolute;right:0;bottom:0;padding:1px 2px;border-radius:3px;background:#111924c4;color:#fff;font-size:8px;line-height:10px;pointer-events:none;min-width:23px;text-align:center}
 .spawn.expired{opacity:.38}
 .sprite{display:block;width:min(var(--sprite),calc(var(--row) - 1px));height:min(var(--sprite),calc(var(--row) - 1px));object-fit:contain;flex-shrink:0;pointer-events:none;filter:drop-shadow(0 1px 1px #0006)}
@@ -40,25 +44,24 @@ body.menu-left #menu{left:0}
 <div id="shell">
  <button id="gear" title="Configurações" aria-label="Abrir opções" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96c-.5-.38-1.03-.69-1.64-.93L14.36 2.8a.49.49 0 0 0-.49-.4h-3.84a.49.49 0 0 0-.49.4l-.36 2.53c-.6.24-1.15.56-1.64.93l-2.39-.96a.49.49 0 0 0-.61.22L2.62 8.84a.5.5 0 0 0 .12.64l2.02 1.58c-.04.3-.07.62-.07.94s.03.64.08.94L2.74 14.5a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.61.22l2.39-.96c.49.38 1.04.7 1.64.93l.36 2.53c.04.24.24.4.49.4h3.84c.25 0 .45-.16.49-.4l.36-2.53c.6-.24 1.15-.55 1.64-.93l2.39.96c.23.09.49 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.02-1.56ZM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"/></svg></button>
  <div id="menu"><div id="controls">
-  <button id="cycle" title="Alternar IV100, GL#1 e UL#1" onclick="Native.cycleMode()">IV100</button>
+  <button id="cycle" title="Alternar: IV100 / Grande Liga #1 / Ultra Liga #1" onclick="Native.cycleMode()">100%</button>
   <button id="sh" title="Ativar ou desativar Shiny" onclick="Native.shiny()">✨</button>
-  <button id="period" title="Atualização automática a cada 5 minutos; toque para alterar" onclick="Native.cycleInterval()">5</button>
+  <button id="period" title="Intervalo de atualização · toque para alterar" onclick="Native.cycleInterval()">5</button>
   <div id="actions">
     <button title="Atualizar agora" onclick="Native.refresh()">↻</button>
-    <button id="sizeplus" title="Aumentar Pokémon" onclick="Native.changeSpriteSize(1)">+</button>
-    <button id="sizeminus" title="Diminuir Pokémon" onclick="Native.changeSpriteSize(-1)">−</button>
-    <button id="clock" title="Exibir ou ocultar os despawns" onclick="Native.toggleTimers()">◷</button>
-    <button id="watch" title="Toque: ligar/desligar alertas · Segure: editar a lista" onclick="watchTap()" oncontextmenu="return false">🔔</button>
-    <button title="Recolher apenas à engrenagem" onclick="Native.minimize()">▁</button>
-    <button title="Fechar" onclick="Native.close()">×</button>
-  </div>
- </div></div>
+    <button id="size" title="Tamanho do sprite: P/M/G · toque para alternar" onclick="Native.cycleSpriteSize()">M</button>
+    <button id="clock" title="Mostrar ou ocultar tempo individual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
+    <button id="watch" title="Toque: ligar/desligar alertas · Segure: editar lista de procurados" onclick="watchTap()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg></button>
+    <button id="settings" title="Preferências, histórico e diagnóstico" onclick="Native.openSettings()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l1.7 2.3 2.7-.5.8 2.7 2.7.8-.5 2.7L22 12l-2.6 1.7.5 2.7-2.7.8-.8 2.7-2.7-.5L12 22l-1.7-2.6-2.7.5-.8-2.7-2.7-.8.5-2.7L2 12l2.6-2.0-.5-2.7 2.7-.8.8-2.7 2.7.5Z"/><circle cx="12" cy="12" r="3"/></svg></button>
+    <button id="minimize" title="Recolher apenas à engrenagem" onclick="Native.minimize()">▁</button>
+    <button id="close" title="Fechar overlay" onclick="Native.close()">×</button>
+  </div> </div></div>
  <div id="spawns"></div>
  <div id="empty">Aguardando busca</div>
 </div>
 <div id="bubble" role="button" aria-label="Restaurar overlay"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96c-.5-.38-1.03-.69-1.64-.93L14.36 2.8a.49.49 0 0 0-.49-.4h-3.84a.49.49 0 0 0-.49.4l-.36 2.53c-.6.24-1.15.56-1.64.93l-2.39-.96a.49.49 0 0 0-.61.22L2.62 8.84a.5.5 0 0 0 .12.64l2.02 1.58c-.04.3-.07.62-.07.94s.03.64.08.94L2.74 14.5a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.61.22l2.39-.96c.49.38 1.04.7 1.64.93l.36 2.53c.04.24.24.4.49.4h3.84c.25 0 .45-.16.49-.4l.36-2.53c.6-.24 1.15-.55 1.64-.93l2.39.96c.23.09.49 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.02-1.56ZM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"/></svg></div>
 <script>
-let cards=[],active=-1,mode="iv",shiny=true,status="",row=46,menuOpen=false,period=5,spriteSize=45,showTimers=false,markBorders=true,watchEnabled=true;
+let cards=[],active=-1,mode="iv",shiny=true,status="",row=46,menuOpen=false,period=5,spriteSize=45,showTimers=false,watchEnabled=true;
 function setMenuOpen(open,side){
  menuOpen=!!open;
  document.getElementById("menu").classList.toggle("open",menuOpen);
@@ -94,19 +97,29 @@ function draw(){
  document.documentElement.style.setProperty("--row",row+"px");
  document.documentElement.style.setProperty("--sprite",spriteSize+"px");
  document.documentElement.style.setProperty("--dock",(spriteSize+8)+"px");
- const cy=document.getElementById("cycle");cy.textContent=mode==="gl"?"GL#1":mode==="ul"?"UL#1":"IV100";cy.classList.add("active");
+ const cy=document.getElementById("cycle");
+ if(mode==="iv"){cy.textContent="100%";cy.classList.add("ivOn");cy.title="IV100 · 15/15/15";}
+ else{
+   const gl=mode==="gl",color=gl?"#2f8ed8":"#d8ad43";
+   cy.innerHTML='<span class="league"><svg viewBox="0 0 24 24" aria-hidden="true">'+
+   '<circle cx="12" cy="12" r="10.5" fill="'+color+'" stroke="#fff" stroke-width="1.2"/>'+
+   '<path d="M3 12h18" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="#fff" stroke="'+color+'" stroke-width="1.5"/></svg>#1</span>';
+   cy.classList.remove("ivOn");
+   cy.title=gl?"Grande Liga · ranking #1":"Ultra Liga · ranking #1";
+ }
+ document.getElementById("size").textContent=spriteSize<=35?"P":spriteSize>=55?"G":"M";
  document.getElementById("sh").classList.toggle("shinyOn",shiny);
  document.getElementById("clock").classList.toggle("timerOn",showTimers);
  const w=document.getElementById("watch");
  w.classList.toggle("watchOn",watchEnabled);
- w.textContent=watchEnabled?"🔔":"🔕";
+ w.style.opacity=watchEnabled?"1":"0.5";
  const p=document.getElementById("period");p.textContent=String(period);p.title="Atualização a cada "+period+" min · toque para alterar";
  document.getElementById("spawns").innerHTML=cards.map((c,i)=>{
   const label=[c.name,c.ivPercent?c.ivPercent+"%":"IV não disponível",c.iv,c.rank?"Rank "+c.rank:""].filter(Boolean).join(" · ");
   const icon=/^(https:\/\/|data:image\/(?:png|webp|gif|jpeg);base64,)/i.test(c.image||"")?'<img class="sprite" src="'+esc(c.image)+'" alt="" loading="eager">':'<span class="fallback">◉</span>';
   const kind=(c.shiny?"shiny":mode),deadline=Number(c.expiresAtMs)||0;
   const badge=showTimers&&deadline?'<span class="timer" data-deadline="'+deadline+'"></span>':"";
-  return '<button title="'+esc(label)+'" aria-label="'+esc(label)+'" class="spawn '+esc(kind)+(markBorders?' marked':'')+(active===i?" active":"")+'" data-index="'+i+'" onclick="spriteClick('+i+')" oncontextmenu="return false">'+icon+badge+'</button>';
+  return '<button title="'+esc(label)+'" aria-label="'+esc(label)+'" class="spawn '+esc(kind)+(active===i?" active":"")+'" data-index="'+i+'" onclick="spriteClick('+i+')" oncontextmenu="return false">'+icon+badge+'</button>';
  }).join("");
  attachLongPress();
  updateTimers();
@@ -128,7 +141,7 @@ function updateTimers(){
 setInterval(updateTimers,1000);
 window.onNativeData=(a,s,m,shi,r,interval,sprite,timers,borders,watch)=>{
  cards=Array.isArray(a)?a.slice(0,10):[];
- mode=m;status=String(s||"");shiny=!!shi;row=Number(r)||46;period=Number(interval)||5;spriteSize=Number(sprite)||45;showTimers=!!timers;markBorders=borders!==false;watchEnabled=watch!==false;
+ mode=m;status=String(s||"");shiny=!!shi;row=Number(r)||46;period=Number(interval)||5;spriteSize=Number(sprite)||45;showTimers=!!timers;watchEnabled=watch!==false;
  if(active>=cards.length)active=-1;
  draw();
 };
@@ -141,5 +154,6 @@ window.setMinimized=value=>{
  if(!value)draw();
 };
 attachWatchHold();
+document.getElementById("clock").addEventListener("click",()=>Native.toggleTimers());
 draw();
 </script></body></html>
