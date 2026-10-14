@@ -395,6 +395,12 @@ public class OverlayService extends Service {
         });
     }
     @Override public int onStartCommand(Intent i,int flags,int id){
+        if(i!=null&&"com.lucianotoscano.pokesearchoverlay.REFRESH_LOGIN".equals(i.getAction())){
+            ++requestGeneration;results="[]";hideDetails();loaded=false;
+            status("Atualizando sessão após login...");
+            CookieManager.getInstance().flush();
+            if(website!=null)website.loadUrl("https://pogocoordinates.com/search");
+        }
         mode=getSharedPreferences("prefs",0).getString("mode",mode);
         shiny=getSharedPreferences("prefs",0).getBoolean("shiny",shiny);
         update();

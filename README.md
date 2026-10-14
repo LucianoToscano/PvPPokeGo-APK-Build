@@ -1,3 +1,3 @@
-# Pokésearch Overlay 0.13 Alpha
+# Pokésearch Overlay v0.14 Alpha
 
-Toque abre ficha, pressionar sprite por 580 ms consulta e copia coordenadas automaticamente quando disponíveis. Fundo 75% transparente. Atualização a cada cinco minutos e contador local de despawn. WebView salva cookies e dados de sessão dentro da instalação (site pode expirar login); builds atuais usam assinatura debug temporária e reinstalações podem apagar login. Integração direta/API oficial ainda não confirmada.
+Na página interna, entradas vazias de Raw IV recebem 15/15/15 e Top ranking recebe 1 quando a aba correspondente está visível. Valores já preenchidos pelo usuário não são substituídos. Ao iniciar overlay após login, o serviço limpa os resultados antigos, fecha a ficha, atualiza os cookies e recarrega o PoGoCoordinates antes de pesquisar. Shiny só é tentado após a página autenticada carregar. Mantém sobreposição 75% transparente, atualização a cada 5 min e gesto de toque longo para copiar coordenadas.
