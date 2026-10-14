@@ -1,3 +1,3 @@
-# Pokésearch Overlay 0.16 Alpha
+# Pokésearch Overlay v0.17
 
-Menu recolhível com engrenagem acima dos sprites. Ao tocar na engrenagem, mostra controles antigos em duas colunas; ao fechar, somente engrenagem, alça e até dez sprites na coluna de 52dp. Tamanho da janela ajusta automaticamente. Mantidos toque longo para copiar, cronômetro, transparência 75% e atualização a cada cinco minutos.
+Um botão alterna IV100 → GL#1 → UL#1 → IV100. Na modalidade UL procura configurar PvP Top ranking 1 e Ultra League; GL procura Great League. Pesquisa e leitura do site continuam experimentais, e os rankings exibidos dependem de resultados corretamente filtrados pelo PoGoCoordinates. Outras funções anteriores preservadas.

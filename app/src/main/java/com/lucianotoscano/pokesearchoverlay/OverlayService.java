@@ -350,8 +350,13 @@ public class OverlayService extends Service {
         });}
 
         @JavascriptInterface public void select(String s){handler.post(()->{
-            if(!s.equals("iv")&&!s.equals("gl"))return;
+            if(!s.equals("iv")&&!s.equals("gl")&&!s.equals("ul"))return;
             mode=s;getSharedPreferences("prefs",0).edit().putString("mode",s).apply();
+            results="[]";hideDetails();update();refresh();
+        });}
+        @JavascriptInterface public void cycleMode(){handler.post(()->{
+            mode=mode.equals("iv")?"gl":mode.equals("gl")?"ul":"iv";
+            getSharedPreferences("prefs",0).edit().putString("mode",mode).apply();
             results="[]";hideDetails();update();refresh();
         });}
         @JavascriptInterface public void shiny(){handler.post(()->{

@@ -25,8 +25,7 @@ button{font:inherit;color:inherit;border:0;cursor:pointer;-webkit-tap-highlight-
  <div id="handle">••••••</div>
  <button id="gear" title="Configurações" aria-label="Abrir opções" onclick="toggleMenu()">⚙</button>
  <div id="controls">
-   <button id="iv" title="Filtrar IV 100%" onclick="Native.select('iv')">IV100</button>
-   <button id="gl" title="Filtrar Grande Liga rank 1" onclick="Native.select('gl')">GL#1</button>
+   <button id="cycle" title="Alternar IV100, GL#1, UL#1" onclick="Native.cycleMode()">IV100</button>
    <button id="sh" title="Ativar/desativar Shiny" onclick="Native.shiny()">✨</button>
    <div id="actions">
     <button title="Atualizar" onclick="Native.refresh()">↻</button>
@@ -55,8 +54,7 @@ function attachLongPress(){
 }
 function draw(){
  document.documentElement.style.setProperty("--row",row+"px");
- document.getElementById("iv").classList.toggle("active",mode==="iv");
- document.getElementById("gl").classList.toggle("active",mode==="gl");
+ const cy=document.getElementById("cycle");cy.textContent=mode==="gl"?"GL#1":mode==="ul"?"UL#1":"IV100";cy.classList.add("active");
  document.getElementById("sh").classList.toggle("shinyOn",shiny);
  document.getElementById("count").textContent=String(cards.length);
  document.getElementById("spawns").innerHTML=cards.map((c,i)=>{

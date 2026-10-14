@@ -109,7 +109,7 @@ function applyIv(){
 }
 function applyGl(){
  const rank=inputNear("Top ranking");
- return !!rank&&valueInput(rank,"1")&&choice("League","Great League")&&choice("Include previous evolutions","Yes");
+ return !!rank&&valueInput(rank,"1")&&choice("League",mode==="ul"?"Ultra League":"Great League")&&choice("Include previous evolutions","Yes");
 }
 function check(){
  const currentShiny=readShiny();
@@ -121,7 +121,7 @@ function check(){
  }
  const rank=inputNear("Top ranking");
  const league=readChoice("League"),prior=readChoice("Include previous evolutions");
- if(!rank||rank.value!=="1"||league!=="Great League"||prior!=="Yes")
+ if(!rank||rank.value!=="1"||league!==(mode==="ul"?"Ultra League":"Great League")||prior!=="Yes")
   return {ok:false,reason:"Grande Liga R1 não confirmada",rank:rank?rank.value:null,league,prior};
  return {ok:true};
 }
@@ -236,7 +236,7 @@ if(action==="search"){
   }else{
    const rank=inputNear("Top ranking");
    if(rank)valueInput(rank,"1");
-   choice("League","Great League");
+   choice("League",mode==="ul"?"Ultra League":"Great League");
    choice("Include previous evolutions","Yes");
   }
   const s=shinyControl();
