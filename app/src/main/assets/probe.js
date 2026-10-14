@@ -193,9 +193,22 @@ if(action==="collect")return collect();
 if(action.startsWith("coords:")){
  const index=Number(action.slice(7));
  const btn=elements("button,[role=button]").filter(e=>vis(e)&&/^Get coords$/i.test(text(e)))[index];
- if(!btn)return JSON.stringify({ok:false,status:"Get coords não está disponível para este Pokémon"});
+ if(!btn)return JSON.stringify({ok:false,status:"Botão Get coords não localizado"});
  btn.click();
- return JSON.stringify({ok:true,status:"Botão Get coords acionado no PoGoCoordinates"});
+ return JSON.stringify({ok:true,status:"Solicitando coordenadas no site"});
+}
+if(action==="readCoords"){
+ const pattern=/(-?(?:90(?:\.0+)?|[0-8]?\d(?:\.\d+)?))\s*[,;\s]\s*(-?(?:180(?:\.0+)?|1[0-7]\d(?:\.\d+)?|[0-9]?\d(?:\.\d+)?))/;
+ // First look for the modal or toast created by Get coords.
+ const dialogs=elements('[role=dialog],[role=alertdialog],[role=alert],[data-state=open],input[readonly],textarea[readonly]');
+ const scoped=dialogs.map(e=>e.matches('input,textarea')?e.value:text(e));
+ // Also read newly exposed map links, but never guess from original search location.
+ const urls=elements('a[href*="maps"],a[href*="coords"]').map(e=>e.href);
+ for(const s of [...scoped,...urls]){
+  const match=String(s||"").match(pattern);
+  if(match)return JSON.stringify({ok:true,coords:match[1]+","+match[2],status:"Coordenadas encontradas"});
+ }
+ return JSON.stringify({ok:false,status:"Aguardando coordenadas do site"});
 }
 if(action==="search"){
  const target=mode==="iv"?"Stats":"PvP";

@@ -5,6 +5,8 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.ClipboardManager;
+import android.content.ClipData;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
@@ -289,6 +291,20 @@ public class OverlayService extends Service {
             detailParams.height=dp(detailHeight);moveDetail();
         }
     }
+    private String extractCoordinates(String input){
+        java.util.regex.Matcher m=java.util.regex.Pattern.compile("(-?\\d{1,2}(?:\\.\\d+)?)\\s*[,;]\\s*(-?\\d{1,3}(?:\\.\\d+)?)").matcher(input);
+        if(m.find()){
+            try{
+                double lat=Double.parseDouble(m.group(1)),lon=Double.parseDouble(m.group(2));
+                if(Math.abs(lat)<=90&&Math.abs(lon)<=180)return m.group(1)+","+m.group(2);
+            }catch(Exception ignored){}
+        }
+        return "";
+    }
+    private void deliverCoords(String coordinates,String message){
+        js(detailPanel,detailLoaded,"window.coordsResult("+JSONObject.quote(coordinates)+","+JSONObject.quote(message)+")");
+        status(message);
+    }
     public class Bridge{
         @JavascriptInterface public void select(String s){handler.post(()->{
             if(!s.equals("iv")&&!s.equals("gl"))return;
@@ -309,8 +325,30 @@ public class OverlayService extends Service {
             if(selected==index)hideDetails();else showDetails(index);
         });}
         @JavascriptInterface public void hideDetail(){handler.post(OverlayService.this::hideDetails);}
-        @JavascriptInterface public void coords(int sourceIndex){handler.post(()->execute(
-                "coords:"+sourceIndex,r->status(r.optString("status",r.optBoolean("ok")?"Get coords acionado":"Get coords indisponível"))));}
+        @JavascriptInterface public void coords(int sourceIndex){handler.post(()->{
+            final ClipboardManager clipboard=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+            final String before=clipboard!=null&&clipboard.hasPrimaryClip()&&clipboard.getPrimaryClip()!=null
+                    &&clipboard.getPrimaryClip().getItemCount()>0?
+                    String.valueOf(clipboard.getPrimaryClip().getItemAt(0).coerceToText(OverlayService.this)):"";
+            execute("coords:"+sourceIndex,r->{
+                if(!r.optBoolean("ok")){deliverCoords("",r.optString("status","Get coords indisponível"));return;}
+                handler.postDelayed(()->{
+                    String coord="";
+                    try{
+                        ClipData clip=clipboard==null?null:clipboard.getPrimaryClip();
+                        if(clip!=null&&clip.getItemCount()>0){
+                            String after=String.valueOf(clip.getItemAt(0).coerceToText(OverlayService.this)).trim();
+                            if(!after.equals(before))coord=extractCoordinates(after);
+                        }
+                    }catch(Exception ignored){}
+                    if(!coord.isEmpty()){deliverCoords(coord,"Coordenadas copiadas");return;}
+                    execute("readCoords",found->deliverCoords(found.optString("coords",""),
+                            found.optBoolean("ok")?"Coordenadas encontradas":
+                            "O site não disponibilizou coordenadas. Abra o app para conferir."));
+                },850L);
+            });
+        });}
+
     }
     @Override public int onStartCommand(Intent i,int flags,int id){
         mode=getSharedPreferences("prefs",0).getString("mode",mode);
