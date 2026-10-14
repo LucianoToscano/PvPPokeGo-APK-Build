@@ -42,6 +42,7 @@ public class OverlayService extends Service {
     private WebView panel,detailPanel,website;
     private boolean menuExpanded=false,menuLeft=false,minimized=false,shiny=false,loaded=false,panelLoaded=false,detailLoaded=false,stopped=false;
     private int height=72,detailHeight=225,requestGeneration=0,selected=-1,intervalMinutes=5,menuPadDp=0;
+    private String probeScriptCache;
     private boolean searchInProgress=false;
     private boolean showTimers=false,alerts=false;
     private String sort="despawn";
@@ -241,7 +242,7 @@ public class OverlayService extends Service {
             }
             return true;
         });
-        root.addView(grip,new FrameLayout.LayoutParams(dp(dockDp()),dp(23),Gravity.TOP|Gravity.LEFT));
+        root.addView(grip,new FrameLayout.LayoutParams(dp(dockDp()),dp(21),Gravity.TOP|Gravity.LEFT));
 
         params=new WindowManager.LayoutParams(dp(dockDp()),dp(height),
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
@@ -281,14 +282,23 @@ public class OverlayService extends Service {
     }
     private String script(){
         try(InputStream in=getAssets().open("probe.js")){
+            if(probeScriptCache!=null)return probeScriptCache;
             ByteArrayOutputStream out=new ByteArrayOutputStream();
             byte[] buf=new byte[4096];int n;
             while((n=in.read(buf))!=-1)out.write(buf,0,n);
-            return out.toString("UTF-8");
+            probeScriptCache=out.toString("UTF-8");
+            return probeScriptCache;
         }catch(Exception e){return "null";}
     }
     private void execute(String action,Consumer<JSONObject> callback){
-        if(!loaded||website==null){status("Abra o app e faça login.");return;}
+        if(!loaded||website==null){
+            if(callback!=null){
+                JSONObject failure=new JSONObject();
+                try{failure.put("ok",false);failure.put("reason","Site indisponível");}catch(Exception ignored){}
+                callback.accept(failure);
+            }else status("Abra o app e faça login.");
+            return;
+        }
         String code=script().replace("__ACTION__",JSONObject.quote(action))
                 .replace("__MODE__",JSONObject.quote(mode))
                 .replace("__SHINY__",shiny?"true":"false");
@@ -308,7 +318,10 @@ public class OverlayService extends Service {
     private void refresh(){refresh(false);}
     private void refresh(boolean manual){
         if(stopped)return;
-        if(searchInProgress&&!manual)return;
+        if(searchInProgress){
+            if(manual)status("A busca atual ainda está em andamento.");
+            return;
+        }
         if(!loaded||website==null){
             diagnosticError("Sessão do site ainda não carregada; abra o aplicativo para conferir o login.");
             return;
@@ -336,7 +349,7 @@ public class OverlayService extends Service {
                 }
                 handler.postDelayed(()->execute("configureSearch",configured->{
                     if(stopped||generation!=requestGeneration)return;
-                    if(!configured.optBoolean("ok")){
+                    if(!configured.optBoolean("ok")||!configured.optBoolean("configured",false)){
                         searchInProgress=false;
                         diagnosticError("Falha ao configurar os filtros.");
                         return;
@@ -540,7 +553,7 @@ public class OverlayService extends Service {
             params.width=dp(menuDp());
             // Reserve vertical space for two actions ABOVE the gear, keeping
             // the gear and Pokémon at the original screen position when possible.
-            menuPadDp=54;
+            menuPadDp=41;
             params.y=Math.max(0,params.y-dp(menuPadDp));
             height+=menuPadDp;
         }else{
@@ -553,7 +566,7 @@ public class OverlayService extends Service {
         menuExpanded=show;
         params.height=dp(height);
         FrameLayout.LayoutParams gripParams=new FrameLayout.LayoutParams(
-            dp(dockDp()),dp(23),Gravity.TOP|Gravity.LEFT);
+            dp(dockDp()),dp(21),Gravity.TOP|Gravity.LEFT);
         gripParams.leftMargin=show&&menuLeft?dp(menuDp()-dockDp()):0;
         gripParams.topMargin=dp(menuPadDp);
         grip.setLayoutParams(gripParams);
@@ -569,7 +582,7 @@ public class OverlayService extends Service {
         params.width=dp(yes?BUBBLE_DP:dockDp());
         params.height=dp(yes?BUBBLE_DP:height);
         grip.setLayoutParams(new FrameLayout.LayoutParams(
-                dp(yes?BUBBLE_DP:dockDp()),dp(yes?BUBBLE_DP:27),Gravity.TOP|Gravity.LEFT));
+                dp(yes?BUBBLE_DP:dockDp()),dp(yes?BUBBLE_DP:21),Gravity.TOP|Gravity.LEFT));
         js(panel,panelLoaded,"window.setMinimized("+yes+")");
         updateWindow();
     }
@@ -682,7 +695,7 @@ public class OverlayService extends Service {
                 params.width=dp(minimized?BUBBLE_DP:dockDp());
                 params.x=Math.max(0,Math.min(metrics().widthPixels-params.width,params.x));
                 grip.setLayoutParams(new FrameLayout.LayoutParams(
-                    dp(minimized?BUBBLE_DP:dockDp()),dp(minimized?BUBBLE_DP:23),
+                    dp(minimized?BUBBLE_DP:dockDp()),dp(minimized?BUBBLE_DP:21),
                     Gravity.TOP|Gravity.LEFT));
                 updateWindow();
             }
@@ -842,7 +855,7 @@ public class OverlayService extends Service {
             params.width=dp(minimized?BUBBLE_DP:dockDp());
             params.x=Math.min(params.x,metrics().widthPixels-params.width);
             grip.setLayoutParams(new FrameLayout.LayoutParams(
-                dp(minimized?BUBBLE_DP:dockDp()),dp(minimized?BUBBLE_DP:23),Gravity.TOP|Gravity.LEFT));
+                dp(minimized?BUBBLE_DP:dockDp()),dp(minimized?BUBBLE_DP:21),Gravity.TOP|Gravity.LEFT));
             updateWindow();
         }
         mode=getSharedPreferences("prefs",0).getString("mode",mode);

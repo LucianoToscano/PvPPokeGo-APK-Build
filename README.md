@@ -43,3 +43,13 @@ As buscas usam a página do PoGoCoordinates e a sessão do navegador integrado; 
 - A janela reserva 54 dp de espaço acima da engrenagem ao abrir as opções. Reposicionamento nativo preserva a posição dos sprites e evita interceptar o toque na engrenagem; menu à esquerda também foi corrigido para ficar realmente à esquerda.
 - Editor de favoritos com **duas seções**: "★ Meus favoritos (n/50)" em cima, sempre visível, com sprite, Pokédex, nome e estrela; "Adicionar Pokémon" embaixo, com pesquisa de 1.025 espécies. Selecionar move imediatamente para a lista de cima; tocar na área superior remove. A lista de procurados e os alertas existentes são preservados.
 - A lista superior ocupa até 3 linhas com rolagem, e a pesquisa inferior mostra até cinco sugestões por vez, separadas por divisória e títulos.
+
+## v0.35-beta — build de distribuição
+- APK recompilado de fonte, assinado por Android APK Signature Scheme v2/v3 em vez de remendos com jarsigner.
+- Ícone PokeSearch no launcher, controle X e recolher sem fundo, menor distância vertical nas opções e Pokémon.
+- R8 minifica/ofusca código Java; os métodos @JavascriptInterface são preservados por regra ProGuard. Proibido confundir ofuscação com criptografia inviolável.
+- Busca manual ignora novas tentativas enquanto outra busca está rodando; retorno do site é checado com confirmação dos filtros.
+- Código da leitura do site é carregado de assets apenas uma vez por serviço, reduzindo I/O repetido.
+- Identidade de pacote para testers: com.lucianotoscano.pokesearch (não conflita com o APK antigo). Preferências antigas não migram para o novo pacote.
+- Para futuras atualizações assinadas, conservar cópia privada da chave de assinatura. Nunca incluí-la no repositório.
+- Ainda é necessário testar login, webview, overlay e filtros com usuário real; a auditoria não consegue executar o serviço no Samsung remoto.

@@ -3,13 +3,20 @@ android {
     namespace = "com.lucianotoscano.pokesearchoverlay"
     compileSdk = 36
     defaultConfig {
-        applicationId = "com.lucianotoscano.pokesearchoverlay"
+        // Separate distribution identity: avoids signature conflicts with previous alpha APKs.
+        applicationId = "com.lucianotoscano.pokesearch"
         minSdk = 26
         targetSdk = 32
-        versionCode = 34
-        versionName = "0.34-alpha"
+        versionCode = 35
+        versionName = "0.35-beta"
     }
-    buildTypes { release { isMinifyEnabled = false } }
+    buildTypes {
+        getByName("release") {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
