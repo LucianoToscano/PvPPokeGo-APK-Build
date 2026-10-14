@@ -51,39 +51,79 @@ function customSelect(label,want){
  }
  return false;
 }
-function setShiny(want){
- for(const el of labels(document,/Shiny only/i)){
-  let p=el;
-  for(let i=0;i<5&&p;i++,p=p.parentElement){
-   const sw=p.querySelector('input[type=checkbox],[role=switch],button[aria-checked]');
-   if(sw){
-    const now=sw.matches("input")?sw.checked:sw.getAttribute("aria-checked")==="true"||sw.getAttribute("data-state")==="checked";
-    if(now!==want)sw.click();
-    return true;
-   }
+function nearby(label,pattern){
+ const matches=labels(document,pattern);
+ for(const e of matches){
+  let p=e;
+  for(let depth=0;depth<6&&p;p=p.parentElement,depth++){
+   const controls=Array.from(p.querySelectorAll('input,[role="switch"],[role="checkbox"],button,select,[role="combobox"]')).filter(vis);
+   if(controls.length>0 && controls.length<12)return {root:p,controls,label:e};
   }
  }
- return false;
+ return null;
+}
+function readShiny(){
+ const match=nearby("Shiny",/Shiny only/i);
+ if(!match)return null;
+ const candidates=[...match.controls].filter(x=>x.matches('input[type=checkbox],[role=switch],[role=checkbox],[aria-checked],[data-state]'));
+ for(const x of candidates){
+  if(x.matches('input[type=checkbox]'))return x.checked;
+  const aria=x.getAttribute('aria-checked'),state=x.getAttribute('data-state');
+  if(aria==="true"||state==="checked")return true;
+  if(aria==="false"||state==="unchecked")return false;
+ }
+ // Custom switch without ARIA: inspect track background classes only as an auxiliary heuristic.
+ const track=match.controls.find(x=>x.matches("button,[role=switch]"));
+ if(track){
+  const c=String(track.className||"");
+  if(/\bbg-(?:red|rose|pink)-[4-9]\d\d\b/.test(c))return true;
+  if(/\bbg-(?:gray|zinc|slate)-[5-9]\d\d\b/.test(c))return false;
+ }
+ return null;
+}
+function setShiny(want){
+ const before=readShiny();
+ if(before===want)return true;
+ const match=nearby("Shiny",/Shiny only/i);
+ if(!match)return false;
+ let sw=match.controls.find(x=>x.matches('input[type=checkbox],[role=switch],[role=checkbox],[aria-checked],[data-state]'));
+ if(!sw)sw=match.controls.find(x=>x.matches('button'));
+ if(!sw)return false;
+ sw.click();
+ return readShiny()===want;
 }
 function applyIv(){
  click("Stats");click("Raw IV");
  let done=false;
  for(const el of labels(document,/^IV$/i)){
   let p=el;
-  for(let depth=0;depth<6&&p;depth++,p=p.parentElement){
+  for(let depth=0;depth<7&&p;depth++,p=p.parentElement){
    const ins=Array.from(p.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio])')).filter(vis);
-   if(ins.length>=3&&ins.length<=5){done=ins.slice(0,3).every(input=>valueInput(input,15));break;}
+   if(ins.length>=3&&ins.length<=5){
+    done=ins.slice(0,3).every(input=>valueInput(input,15));
+    if(done)done=ins.slice(0,3).every(input=>input.value==="15");
+    break;
+   }
   }
   if(done)break;
  }
  return done;
 }
 function applyGl(){
- click("PvP");
- let ok=!!valueInput(inputNear("Top ranking"),1);
+ const tab=click("PvP");
+ const ranking=inputNear("Top ranking");
+ const ok=ranking?valueInput(ranking,1)&&ranking.value==="1":false;
  const league=customSelect("League","Great League");
  const prior=customSelect("Include previous evolutions","Yes");
- return {ok,league,prior};
+ return {ok,league,prior,tab};
+}
+function getModeState(){
+ const shiny=readShiny();
+ const rank=inputNear("Top ranking");
+ const leagueLabel=nearby("League",/^League$/i);
+ const evolutionLabel=nearby("Include previous evolutions",/^Include previous evolutions$/i);
+ function selected(m){if(!m)return "";const el=m.controls.find(x=>x.matches('select,[role=combobox]'))||m.root.querySelector("select,button");return el?(el.tagName==="SELECT"?text(el.selectedOptions[0]):text(el)):"";}
+ return {shiny,ranking:rank?rank.value:null,league:selected(leagueLabel),evolutions:selected(evolutionLabel)};
 }
 function cardRoots(){
  const btns=elements("button,[role=button]").filter(e=>vis(e)&&/^Get coords$/i.test(text(e)));
@@ -157,14 +197,21 @@ if(action.startsWith("coords:")){
  btn.click();
  return JSON.stringify({ok:true,status:"Botão Get coords acionado no PoGoCoordinates"});
 }
-if(action==="search"){
- const shin=setShiny(shinyOnly);
+if(action==="prepare"){
  const tab=click(mode==="iv"?"Stats":"PvP");
- setTimeout(()=>{
-  const fields=mode==="iv"?applyIv():applyGl().ok;
-  setTimeout(()=>click("Search"),650);
- },400);
- return JSON.stringify({ok:tab,shinyConfirmed:shin,mode});
+ return JSON.stringify({ok:tab,mode});
+}
+if(action==="configure"){
+ const shinyDone=setShiny(shinyOnly);
+ const filters=mode==="iv"?{ok:applyIv()}:applyGl();
+ return JSON.stringify({ok:shinyDone&&filters.ok,shinyDone,filters,state:getModeState()});
+}
+if(action==="submit"){
+ const pressed=click("Search");
+ return JSON.stringify({ok:pressed,state:getModeState()});
+}
+if(action==="state"){
+ return JSON.stringify({ok:true,state:getModeState()});
 }
 return JSON.stringify({ok:false});
 })()

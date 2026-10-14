@@ -1,3 +1,3 @@
-# PokeSearch Overlay 0.6 Alpha
+# Pokésearch Overlay 0.7 Alpha
 
-Ultra narrow 52dp dock. Tiny two-column borderless controls, 12dp horizontal drag grip, icon-only Pokémon results, separate details. Existing experimental logged-in PoGoCoordinates search retained. Build signing is still ephemeral debug signing and can require reinstall.
+Correções experimentais para filtros: automação em etapas (modo, Shiny, IV ou PvP e Search) com validação de estado, sem aceitar falha silenciosa. A página React do PoGoCoordinates pode alterar sua estrutura. Se algum controle não puder ser confirmado, mostra aviso e não promete resultados confiáveis.

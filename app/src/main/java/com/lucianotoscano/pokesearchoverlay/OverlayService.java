@@ -228,12 +228,21 @@ public class OverlayService extends Service {
         if(!loaded){status("Aguardando login...");return;}
         int generation=++requestGeneration;
         status("Pesquisando...");
-        execute("search",r->{
+        execute("prepare",r->{
             if(generation!=requestGeneration)return;
-            if(!r.optBoolean("ok"))status("Verifique filtros no site");
-            handler.postDelayed(()->{
-                if(!stopped&&generation==requestGeneration)collect(generation);
-            },4500);
+            if(!r.optBoolean("ok")){results="[]";status("Não foi possível selecionar o modo");return;}
+            handler.postDelayed(()->execute("configure",config->{
+                if(generation!=requestGeneration)return;
+                if(!config.optBoolean("ok")){
+                    results="[]";
+                    status("Filtros não confirmados no site");
+                    return;
+                }
+                execute("submit",sent->{
+                    if(!sent.optBoolean("ok")){results="[]";status("Busca não iniciada");return;}
+                    handler.postDelayed(()->{if(!stopped&&generation==requestGeneration)collect(generation);},4200);
+                });
+            }),650);
         });
     }
     private void collect(int generation){
