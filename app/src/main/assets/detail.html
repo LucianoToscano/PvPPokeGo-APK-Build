@@ -16,7 +16,8 @@ button{font:inherit;color:inherit;border:0;cursor:pointer}
 #info{color:#d8e0ea;line-height:1.38;margin-top:5px;font-size:10px;overflow-wrap:anywhere}
 #info div{margin:2px 0}
 #info em{color:#afb9c8;font-style:normal}
-#watch{margin-top:6px;width:100%;border:1px solid #edc95778;background:#e8bf3d24;border-radius:7px;padding:6px;font-weight:bold;color:#ffecba}
+#watch{margin-top:6px;width:100%;border:1px solid #edc95778;background:#e8bf3d24;border-radius:7px;padding:6px;font-weight:bold;color:#ffecba;display:flex;align-items:center;justify-content:center;gap:5px}
+#watch svg{width:14px;height:14px;flex-shrink:0}
 #copy{margin-top:5px;width:100%;border:1px solid #ffffff35;background:#ffffff22;border-radius:7px;padding:7px;font-weight:bold}#coords{margin-top:7px;width:100%;border-radius:7px;padding:7px;background:#eb2850ce;font-weight:bold}
 </style></head><body><div id="panel">
  <div id="header">
@@ -25,7 +26,7 @@ button{font:inherit;color:inherit;border:0;cursor:pointer}
   <button id="x" onclick="Native.hideDetail()">×</button>
  </div>
  <div id="major"></div><div id="info"></div>
- <button id="watch" onclick="Native.toggleWatch(watchName)">🔔 Adicionar aos procurados</button>
+ <button id="watch" onclick="Native.toggleWatch(watchName)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 3.1 6.4 7.1 1-5.1 4.9 1.2 7-6.3-3.3-6.3 3.3 1.2-7L1.8 9.4l7.1-1L12 2Z"/></svg> <span id="watchLabel">Adicionar aos favoritos</span></button>
  <button id="coords" onclick="Native.coords(currentIndex)">⌖ Get coords</button><button id="copy" onclick="copyCoords()">⧉ Copiar coordenadas</button>
 </div>
 <script>
@@ -36,7 +37,7 @@ window.coordsResult=function(coords,message){if(coords)currentCoords=coords;docu
 const h=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const item=(k,v)=>v?'<div><em>'+h(k)+':</em> '+h(v)+'</div>':"";
 window.watchFeedback=watched=>{
- document.getElementById("watch").textContent=watched?"🔔 Monitorando · remover da lista":"🔕 Adicionar aos procurados";
+ document.getElementById("watchLabel").textContent=watched?"★ Favorito · remover":"☆ Adicionar aos favoritos";
 };
 window.showDetails=(c,mode,watched)=>{
  watchName=String(c.name||"");window.watchFeedback(!!watched);

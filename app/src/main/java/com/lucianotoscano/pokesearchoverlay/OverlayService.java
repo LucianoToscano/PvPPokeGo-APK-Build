@@ -33,7 +33,7 @@ public class OverlayService extends Service {
     private static final int BUBBLE_DP=45, DETAIL_DP=226;
     private int spriteSize=45;
     private int dockDp(){return spriteSize+8;}
-    private int menuDp(){return dockDp()+301;}
+    private int menuDp(){return dockDp()+306;}
     private final Handler handler=new Handler(Looper.getMainLooper());
     private WindowManager wm;
     private WindowManager.LayoutParams params,detailParams;
@@ -129,7 +129,7 @@ public class OverlayService extends Service {
     }
     private void update(){
         js(panel,panelLoaded,"window.onNativeData("+results+","+JSONObject.quote(status)+","+
-                JSONObject.quote(mode)+","+shiny+","+rowDp()+","+intervalMinutes+","+spriteSize+","+showTimers+",false,"+WatchAlerts.enabled(this)+")");
+                JSONObject.quote(mode)+","+shiny+","+rowDp()+","+intervalMinutes+","+spriteSize+","+showTimers+",false,"+alerts+","+(WatchAlerts.watched(this).size()>0)+")");
         if(selected>=0)showDetails(selected);
     }
     private void status(String s){
@@ -684,6 +684,14 @@ public class OverlayService extends Service {
             showTimers=!showTimers;
             getSharedPreferences("prefs",0).edit().putBoolean("showTimers",showTimers).apply();
             update();
+        });}
+        @JavascriptInterface public void toggleGeneralAlerts(){handler.post(()->{
+            alerts=!alerts;
+            getSharedPreferences("prefs",0).edit().putBoolean("alerts",alerts).apply();
+            update();
+            android.widget.Toast.makeText(OverlayService.this,
+                alerts?"Novos Pokémon: notificações ativadas":"Novos Pokémon: notificações desligadas",
+                android.widget.Toast.LENGTH_SHORT).show();
         });}
         @JavascriptInterface public void toggleWatchAlerts(){handler.post(()->{
             boolean enabled=!WatchAlerts.enabled(OverlayService.this);

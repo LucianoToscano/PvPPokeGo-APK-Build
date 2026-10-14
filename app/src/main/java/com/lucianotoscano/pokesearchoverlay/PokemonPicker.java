@@ -143,7 +143,7 @@ public final class PokemonPicker {
                 holder.name.setTextColor(Color.WHITE);holder.name.setTextSize(15);
                 row.addView(holder.name,new LinearLayout.LayoutParams(0,-2,1));
                 holder.checked=new TextView(activity);
-                holder.checked.setTextColor(Color.rgb(82,222,158));
+                holder.checked.setTextColor(Color.rgb(255,214,116));
                 holder.checked.setTextSize(18);holder.checked.setTypeface(null,Typeface.BOLD);
                 holder.checked.setGravity(Gravity.CENTER);
                 row.addView(holder.checked,new LinearLayout.LayoutParams(dp(activity,26),dp(activity,43)));
@@ -152,7 +152,7 @@ public final class PokemonPicker {
             Entry e=visible.get(position);
             holder.dex.setText(String.format(Locale.US,"#%03d",e.id));
             holder.name.setText(e.name);
-            holder.checked.setText(WatchAlerts.isWatched(activity,e.name)?"✓":"");
+            holder.checked.setText(WatchAlerts.isWatched(activity,e.name)?"★":"☆");
             setImage(activity,holder.picture,e.id);
             return recycled;
         }
@@ -167,7 +167,7 @@ public final class PokemonPicker {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(activity,12),dp(activity,4),dp(activity,12),0);
         TextView hint=new TextView(activity);
-        hint.setText("Toque em um Pokémon para adicionar ou remover dos procurados.");
+        hint.setText("Toque na estrela para adicionar ou remover um favorito.");
         hint.setTextColor(Color.rgb(183,193,207));hint.setTextSize(12);
         root.addView(hint);
         EditText search=new EditText(activity);
@@ -178,7 +178,7 @@ public final class PokemonPicker {
         search.setTextSize(15);
         root.addView(search,new LinearLayout.LayoutParams(-1,dp(activity,54)));
         android.widget.CheckBox notify=new android.widget.CheckBox(activity);
-        notify.setText("🔔 Avisar com som quando encontrar um procurado válido");
+        notify.setText("★ Som para favoritos com IV100 / GL#1 / UL#1");
         notify.setTextColor(Color.WHITE);
         notify.setTextSize(12);
         notify.setChecked(WatchAlerts.enabled(activity));
@@ -199,7 +199,7 @@ public final class PokemonPicker {
         list.setAdapter(adapter);
         Runnable refresh=()->{
             int total=WatchAlerts.watched(activity).size();
-            count.setText("Monitorando "+total+" de 50 · alertas somente IV100 / GL#1 / UL#1");
+            count.setText(total+" de 50 favoritos · filtro atual: IV100 / GL#1 / UL#1");
             adapter.filter(search.getText().toString());
             if(changed!=null)changed.run();
         };
@@ -212,11 +212,11 @@ public final class PokemonPicker {
         list.setOnItemClickListener((parent,view,position,id)->{
             Entry e=(Entry)adapter.getItem(position);
             boolean added=WatchAlerts.toggle(activity,e.name);
-            Toast.makeText(activity,(added?"✓ Adicionado: ":"Removido: ")+e.name,Toast.LENGTH_SHORT).show();
+            Toast.makeText(activity,(added?"★ Adicionado: ":"Removido: ")+e.name,Toast.LENGTH_SHORT).show();
             refresh.run();
         });
         new AlertDialog.Builder(activity)
-            .setTitle("🔔 Pokémon procurados")
+            .setTitle("★ Pokémon favoritos")
             .setView(root)
             .setPositiveButton("Concluído",null)
             .show();

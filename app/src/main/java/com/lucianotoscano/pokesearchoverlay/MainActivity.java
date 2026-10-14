@@ -82,13 +82,13 @@ public class MainActivity extends Activity {
         watchRow.setPadding(d(11),d(5),d(10),d(5));
         watchRow.setBackground(round(Color.rgb(24,28,36),11));
         ImageView bell=new ImageView(this);
-        bell.setImageResource(R.drawable.ic_bell_outline);
+        bell.setImageResource(R.drawable.ic_star_outline);
         watchRow.addView(bell,new LinearLayout.LayoutParams(d(27),d(27)));
         LinearLayout watchTexts=new LinearLayout(this);
         watchTexts.setOrientation(LinearLayout.VERTICAL);
         watchTexts.setPadding(d(9),0,0,0);
         TextView watchTitle=new TextView(this);
-        watchTitle.setText("Pokémon procurados");
+        watchTitle.setText("Pokémon favoritos");
         watchTitle.setTextColor(Color.WHITE);
         watchTitle.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
         watchTitle.setTextSize(13);
@@ -150,8 +150,8 @@ public class MainActivity extends Activity {
     private void refreshWatchCount(){
         if(watchSummary==null)return;
         int size=WatchAlerts.watched(this).size();
-        watchSummary.setText(size==0?"Nenhum selecionado · toque para adicionar":
-            size+" monitorado"+(size==1?"":"s")+" · toque para editar");
+        watchSummary.setText(size==0?"Nenhum favorito · toque para escolher":
+            size+" favorito"+(size==1?"":"s")+" · toque para editar");
     }
     private void openPicker(){
         PokemonPicker.show(this,this::refreshWatchCount);
@@ -194,7 +194,7 @@ public class MainActivity extends Activity {
     private void showPreferencesDialog(){
         ScrollView view=buildPreferences();
         new AlertDialog.Builder(this)
-            .setTitle("⚙ Configurações e diagnóstico")
+            .setTitle("⚙ Preferências")
             .setView(view)
             .setPositiveButton("Concluído",null)
             .show();
@@ -202,21 +202,10 @@ public class MainActivity extends Activity {
     private ScrollView buildPreferences(){
         SharedPreferences prefs=getSharedPreferences("prefs",0);
         ScrollView sc=new ScrollView(this);
-        sc.setFillViewport(false);
         LinearLayout body=new LinearLayout(this);
         body.setOrientation(LinearLayout.VERTICAL);
-        body.setPadding(d(14),d(8),d(14),d(12));
+        body.setPadding(d(14),d(10),d(14),d(14));
         sc.addView(body);
-        Button picker=new Button(this);
-        picker.setText("🔔 Procurados · buscar na Pokédex");
-        picker.setAllCaps(false);
-        body.addView(picker);
-        picker.setOnClickListener(v->openPicker());
-        Button textMode=new Button(this);
-        textMode.setText("Editar nomes manualmente");
-        textMode.setAllCaps(false);
-        body.addView(textMode);
-        textMode.setOnClickListener(v->showWatchDialog());
         android.widget.TextView subtitle=new android.widget.TextView(this);
         subtitle.setText("Tamanho do Pokémon · altere também por P / M / G no overlay");
         subtitle.setTextColor(Color.LTGRAY);body.addView(subtitle);
@@ -249,112 +238,7 @@ public class MainActivity extends Activity {
         });
         body.addView(order);
         settingCheckbox(body,prefs,"showTimers","Mostrar tempo individual de despawn",false);
-        settingCheckbox(body,prefs,"alerts","Alertar novos Pokémon (notificação)",false);
-        Button history=new Button(this);history.setText("Ver histórico recente");
-        body.addView(history);
-        history.setOnClickListener(v->{
-            JSONArray data;
-            try{data=new JSONArray(prefs.getString("history","[]"));}catch(Exception e){data=new JSONArray();}
-            StringBuilder msg=new StringBuilder();
-            SimpleDateFormat df=new SimpleDateFormat("dd/MM HH:mm",Locale.getDefault());
-            for(int i=data.length()-1;i>=0;i--){
-                JSONObject item=data.optJSONObject(i);if(item==null)continue;
-                msg.append(df.format(new Date(item.optLong("at",0)))).append(" · ")
-                  .append(item.optString("name","Pokémon")).append(" · ")
-                  .append(item.optString("mode","")).append(" · CP ")
-                  .append(item.optString("cp","?")).append("\n");
-            }
-            new AlertDialog.Builder(this).setTitle("Últimos resultados")
-                .setMessage(msg.length()==0?"Nenhum resultado registrado.":msg.toString())
-                .setPositiveButton("Fechar",null)
-                .setNegativeButton("Limpar histórico",(dialog,w)->prefs.edit().remove("history").apply())
-                .show();
-        });
-        Button diagnostics=new Button(this);diagnostics.setText("Diagnóstico da última busca");
-        body.addView(diagnostics);
-        diagnostics.setOnClickListener(v->{
-            long when=prefs.getLong("lastSearchAt",0);
-            String time=when>0?new SimpleDateFormat("dd/MM HH:mm:ss",Locale.getDefault()).format(new Date(when)):"Ainda não realizada";
-            String message="Status: "+prefs.getString("lastStatus","Aguardando primeira pesquisa")
-                +"\nSessão: "+prefs.getString("sessionStatus","Desconhecida")
-                +"\nÚltima busca: "+time
-                +"\nÚltimo erro: "+prefs.getString("lastError","Nenhum registrado");
-            new AlertDialog.Builder(this).setTitle("Diagnóstico do Pokésearch")
-                .setMessage(message).setPositiveButton("OK",null).show();
-        });
-        Button stop=new Button(this);
-        stop.setText("Encerrar overlay");
-        stop.setAllCaps(false);
-        stop.setTextColor(Color.rgb(250,122,137));
-        body.addView(stop);
-        stop.setOnClickListener(v->new AlertDialog.Builder(this)
-            .setTitle("Encerrar PokeSearch?")
-            .setMessage("A janela flutuante e as buscas automáticas serão interrompidas. Seus favoritos ficam salvos.")
-            .setPositiveButton("Encerrar",(dialog,which)->{
-                stopService(new Intent(this,OverlayService.class));
-                Toast.makeText(this,"Overlay encerrado",Toast.LENGTH_SHORT).show();
-            })
-            .setNegativeButton("Cancelar",null).show());
         return sc;
-    }
-    private void buildWatchButton(LinearLayout root){
-        Button watch=new Button(this);
-        watch.setText("🔔 Pokémon procurados · alerta sonoro");
-        root.addView(watch);
-        watch.setOnClickListener(v->showWatchDialog());
-    }
-    private boolean checkNotificationPermission(){
-        if(Build.VERSION.SDK_INT>=33 &&
-            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){
-            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},83);
-            Toast.makeText(this,"Autorize notificações e tente novamente",Toast.LENGTH_LONG).show();
-            return false;
-        }
-        return true;
-    }
-    private void showWatchDialog(){
-        SharedPreferences p=getSharedPreferences("prefs",0);
-        LinearLayout content=new LinearLayout(this);
-        content.setPadding(d(18),d(8),d(18),d(6));
-        content.setOrientation(LinearLayout.VERTICAL);
-        TextView help=new TextView(this);
-        help.setText("Cadastre até 50 Pokémon por nome, separados por vírgulas ou uma por linha. Ex.: Frigibax, Gible, Axew. Avisamos somente quando a nova ocorrência atender IV100, GL#1 ou UL#1, com dados confirmados no filtro ativo.");
-        help.setTextColor(Color.WHITE);content.addView(help);
-        EditText edit=new EditText(this);
-        edit.setText(p.getString(WatchAlerts.PREF_LIST,""));
-        edit.setHint("Frigibax, Gible, Axew...");
-        edit.setTextColor(Color.WHITE);edit.setHintTextColor(Color.LTGRAY);
-        edit.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE|InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
-        edit.setMinLines(3);edit.setMaxLines(6);content.addView(edit);
-        CheckBox enabled=new CheckBox(this);
-        enabled.setText("Ativar notificações sonoras de procurados");
-        enabled.setTextColor(Color.WHITE);
-        enabled.setChecked(p.getBoolean(WatchAlerts.PREF_ENABLED,true));
-        content.addView(enabled);
-        TextView note=new TextView(this);
-        note.setText("O som depende da permissão de notificações e das configurações do canal no Android. Alertas gerais são independentes.");
-        note.setTextColor(Color.LTGRAY);content.addView(note);
-        ScrollView sc=new ScrollView(this);sc.addView(content);
-        AlertDialog dialog=new AlertDialog.Builder(this)
-            .setTitle("🔔 Minha lista de procurados")
-            .setView(sc)
-            .setPositiveButton("Salvar",(w,which)->{
-                String list=WatchAlerts.canonicalList(edit.getText().toString());
-                p.edit().putString(WatchAlerts.PREF_LIST,list)
-                    .putBoolean(WatchAlerts.PREF_ENABLED,enabled.isChecked()).apply();
-                Toast.makeText(this,"Lista salva: "+WatchAlerts.names(list).size()+" Pokémon",Toast.LENGTH_SHORT).show();
-                if(enabled.isChecked()&&!list.isEmpty())checkNotificationPermission();
-            })
-            .setNegativeButton("Cancelar",null)
-            .setNeutralButton("🔊 Testar som",null)
-            .create();
-        dialog.setOnShowListener(w->dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v->{
-            if(checkNotificationPermission()){
-                boolean sent=WatchAlerts.test(this);
-                Toast.makeText(this,sent?"Notificação de teste enviada":"Não foi possível enviar o alerta",Toast.LENGTH_SHORT).show();
-            }
-        }));
-        dialog.show();
     }
     private void settingCheckbox(LinearLayout root,SharedPreferences prefs,String key,String label,boolean def){
         CheckBox check=new CheckBox(this);check.setText(label);check.setTextColor(Color.WHITE);
