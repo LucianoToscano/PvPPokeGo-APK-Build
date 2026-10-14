@@ -543,7 +543,7 @@ public class OverlayService extends Service {
             params.width=dp(dockDp());
         }
         menuExpanded=show;
-        FrameLayout.LayoutParams g=new FrameLayout.LayoutParams(dp(dockDp()),dp(27),Gravity.TOP|Gravity.LEFT);
+        FrameLayout.LayoutParams g=new FrameLayout.LayoutParams(dp(dockDp()),dp(23),Gravity.TOP|Gravity.LEFT);
         g.leftMargin=show&&menuLeft?dp(menuDp()-dockDp()):0;
         grip.setLayoutParams(g);
         js(panel,panelLoaded,"window.syncMenu("+show+","+JSONObject.quote(show&&menuLeft?"left":"right")+")");
