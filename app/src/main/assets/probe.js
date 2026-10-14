@@ -170,7 +170,18 @@ function parseCard(box,sourceIndex){
  const move=lines.find(s=>/\s\/\s/.test(s)&&!/\d+\s*\/\s*\d+\s*\/\s*\d+/.test(s))||"";
  const loc=nextLabelValue(box,"LOCATION")||(body.match(/\bLOCATION\s*\n?\s*([^\n]+?)(?=\n|DESPAWN|$)/i)||[])[1]||"";
  const desp=nextLabelValue(box,"DESPAWN")||(body.match(/\bDESPAWN\s*(\d{1,2}:\d{2})/i)||[])[1]||"";
- const image=Array.from(box.querySelectorAll("img[src]")).find(e=>/^https?:/.test(e.src)||e.src.startsWith("data:"));
+ const candidates=Array.from(box.querySelectorAll("img[src]")).filter(e=>/^https?:/.test(e.src)||e.src.startsWith("data:image/"));
+ const image=candidates.sort((a,b)=>{
+  const score=e=>{
+   const alt=String(e.alt||"").toLowerCase(),src=String(e.src||"").toLowerCase();
+   const name=String(title||"").replace(/✨/g,"").trim().toLowerCase();
+   return (name&&alt.includes(name)?80:0)+(/pokemon|pok[eé]mon|sprite|pogo|pokeapi/.test(src)?18:0)+
+    (/sprite|pokemon|pok[eé]mon/.test(alt)?12:0)+
+    (e.naturalWidth>0&&e.naturalWidth===e.naturalHeight?7:0)-
+    (/logo|avatar|icon-user|profile/.test(src)?35:0);
+  };
+  return score(b)-score(a);
+ })[0];
  const rankMatch=body.match(/\b(?:PvP\s*)?(?:Rank|Ranking|Rk)\s*#?\s*(\d+)\b/i);
  const isShiny=/✨/.test(title);
  return {

@@ -82,7 +82,7 @@ function draw(){
  const p=document.getElementById("period");p.textContent=String(period);p.title="Atualização a cada "+period+" min · toque para alterar";
  document.getElementById("spawns").innerHTML=cards.map((c,i)=>{
   const label=[c.name,c.ivPercent?c.ivPercent+"%":"IV não disponível",c.iv,c.rank?"Rank "+c.rank:""].filter(Boolean).join(" · ");
-  const icon=/^https:\/\//.test(c.image||"")?'<img class="sprite" src="'+esc(c.image)+'" alt="">':'<span class="fallback">◉</span>';
+  const icon=/^(https:\/\/|data:image\/(?:png|webp|gif|jpeg);base64,)/i.test(c.image||"")?'<img class="sprite" src="'+esc(c.image)+'" alt="" loading="eager">':'<span class="fallback">◉</span>';
   const kind=(c.shiny?"shiny":mode),deadline=Number(c.expiresAtMs)||0;
   const badge=showTimers&&deadline?'<span class="timer" data-deadline="'+deadline+'"></span>':"";
   return '<button title="'+esc(label)+'" aria-label="'+esc(label)+'" class="spawn '+esc(kind)+(markBorders?' marked':'')+(active===i?" active":"")+'" data-index="'+i+'" onclick="spriteClick('+i+')" oncontextmenu="return false">'+icon+badge+'</button>';
