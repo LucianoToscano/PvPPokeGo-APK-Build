@@ -26,6 +26,7 @@ jobs:
         run: |
           node --check app/src/main/assets/probe.js
           node --check app/src/main/assets/presets.js
+          node --check app/src/main/assets/shiny_login.js
           python3 - <<'PY'
           from pathlib import Path
           text = Path('app/src/main/assets/dock.html').read_text()
@@ -47,10 +48,10 @@ jobs:
           test -s app/build/outputs/apk/debug/app-debug.apk
           unzip -t app/build/outputs/apk/debug/app-debug.apk >/dev/null
           mkdir -p delivery
-          cp app/build/outputs/apk/debug/app-debug.apk delivery/PokeSearch-0.31-alpha.apk
+          cp app/build/outputs/apk/debug/app-debug.apk delivery/PokeSearch-0.32-alpha.apk
           sha256sum delivery/*.apk > delivery/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: PokeSearch-0.31-alpha-APK
+          name: PokeSearch-0.32-alpha-APK
           path: delivery/
           retention-days: 30

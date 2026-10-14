@@ -24,3 +24,9 @@ As buscas usam a página do PoGoCoordinates e a sessão do navegador integrado; 
 - **AUTO 5m** deixa claro o intervalo automático. **↻** continua sendo a atualização manual.
 - O sino abre a lista visual dos procurados; nela há uma caixa explícita para ativar ou pausar o som.
 - **Encerrar overlay** está nas configurações, mediante confirmação.
+
+## Shiny opt-in v0.32
+- Shiny only desativado inicialmente. Migração de alpha anteriores restaura o estado desativado uma única vez; toques subsequentes são preservados.
+- Somente ao tocar em ✨ o aplicativo abre o PoGoCoordinates visível e seleciona o controle Shiny only na página. O próprio site poderá solicitar login por Discord ou Google; nenhuma autenticação automática foi adicionada.
+- Sem Shiny only a pesquisa IV100/GL#1/UL#1 não precisa ser bloqueada apenas pela existência de um botão de login na página.
+- Sessões do navegador externo (Chrome) não são copiadas. O login via Google pode ser recusado em WebView dependendo do provedor.
