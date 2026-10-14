@@ -101,23 +101,35 @@ public final class PokemonPicker {
         private final Activity activity;
         private final List<Entry> full;
         private final List<Entry> visible=new ArrayList<>();
-        Adapter(Activity activity,List<Entry> full){
-            this.activity=activity;this.full=full;
+        private final boolean selectedOnly;
+        Adapter(Activity activity,List<Entry> full,boolean selectedOnly){
+            this.activity=activity;this.full=full;this.selectedOnly=selectedOnly;
             filter("");
         }
         void filter(String term){
             String key=WatchAlerts.normalized(term);
             visible.clear();
             Set<String> selected=WatchAlerts.watched(activity);
-            if(key.isEmpty()){
+            if(selectedOnly){
                 for(Entry e:full)if(selected.contains(e.normalized))visible.add(e);
-                for(Entry e:full)if(visible.size()<65&&!selected.contains(e.normalized))visible.add(e);
             }else{
-                for(Entry e:full)if(e.normalized.startsWith(key)||String.valueOf(e.id).startsWith(key))
-                    visible.add(e);
-                for(Entry e:full)if(visible.size()<80&&!visible.contains(e)&&e.normalized.contains(key))
-                    visible.add(e);
-                if(visible.size()>80)visible.subList(80,visible.size()).clear();
+                // Results are distinct from favorites, so you can always
+                // see WHAT IS ALREADY SELECTED above the search suggestions.
+                for(Entry e:full){
+                    if(selected.contains(e.normalized))continue;
+                    if(key.isEmpty()||e.normalized.startsWith(key)||
+                       String.valueOf(e.id).startsWith(key)){
+                        visible.add(e);
+                        if(visible.size()>=80)break;
+                    }
+                }
+                if(!key.isEmpty()&&visible.size()<80){
+                    for(Entry e:full){
+                        if(selected.contains(e.normalized)||visible.contains(e))continue;
+                        if(e.normalized.contains(key))visible.add(e);
+                        if(visible.size()>=80)break;
+                    }
+                }
             }
             notifyDataSetChanged();
         }
@@ -165,56 +177,109 @@ public final class PokemonPicker {
         }
         LinearLayout root=new LinearLayout(activity);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(activity,12),dp(activity,4),dp(activity,12),0);
-        TextView hint=new TextView(activity);
-        hint.setText("Toque na estrela para adicionar ou remover um favorito.");
-        hint.setTextColor(Color.rgb(183,193,207));hint.setTextSize(12);
-        root.addView(hint);
+        root.setPadding(dp(activity,14),dp(activity,7),dp(activity,14),dp(activity,6));
+
+        TextView selectedTitle=new TextView(activity);
+        selectedTitle.setTextColor(Color.rgb(255,211,118));
+        selectedTitle.setTypeface(null,Typeface.BOLD);
+        selectedTitle.setTextSize(14);
+        selectedTitle.setPadding(dp(activity,3),dp(activity,3),0,dp(activity,6));
+        root.addView(selectedTitle);
+
+        TextView selectedEmpty=new TextView(activity);
+        selectedEmpty.setText("Nenhum favorito escolhido. Pesquise e toque numa estrela ☆ abaixo.");
+        selectedEmpty.setTextColor(Color.rgb(156,167,183));
+        selectedEmpty.setTextSize(12);
+        selectedEmpty.setPadding(dp(activity,6),dp(activity,4),0,dp(activity,12));
+        root.addView(selectedEmpty);
+
+        // Separate, clearly labeled list: selected Pokémon stay here
+        // even when the user types a different species into the search.
+        ListView selectedList=new ListView(activity);
+        selectedList.setDividerHeight(0);
+        selectedList.setCacheColorHint(Color.TRANSPARENT);
+        root.addView(selectedList,new LinearLayout.LayoutParams(-1,0));
+        Adapter selectedAdapter=new Adapter(activity,all,true);
+        selectedList.setAdapter(selectedAdapter);
+
+        View divider=new View(activity);
+        divider.setBackgroundColor(Color.rgb(55,61,73));
+        LinearLayout.LayoutParams dividerParams=new LinearLayout.LayoutParams(-1,dp(activity,1));
+        dividerParams.setMargins(0,dp(activity,4),0,dp(activity,12));
+        root.addView(divider,dividerParams);
+
+        TextView searchTitle=new TextView(activity);
+        searchTitle.setText("Adicionar Pokémon");
+        searchTitle.setTextColor(Color.WHITE);
+        searchTitle.setTextSize(14);
+        searchTitle.setTypeface(null,Typeface.BOLD);
+        searchTitle.setPadding(dp(activity,3),0,0,dp(activity,3));
+        root.addView(searchTitle);
+
         EditText search=new EditText(activity);
         search.setSingleLine(true);
         search.setTextColor(Color.WHITE);
         search.setHintTextColor(Color.rgb(146,154,168));
-        search.setHint("Buscar por nome ou número da Pokédex");
-        search.setTextSize(15);
-        root.addView(search,new LinearLayout.LayoutParams(-1,dp(activity,54)));
-        android.widget.CheckBox notify=new android.widget.CheckBox(activity);
-        notify.setText("★ Som para favoritos com IV100 / GL#1 / UL#1");
-        notify.setTextColor(Color.WHITE);
-        notify.setTextSize(12);
-        notify.setChecked(WatchAlerts.enabled(activity));
-        notify.setOnCheckedChangeListener((button,enabled)->{
+        search.setHint("Nome ou número da Pokédex");
+        search.setTextSize(14);
+        root.addView(search,new LinearLayout.LayoutParams(-1,dp(activity,49)));
+
+        ListView results=new ListView(activity);
+        results.setDividerHeight(0);
+        results.setCacheColorHint(Color.TRANSPARENT);
+        root.addView(results,new LinearLayout.LayoutParams(-1,dp(activity,243)));
+        Adapter suggestions=new Adapter(activity,all,false);
+        results.setAdapter(suggestions);
+
+        android.widget.CheckBox sound=new android.widget.CheckBox(activity);
+        sound.setText("Alertar com som ao encontrar um favorito válido");
+        sound.setTextColor(Color.WHITE);
+        sound.setTextSize(12);
+        sound.setChecked(WatchAlerts.enabled(activity));
+        sound.setOnCheckedChangeListener((button,enabled)->
             activity.getSharedPreferences("prefs",0).edit()
-                .putBoolean(WatchAlerts.PREF_ENABLED,enabled).apply();
-        });
-        root.addView(notify);
-        TextView count=new TextView(activity);
-        count.setTextSize(12);count.setTextColor(Color.rgb(94,223,157));
-        count.setPadding(dp(activity,4),0,0,dp(activity,5));
-        root.addView(count);
-        ListView list=new ListView(activity);
-        list.setDividerHeight(0);
-        list.setCacheColorHint(Color.TRANSPARENT);
-        root.addView(list,new LinearLayout.LayoutParams(-1,dp(activity,355)));
-        Adapter adapter=new Adapter(activity,all);
-        list.setAdapter(adapter);
+                .putBoolean(WatchAlerts.PREF_ENABLED,enabled).apply());
+        root.addView(sound);
+
+        TextView note=new TextView(activity);
+        note.setText("Somente IV100, Grande Liga #1 ou Ultra Liga #1, no filtro ativo.");
+        note.setTextColor(Color.rgb(161,171,184));
+        note.setTextSize(11);
+        note.setPadding(dp(activity,4),0,0,dp(activity,4));
+        root.addView(note);
+
         Runnable refresh=()->{
             int total=WatchAlerts.watched(activity).size();
-            count.setText(total+" de 50 favoritos · filtro atual: IV100 / GL#1 / UL#1");
-            adapter.filter(search.getText().toString());
+            selectedTitle.setText("★ Meus favoritos ("+total+"/50)");
+            selectedAdapter.filter("");
+            int listHeight=dp(activity,Math.min(total,3)*52);
+            LinearLayout.LayoutParams lp=(LinearLayout.LayoutParams)selectedList.getLayoutParams();
+            lp.height=listHeight;
+            selectedList.setLayoutParams(lp);
+            selectedEmpty.setVisibility(total==0?View.VISIBLE:View.GONE);
+            selectedList.setVisibility(total>0?View.VISIBLE:View.GONE);
+            suggestions.filter(search.getText().toString());
             if(changed!=null)changed.run();
         };
-        refresh.run();
         search.addTextChangedListener(new TextWatcher(){
-            public void beforeTextChanged(CharSequence s,int start,int c,int after){}
-            public void onTextChanged(CharSequence s,int st,int before,int count){adapter.filter(s.toString());}
-            public void afterTextChanged(Editable e){}
+            @Override public void beforeTextChanged(CharSequence txt,int start,int count,int after){}
+            @Override public void onTextChanged(CharSequence txt,int start,int before,int count){
+                suggestions.filter(txt.toString());
+            }
+            @Override public void afterTextChanged(Editable txt){}
         });
-        list.setOnItemClickListener((parent,view,position,id)->{
-            Entry e=(Entry)adapter.getItem(position);
-            boolean added=WatchAlerts.toggle(activity,e.name);
-            Toast.makeText(activity,(added?"★ Adicionado: ":"Removido: ")+e.name,Toast.LENGTH_SHORT).show();
+        selectedList.setOnItemClickListener((parent,view,index,id)->{
+            Entry e=(Entry)selectedAdapter.getItem(index);
+            WatchAlerts.toggle(activity,e.name);
             refresh.run();
         });
+        results.setOnItemClickListener((parent,view,index,id)->{
+            Entry e=(Entry)suggestions.getItem(index);
+            boolean added=WatchAlerts.toggle(activity,e.name);
+            if(!added)Toast.makeText(activity,"Limite de 50 favoritos atingido",Toast.LENGTH_SHORT).show();
+            refresh.run();
+        });
+        refresh.run();
         new AlertDialog.Builder(activity)
             .setTitle("★ Pokémon favoritos")
             .setView(root)

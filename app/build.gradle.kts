@@ -6,8 +6,8 @@ android {
         applicationId = "com.lucianotoscano.pokesearchoverlay"
         minSdk = 26
         targetSdk = 32
-        versionCode = 33
-        versionName = "0.33-alpha"
+        versionCode = 34
+        versionName = "0.34-alpha"
     }
     buildTypes { release { isMinifyEnabled = false } }
     compileOptions {

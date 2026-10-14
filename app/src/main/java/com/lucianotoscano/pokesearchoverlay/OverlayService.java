@@ -33,7 +33,7 @@ public class OverlayService extends Service {
     private static final int BUBBLE_DP=45, DETAIL_DP=226;
     private int spriteSize=45;
     private int dockDp(){return spriteSize+8;}
-    private int menuDp(){return dockDp()+306;}
+    private int menuDp(){return dockDp()+258;}
     private final Handler handler=new Handler(Looper.getMainLooper());
     private WindowManager wm;
     private WindowManager.LayoutParams params,detailParams;
@@ -41,7 +41,7 @@ public class OverlayService extends Service {
     private View grip;
     private WebView panel,detailPanel,website;
     private boolean menuExpanded=false,menuLeft=false,minimized=false,shiny=false,loaded=false,panelLoaded=false,detailLoaded=false,stopped=false;
-    private int height=72,detailHeight=225,requestGeneration=0,selected=-1,intervalMinutes=5;
+    private int height=72,detailHeight=225,requestGeneration=0,selected=-1,intervalMinutes=5,menuPadDp=0;
     private boolean searchInProgress=false;
     private boolean showTimers=false,alerts=false;
     private String sort="despawn";
@@ -154,7 +154,7 @@ public class OverlayService extends Service {
         int left=dockPos-DETAIL_DP-gap;
         int preferred=right+DETAIL_DP<=w-4?right:left;
         detailParams.x=dp(Math.max(0,Math.min(w-DETAIL_DP,preferred)));
-        int dockY=params.y/dp(1);
+        int dockY=params.y/dp(1)+menuPadDp;
         detailParams.y=dp(Math.max(0,Math.min(h-detailHeight-45,dockY+18)));
         try{wm.updateViewLayout(detailRoot,detailParams);}catch(Exception ignored){}
     }
@@ -538,15 +538,27 @@ public class OverlayService extends Service {
             menuLeft=params.x+dp(menuDp())>screen;
             if(menuLeft)params.x=Math.max(0,params.x-extra);
             params.width=dp(menuDp());
+            // Reserve vertical space for two actions ABOVE the gear, keeping
+            // the gear and Pokémon at the original screen position when possible.
+            menuPadDp=54;
+            params.y=Math.max(0,params.y-dp(menuPadDp));
+            height+=menuPadDp;
         }else{
             if(menuLeft)params.x=Math.min(metrics().widthPixels-dp(dockDp()),params.x+dp(menuDp()-dockDp()));
             params.width=dp(dockDp());
+            params.y=Math.min(metrics().heightPixels-dp(46),params.y+dp(menuPadDp));
+            height=Math.max(46,height-menuPadDp);
+            menuPadDp=0;
         }
         menuExpanded=show;
-        FrameLayout.LayoutParams g=new FrameLayout.LayoutParams(dp(dockDp()),dp(23),Gravity.TOP|Gravity.LEFT);
-        g.leftMargin=show&&menuLeft?dp(menuDp()-dockDp()):0;
-        grip.setLayoutParams(g);
-        js(panel,panelLoaded,"window.syncMenu("+show+","+JSONObject.quote(show&&menuLeft?"left":"right")+")");
+        params.height=dp(height);
+        FrameLayout.LayoutParams gripParams=new FrameLayout.LayoutParams(
+            dp(dockDp()),dp(23),Gravity.TOP|Gravity.LEFT);
+        gripParams.leftMargin=show&&menuLeft?dp(menuDp()-dockDp()):0;
+        gripParams.topMargin=dp(menuPadDp);
+        grip.setLayoutParams(gripParams);
+        js(panel,panelLoaded,"window.syncMenu("+show+","+
+            JSONObject.quote(show&&menuLeft?"left":"right")+","+menuPadDp+")");
         updateWindow();moveDetail();
     }
     private void minimize(boolean yes){
