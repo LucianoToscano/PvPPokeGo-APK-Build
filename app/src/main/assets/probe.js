@@ -225,6 +225,38 @@ if(action.startsWith("readCoords:")){
  }
  return JSON.stringify({ok:false,status:"O site ainda não exibiu coordenadas"});
 }
+if(action==="prepareSearch"){
+ const target=mode==="iv"?"Stats":"PvP";
+ return JSON.stringify({ok:tab(target),stage:"prepare"});
+}
+if(action==="configureSearch"){
+ let configured=false;
+ if(mode==="iv"){
+  tab("Raw IV");
+  const fields=rawIVInputs();
+  configured=fields.length===3;
+  if(configured)for(const e of fields)valueInput(e,"15");
+ }else{
+  const rank=inputNear("Top ranking");
+  if(rank)valueInput(rank,"1");
+  choice("League",mode==="ul"?"Ultra League":"Great League");
+  choice("Include previous evolutions","Yes");
+  configured=!!rank;
+ }
+ const existing=readShiny();
+ if(existing!==null&&existing!==shinyOnly){
+  const sw=shinyControl();if(sw)sw.click();
+ }
+ return JSON.stringify({ok:true,configured,shinyKnown:existing!==null,stage:"configure"});
+}
+if(action==="submitSearch"){
+ const b=oneButton("Search");
+ if(!b)return JSON.stringify({ok:false,reason:"Botão Search não localizado"});
+ if(b.disabled||b.getAttribute("aria-disabled")==="true")
+  return JSON.stringify({ok:false,reason:"Botão Search indisponível"});
+ b.click();
+ return JSON.stringify({ok:true,stage:"submitted"});
+}
 if(action==="search"){
  const target=mode==="iv"?"Stats":"PvP";
  const ok=tab(target);

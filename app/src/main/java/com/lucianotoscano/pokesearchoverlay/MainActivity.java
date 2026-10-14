@@ -25,7 +25,7 @@ public class MainActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(Color.rgb(17,18,22));
         TextView help=new TextView(this);
-        help.setText("POKÉSEARCH OVERLAY · ALPHA 0.22\nFaça login AQUI no PoGoCoordinates, mesmo que já tenha entrado pelo navegador.\nToque em INICIAR OVERLAY. Toque na engrenagem para abrir ou fechar o menu; segure e arraste a engrenagem para mover.");
+        help.setText("POKÉSEARCH OVERLAY · ALPHA 0.23\nFaça login AQUI no PoGoCoordinates, mesmo que já tenha entrado pelo navegador.\nToque em INICIAR OVERLAY. Toque na engrenagem para abrir ou fechar o menu; segure e arraste a engrenagem para mover.");
         help.setTextColor(Color.WHITE);help.setTextSize(13);help.setPadding(16,16,16,12);
         root.addView(help);
         Button start=new Button(this);start.setText("INICIAR OVERLAY");root.addView(start);

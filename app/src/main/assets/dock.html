@@ -7,6 +7,8 @@ button{font:inherit;color:inherit;border:0;cursor:pointer;touch-action:manipulat
 #shell{width:44px;background:transparent!important;border:0;border-radius:0;box-shadow:none;overflow:visible}
 #gear{width:28px;height:27px;margin:0 auto;padding:0;border:0;background:transparent;color:#e9ecf1;display:flex;align-items:center;justify-content:center}
 #gear svg{display:block;width:19px;height:19px;filter:drop-shadow(0 1px 1px #0007)}
+#gear.busy svg{animation:gearbusy 1.25s linear infinite}
+@keyframes gearbusy{to{transform:rotate(360deg)}}
 #menu{display:none;position:absolute;top:0;left:44px;width:203px;height:27px;z-index:3;padding:0 4px;border:0;border-radius:0;background:transparent;box-shadow:none}
 #menu.open{display:block}
 body.menu-left #shell{margin-left:203px}
@@ -24,15 +26,15 @@ body.menu-left #menu{left:0}
 .sprite{display:block;width:32px;height:32px;object-fit:contain;flex-shrink:0;pointer-events:none;filter:drop-shadow(0 1px 1px #0006)}
 .fallback{font-size:20px}
 #empty{display:block;width:44px;height:18px;line-height:18px;text-align:center;color:#dce1e9b8;font-size:12px;overflow:hidden}
-#bubble{display:none;width:45px;height:45px;border-radius:50%;border:1px solid #ffffff70;background:#1b1c28bf;box-shadow:0 3px 12px #0006;align-items:center;justify-content:center;flex-direction:column;gap:1px}
-#bubble b{font-size:18px}#bubble small{font-size:10px;color:#ff839a}
+#bubble{display:none;width:45px;height:45px;border:0;background:transparent;box-shadow:none;border-radius:0;align-items:center;justify-content:center}
+#bubble svg{width:20px;height:20px;color:#e9ecf1;filter:drop-shadow(0 1px 1px #0009)}
 </style></head><body>
 <div id="shell">
  <button id="gear" title="Configurações" aria-label="Abrir opções" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96c-.5-.38-1.03-.69-1.64-.93L14.36 2.8a.49.49 0 0 0-.49-.4h-3.84a.49.49 0 0 0-.49.4l-.36 2.53c-.6.24-1.15.56-1.64.93l-2.39-.96a.49.49 0 0 0-.61.22L2.62 8.84a.5.5 0 0 0 .12.64l2.02 1.58c-.04.3-.07.62-.07.94s.03.64.08.94L2.74 14.5a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.61.22l2.39-.96c.49.38 1.04.7 1.64.93l.36 2.53c.04.24.24.4.49.4h3.84c.25 0 .45-.16.49-.4l.36-2.53c.6-.24 1.15-.55 1.64-.93l2.39.96c.23.09.49 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.02-1.56ZM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"/></svg></button>
  <div id="menu"><div id="controls">
   <button id="cycle" title="Alternar IV100, GL#1 e UL#1" onclick="Native.cycleMode()">IV100</button>
   <button id="sh" title="Ativar ou desativar Shiny" onclick="Native.shiny()">✨</button>
-  <button id="period" title="Atualização automática a cada 10 minutos; toque para alterar" onclick="Native.cycleInterval()">5</button>
+  <button id="period" title="Atualização automática a cada 5 minutos; toque para alterar" onclick="Native.cycleInterval()">5</button>
   <div id="actions">
     <button title="Atualizar agora" onclick="Native.refresh()">↻</button>
     <button title="Minimizar" onclick="Native.minimize()">−</button>
@@ -42,7 +44,7 @@ body.menu-left #menu{left:0}
  <div id="spawns"></div>
  <div id="empty">Aguardando busca</div>
 </div>
-<div id="bubble"><b>◉</b><small id="count">0</small></div>
+<div id="bubble" role="button" aria-label="Restaurar overlay"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96c-.5-.38-1.03-.69-1.64-.93L14.36 2.8a.49.49 0 0 0-.49-.4h-3.84a.49.49 0 0 0-.49.4l-.36 2.53c-.6.24-1.15.56-1.64.93l-2.39-.96a.49.49 0 0 0-.61.22L2.62 8.84a.5.5 0 0 0 .12.64l2.02 1.58c-.04.3-.07.62-.07.94s.03.64.08.94L2.74 14.5a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.61.22l2.39-.96c.49.38 1.04.7 1.64.93l.36 2.53c.04.24.24.4.49.4h3.84c.25 0 .45-.16.49-.4l.36-2.53c.6-.24 1.15-.55 1.64-.93l2.39.96c.23.09.49 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.02-1.56ZM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"/></svg></div>
 <script>
 let cards=[],active=-1,mode="iv",shiny=true,status="",row=34,menuOpen=false,period=5;
 function setMenuOpen(open,side){
@@ -70,7 +72,6 @@ function draw(){
  const cy=document.getElementById("cycle");cy.textContent=mode==="gl"?"GL#1":mode==="ul"?"UL#1":"IV100";cy.classList.add("active");
  document.getElementById("sh").classList.toggle("shinyOn",shiny);
  const p=document.getElementById("period");p.textContent=String(period);p.title="Atualização a cada "+period+" min · toque para alterar";
- document.getElementById("count").textContent=String(cards.length);
  document.getElementById("spawns").innerHTML=cards.map((c,i)=>{
   const label=[c.name,c.ivPercent?c.ivPercent+"%":"IV não disponível",c.iv,c.rank?"Rank "+c.rank:""].filter(Boolean).join(" · ");
   const icon=/^https:\/\//.test(c.image||"")?'<img class="sprite" src="'+esc(c.image)+'" alt="">':'<span class="fallback">◉</span>';
@@ -82,6 +83,7 @@ function draw(){
  empty.textContent=/sem resultados/i.test(status)?"0":/falha|erro|não|login/i.test(status)?"!":"…";
  empty.title=status||"Aguardando busca";
  document.getElementById("gear").title=status?("Configurações · "+status):"Configurações";
+ document.getElementById("gear").classList.toggle("busy",/(atualizando|buscando|busca manual|pesquisa)/i.test(status));
  requestAnimationFrame(()=>Native.resize(Math.ceil(document.getElementById("shell").getBoundingClientRect().height)+1));
 }
 window.onNativeData=(a,s,m,shi,r,interval)=>{

@@ -39,6 +39,42 @@ public class OverlayService extends Service {
     private WebView panel,detailPanel,website;
     private boolean menuExpanded=false,menuLeft=false,minimized=false,shiny=true,loaded=false,panelLoaded=false,detailLoaded=false,stopped=false;
     private int height=68,detailHeight=225,requestGeneration=0,selected=-1,intervalMinutes=5;
+    private boolean searchInProgress=false;
+    private long armedDespawnMillis=0L;
+    private final Runnable expiryRefresh=new Runnable(){
+        @Override public void run(){
+            armedDespawnMillis=0L;
+            if(stopped||!loaded)return;
+            if(searchInProgress){
+                handler.postDelayed(this,2000L);
+                return;
+            }
+            refresh(false);
+        }
+    };
+    private void armNextDespawn(JSONArray cards){
+        handler.removeCallbacks(expiryRefresh);
+        armedDespawnMillis=0L;
+        long now=System.currentTimeMillis(),next=Long.MAX_VALUE;
+        if(cards==null)return;
+        for(int i=0;i<cards.length();i++){
+            JSONObject card=cards.optJSONObject(i);
+            if(card==null)continue;
+            String timer=card.optString("despawn","");
+            String[] parts=timer.split(":");
+            if(parts.length!=2)continue;
+            try{
+                long seconds=Long.parseLong(parts[0])*60L+Long.parseLong(parts[1]);
+                if(seconds<=0||seconds>86400)continue;
+                long readAt=card.optLong("sampledAt",now);
+                long deadline=readAt+seconds*1000L;
+                if(deadline>now&&deadline<next)next=deadline;
+            }catch(NumberFormatException ignored){}
+        }
+        if(next==Long.MAX_VALUE)return;
+        armedDespawnMillis=next;
+        handler.postDelayed(expiryRefresh,Math.max(250L,next-now+150L));
+    }
     private String mode="iv",results="[]",status="Conectando...";
     private float startRawX,startRawY;
     private int startX,startY;
@@ -236,16 +272,40 @@ public class OverlayService extends Service {
             }catch(Exception e){status("Falha ao ler resultados no site.");}
         });
     }
-    private void refresh(){
-        if(!loaded){status("Aguardando login...");return;}
+    private void refresh(){refresh(false);}
+    private void refresh(boolean manual){
+        if(stopped)return;
+        if(!loaded||website==null){
+            status("Aguardando login...");
+            return;
+        }
+        handler.removeCallbacks(expiryRefresh);
+        armedDespawnMillis=0L;
+        searchInProgress=true;
         final int generation=++requestGeneration;
-        status("Atualizando...");
-        execute("search",response->{
-            if(generation!=requestGeneration)return;
-            if(!response.optBoolean("ok"))status("Tentando consultar os filtros do site...");
-            handler.postDelayed(()->{
-                if(!stopped&&generation==requestGeneration)collect(generation);
-            },4600L);
+        status(manual?"Busca manual iniciada...":"Atualizando...");
+        execute("prepareSearch",prepared->{
+            if(stopped||generation!=requestGeneration)return;
+            if(!prepared.optBoolean("ok")){
+                searchInProgress=false;
+                status("Aba Stats/PvP não encontrada no site");
+                return;
+            }
+            handler.postDelayed(()->execute("configureSearch",configured->{
+                if(stopped||generation!=requestGeneration)return;
+                handler.postDelayed(()->execute("submitSearch",submitted->{
+                    if(stopped||generation!=requestGeneration)return;
+                    if(!submitted.optBoolean("ok")){
+                        searchInProgress=false;
+                        status(submitted.optString("reason","Não foi possível pesquisar"));
+                        return;
+                    }
+                    status(manual?"Buscando manualmente...":"Buscando...");
+                    handler.postDelayed(()->{
+                        if(!stopped&&generation==requestGeneration)collect(generation);
+                    },4400L);
+                }),650L);
+            }),600L);
         });
     }
     private void collect(int generation){
@@ -260,6 +320,8 @@ public class OverlayService extends Service {
                 }
             }
             results=items==null?"[]":items.toString();
+            searchInProgress=false;
+            armNextDespawn(items);
             int n=count();
             if(selected>=n)hideDetails();
             if(r.optBoolean("uncertain"))status("IV não confirmado");
@@ -411,7 +473,7 @@ public class OverlayService extends Service {
             shiny=!shiny;getSharedPreferences("prefs",0).edit().putBoolean("shiny",shiny).apply();
             results="[]";hideDetails();update();refresh();
         });}
-        @JavascriptInterface public void refresh(){handler.post(OverlayService.this::refresh);}
+        @JavascriptInterface public void refresh(){handler.post(()->OverlayService.this.refresh(true));}
         @JavascriptInterface public void minimize(){handler.post(()->OverlayService.this.minimize(true));}
         @JavascriptInterface public void restore(){handler.post(()->OverlayService.this.minimize(false));}
         @JavascriptInterface public void close(){handler.post(()->stopSelf());}
@@ -449,7 +511,8 @@ public class OverlayService extends Service {
     }
     @Override public int onStartCommand(Intent i,int flags,int id){
         if(i!=null&&"com.lucianotoscano.pokesearchoverlay.REFRESH_LOGIN".equals(i.getAction())){
-            ++requestGeneration;results="[]";hideDetails();loaded=false;
+            ++requestGeneration;searchInProgress=false;handler.removeCallbacks(expiryRefresh);
+            results="[]";hideDetails();loaded=false;
             status("Atualizando sessão após login...");
             CookieManager.getInstance().flush();
             if(website!=null)website.loadUrl("https://pogocoordinates.com/search");

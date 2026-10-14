@@ -1,3 +1,7 @@
-# Pokésearch Overlay 0.22 Alpha
+# Pokésearch Overlay 0.23 Alpha
 
-A engrenagem substitui a antiga alça de pontinhos: toque curto alterna a abertura do submenu horizontal; arrastar a própria engrenagem move toda a coluna do overlay sem abrir ou fechar o menu. Movimento com tolerância de 4 dp para diferenciar toque de arrasto. Hitbox nativa de 44×27 dp, sobreposta à engrenagem desenhada em SVG; excluído o controle antigo de 9 dp. Menu lateral alinhado ao topo da engrenagem, sprites imediatamente abaixo. Com a janela minimizada, toque restaura a coluna normalmente. Atualização padrão 5 minutos mantida. O APK compila em CI, mas os gestos ainda precisam de teste em aparelho.
+- O botão − minimiza somente para a mesma engrenagem (ícone vetorial), não a bolha ◉; tocá-la restaura sprites e menu recolhido.
+- ↻ inicia pesquisa manual genuína em fases separadas: selecionar Stats/PvP, aplicar filtros, clicar Search, aguardar resultados e ler novamente. Feedback visual de pesquisa em andamento.
+- Ao vencer o despawn mais próximo entre os Pokémon da busca atual, faz nova busca automaticamente, sem esperar o intervalo periódico. Reagenda a partir dos dados frescos; não agenda repetidamente os casos já vencidos.
+- A frequência automática padrão permanece em 5 minutos, com opções 1, 3, 5, 10, 15 e 20 min.
+- Integração continua dependente dos controles do PoGoCoordinates; teste autenticado real ainda necessário para garantir sucesso da busca.
