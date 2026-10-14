@@ -30,7 +30,10 @@ import java.io.InputStream;
 import java.util.function.Consumer;
 
 public class OverlayService extends Service {
-    private static final int DOCK_DP=68, BUBBLE_DP=45, DETAIL_DP=226, MENU_DP=271;
+    private static final int BUBBLE_DP=45, DETAIL_DP=226;
+    private int spriteSize=50;
+    private int dockDp(){return spriteSize+8;}
+    private int menuDp(){return dockDp()+203;}
     private final Handler handler=new Handler(Looper.getMainLooper());
     private WindowManager wm;
     private WindowManager.LayoutParams params,detailParams;
@@ -40,6 +43,10 @@ public class OverlayService extends Service {
     private boolean menuExpanded=false,menuLeft=false,minimized=false,shiny=true,loaded=false,panelLoaded=false,detailLoaded=false,stopped=false;
     private int height=72,detailHeight=225,requestGeneration=0,selected=-1,intervalMinutes=5;
     private boolean searchInProgress=false;
+    private boolean showTimers=false,markBorders=true,alerts=false;
+    private String sort="despawn";
+    private long lastAlertAt=0L;
+    private final java.util.Set<String> knownSpawns=new java.util.HashSet<>();
     private long armedDespawnMillis=0L;
     private final Runnable expiryRefresh=new Runnable(){
         @Override public void run(){
@@ -49,6 +56,19 @@ public class OverlayService extends Service {
                 handler.postDelayed(this,2000L);
                 return;
             }
+            try{
+                JSONArray old=new JSONArray(results),active=new JSONArray();
+                long now=System.currentTimeMillis();
+                for(int i=0;i<old.length();i++){
+                    JSONObject card=old.optJSONObject(i);
+                    if(card==null)continue;
+                    long expiry=card.optLong("expiresAtMs",Long.MAX_VALUE);
+                    if(expiry>now)active.put(card);
+                }
+                if(active.length()!=old.length()){
+                    results=active.toString();hideDetails();update();
+                }
+            }catch(Exception ignored){}
             refresh(false);
         }
     };
@@ -105,14 +125,22 @@ public class OverlayService extends Service {
     private int rowDp(){
         int n=Math.max(1,count());
         int available=screenHeightDp()-160;
-        return Math.max(38,Math.min(62,available/n));
+        return Math.max(28,Math.min(spriteSize+2,available/n));
     }
     private void update(){
         js(panel,panelLoaded,"window.onNativeData("+results+","+JSONObject.quote(status)+","+
-                JSONObject.quote(mode)+","+shiny+","+rowDp()+","+intervalMinutes+")");
+                JSONObject.quote(mode)+","+shiny+","+rowDp()+","+intervalMinutes+","+spriteSize+","+showTimers+","+markBorders+")");
         if(selected>=0)showDetails(selected);
     }
-    private void status(String s){status=s;update();}
+    private void status(String s){
+        status=s;
+        getSharedPreferences("prefs",0).edit().putString("lastStatus",s).apply();
+        update();
+    }
+    private void diagnosticError(String s){
+        getSharedPreferences("prefs",0).edit().putString("lastError",s).apply();
+        status(s);
+    }
     private void updateWindow(){
         if(wm!=null&&root!=null&&params!=null){
             try{wm.updateViewLayout(root,params);}catch(Exception ignored){}
@@ -121,8 +149,8 @@ public class OverlayService extends Service {
     private void moveDetail(){
         if(detailRoot==null||detailParams==null||params==null)return;
         int w=screenWidthDp(),h=screenHeightDp(),gap=5;
-        int dockPos=params.x/dp(1)+(menuExpanded&&menuLeft?MENU_DP-DOCK_DP:0);
-        int right=dockPos+DOCK_DP+gap;
+        int dockPos=params.x/dp(1)+(menuExpanded&&menuLeft?menuDp()-dockDp():0);
+        int right=dockPos+dockDp()+gap;
         int left=dockPos-DETAIL_DP-gap;
         int preferred=right+DETAIL_DP<=w-4?right:left;
         detailParams.x=dp(Math.max(0,Math.min(w-DETAIL_DP,preferred)));
@@ -195,7 +223,7 @@ public class OverlayService extends Service {
                     if(Math.abs(dx)+Math.abs(dy)>dp(4))dragged=true;
                     if(dragged){
                         DisplayMetrics d=metrics();
-                        int winWidth=dp(minimized?BUBBLE_DP:menuExpanded?MENU_DP:DOCK_DP);
+                        int winWidth=dp(minimized?BUBBLE_DP:menuExpanded?menuDp():dockDp());
                         int winHeight=dp(minimized?BUBBLE_DP:height);
                         params.x=Math.max(0,Math.min(d.widthPixels-winWidth,startX+dx));
                         params.y=Math.max(0,Math.min(d.heightPixels-winHeight,startY+dy));
@@ -213,14 +241,14 @@ public class OverlayService extends Service {
             }
             return true;
         });
-        root.addView(grip,new FrameLayout.LayoutParams(dp(DOCK_DP),dp(27),Gravity.TOP|Gravity.LEFT));
+        root.addView(grip,new FrameLayout.LayoutParams(dp(dockDp()),dp(27),Gravity.TOP|Gravity.LEFT));
 
-        params=new WindowManager.LayoutParams(dp(DOCK_DP),dp(height),
+        params=new WindowManager.LayoutParams(dp(dockDp()),dp(height),
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
                 PixelFormat.TRANSLUCENT);
         params.gravity=Gravity.TOP|Gravity.LEFT;
-        params.x=dp(Math.max(0,screenWidthDp()-DOCK_DP-7));params.y=dp(120);
+        params.x=dp(Math.max(0,screenWidthDp()-dockDp()-7));params.y=dp(120);
         try{wm.addView(root,params);}catch(Exception e){stopSelf();return;}
 
         detailRoot=new FrameLayout(this);
@@ -269,14 +297,20 @@ public class OverlayService extends Service {
                 String decoded=new JSONArray("["+raw+"]").getString(0);
                 JSONObject r=new JSONObject(decoded);
                 if(callback!=null)callback.accept(r);
-            }catch(Exception e){status("Falha ao ler resultados no site.");}
+            }catch(Exception e){
+                JSONObject failure=new JSONObject();
+                try{failure.put("ok",false);failure.put("reason","Resposta inválida do navegador interno");}catch(Exception ignored){}
+                if(callback!=null)callback.accept(failure);
+                else diagnosticError("Falha ao ler resultados no site.");
+            }
         });
     }
     private void refresh(){refresh(false);}
     private void refresh(boolean manual){
         if(stopped)return;
+        if(searchInProgress&&!manual)return;
         if(!loaded||website==null){
-            status("Aguardando login...");
+            diagnosticError("Sessão do site ainda não carregada; abra o aplicativo para conferir o login.");
             return;
         }
         handler.removeCallbacks(expiryRefresh);
@@ -284,50 +318,173 @@ public class OverlayService extends Service {
         searchInProgress=true;
         final int generation=++requestGeneration;
         status(manual?"Busca manual iniciada...":"Atualizando...");
-        execute("prepareSearch",prepared->{
+        execute("session",session->{
             if(stopped||generation!=requestGeneration)return;
-            if(!prepared.optBoolean("ok")){
+            final String auth=session.optString("auth","não confirmado");
+            getSharedPreferences("prefs",0).edit().putString("sessionStatus",auth).apply();
+            if(auth.equals("login necessário")){
                 searchInProgress=false;
-                status("Aba Stats/PvP não encontrada no site");
+                diagnosticError("Login necessário. Abra o Pokésearch e autentique-se.");
                 return;
             }
-            handler.postDelayed(()->execute("configureSearch",configured->{
+            execute("prepareSearch",prepared->{
                 if(stopped||generation!=requestGeneration)return;
-                handler.postDelayed(()->execute("submitSearch",submitted->{
+                if(!prepared.optBoolean("ok")){
+                    searchInProgress=false;
+                    diagnosticError("Não foi possível selecionar a aba de busca.");
+                    return;
+                }
+                handler.postDelayed(()->execute("configureSearch",configured->{
                     if(stopped||generation!=requestGeneration)return;
-                    if(!submitted.optBoolean("ok")){
+                    if(!configured.optBoolean("ok")){
                         searchInProgress=false;
-                        status(submitted.optString("reason","Não foi possível pesquisar"));
+                        diagnosticError("Falha ao configurar os filtros.");
                         return;
                     }
-                    status(manual?"Buscando manualmente...":"Buscando...");
-                    handler.postDelayed(()->{
-                        if(!stopped&&generation==requestGeneration)collect(generation);
-                    },4400L);
-                }),650L);
-            }),600L);
+                    handler.postDelayed(()->execute("submitSearch",submitted->{
+                        if(stopped||generation!=requestGeneration)return;
+                        if(!submitted.optBoolean("ok")){
+                            searchInProgress=false;
+                            diagnosticError(submitted.optString("reason","Falha ao pressionar Search."));
+                            return;
+                        }
+                        status(manual?"Busca manual em andamento...":"Buscando...");
+                        pollSearch(generation,0,manual);
+                    }),650L);
+                }),600L);
+            });
         });
     }
-    private void collect(int generation){
-        execute("collect",r->{
+    private void pollSearch(int generation,int attempt,boolean manual){
+        handler.postDelayed(()->execute("collect",r->{
             if(stopped||generation!=requestGeneration)return;
-            JSONArray items=r.optJSONArray("cards");
-            if(items!=null){
-                long receivedAt=System.currentTimeMillis();
-                for(int i=0;i<items.length();i++){
-                    JSONObject card=items.optJSONObject(i);
-                    if(card!=null)try{card.put("sampledAt",receivedAt);}catch(Exception ignored){}
-                }
+            if(!r.optBoolean("ok")){
+                searchInProgress=false;
+                diagnosticError("Falha na leitura dos resultados do site.");
+                return;
             }
-            results=items==null?"[]":items.toString();
-            searchInProgress=false;
-            armNextDespawn(items);
-            int n=count();
-            if(selected>=n)hideDetails();
-            if(r.optBoolean("uncertain"))status("IV não confirmado");
-            else if(n==0)status("Sem resultados");
-            else status(n+" Pokémon");
-        });
+            int found=r.optInt("found",0);
+            boolean loading=r.optBoolean("loading",false);
+            boolean empty=r.optBoolean("explicitEmpty",false);
+            if((loading||(!empty&&found==0))&&attempt<8){
+                pollSearch(generation,attempt+1,manual);
+                return;
+            }
+            if(loading||(!empty&&found==0&&attempt>=8)){
+                searchInProgress=false;
+                diagnosticError("Busca não confirmada no site (tempo limite). Resultados anteriores mantidos.");
+                return;
+            }
+            applyCollectedResults(r);
+        }), attempt==0?3000L:1300L);
+    }
+    private long expiration(JSONObject item){
+        if(item==null)return Long.MAX_VALUE;
+        String[] p=item.optString("despawn","").split(":");
+        if(p.length!=2)return Long.MAX_VALUE;
+        try{
+            long secs=Long.parseLong(p[0])*60+Long.parseLong(p[1]);
+            if(secs<=0||secs>86400)return Long.MAX_VALUE;
+            return item.optLong("sampledAt",System.currentTimeMillis())+secs*1000L;
+        }catch(Exception e){return Long.MAX_VALUE;}
+    }
+    private String spawnKey(JSONObject c){
+        return c.optString("name","")+"|"+c.optString("cp","")+"|"+
+            c.optString("level","")+"|"+c.optString("location","");
+    }
+    private JSONArray sortItems(JSONArray source){
+        java.util.ArrayList<JSONObject> a=new java.util.ArrayList<>();
+        if(source!=null)for(int i=0;i<source.length();i++){
+            JSONObject c=source.optJSONObject(i);if(c!=null)a.add(c);
+        }
+        java.util.Comparator<JSONObject> comparator;
+        switch(sort){
+            case "rank":
+                comparator=(a1,a2)->Integer.compare(rankForSort(a1),rankForSort(a2));break;
+            case "iv":
+                comparator=(a1,a2)->Double.compare(a2.optDouble("ivPercent",0),a1.optDouble("ivPercent",0));break;
+            case "shiny":
+                comparator=(a1,a2)->Boolean.compare(a2.optBoolean("shiny"),a1.optBoolean("shiny"));break;
+            default:
+                comparator=(a1,a2)->Long.compare(expiration(a1),expiration(a2));
+        }
+        a.sort(comparator);
+        JSONArray sorted=new JSONArray();
+        for(JSONObject c:a)sorted.put(c);
+        return sorted;
+    }
+    private int rankForSort(JSONObject card){
+        try{return Integer.parseInt(card.optString("rank","999999"));}
+        catch(Exception ignored){return 999999;}
+    }
+    private void recordNewResults(JSONArray cards){
+        android.content.SharedPreferences preferences=getSharedPreferences("prefs",0);
+        JSONArray history;
+        try{history=new JSONArray(preferences.getString("history","[]"));}
+        catch(Exception ignored){history=new JSONArray();}
+        java.util.Set<String> current=new java.util.HashSet<>();
+        String firstNew="";
+        long now=System.currentTimeMillis();
+        for(int i=0;i<cards.length();i++){
+            JSONObject c=cards.optJSONObject(i);
+            if(c==null)continue;
+            String key=spawnKey(c);
+            current.add(key);
+            if(knownSpawns.contains(key))continue;
+            if(firstNew.isEmpty())firstNew=c.optString("name","Pokémon");
+            JSONObject entry=new JSONObject();
+            try{
+                entry.put("name",c.optString("name","Pokémon"));
+                entry.put("cp",c.optString("cp",""));
+                entry.put("mode",mode.toUpperCase(java.util.Locale.ROOT));
+                entry.put("rank",c.optString("rank",""));
+                entry.put("at",now);
+                history.put(entry);
+            }catch(Exception ignored){}
+        }
+        knownSpawns.clear();knownSpawns.addAll(current);
+        JSONArray limited=new JSONArray();
+        for(int i=Math.max(0,history.length()-40);i<history.length();i++)limited.put(history.opt(i));
+        preferences.edit().putString("history",limited.toString()).apply();
+        if(alerts&&!firstNew.isEmpty()&&now-lastAlertAt>60000L){
+            lastAlertAt=now;
+            NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);
+            if(nm!=null){
+                nm.createNotificationChannel(new NotificationChannel("pokesearch_alerts",
+                    "Novos Pokémon encontrados",NotificationManager.IMPORTANCE_DEFAULT));
+                Notification note=new Notification.Builder(this,"pokesearch_alerts")
+                    .setSmallIcon(android.R.drawable.ic_menu_search)
+                    .setContentTitle("Novo Pokémon: "+firstNew)
+                    .setContentText("Encontrado na busca "+mode.toUpperCase(java.util.Locale.ROOT))
+                    .setAutoCancel(true).build();
+                try{nm.notify(74,note);}catch(Exception ignored){}
+            }
+        }
+    }
+    private void applyCollectedResults(JSONObject r){
+        JSONArray items=r.optJSONArray("cards");
+        if(items==null)items=new JSONArray();
+        long now=System.currentTimeMillis();
+        for(int i=0;i<items.length();i++){
+            JSONObject card=items.optJSONObject(i);
+            if(card==null)continue;
+            try{
+                card.put("sampledAt",now);
+                long end=expiration(card);
+                if(end!=Long.MAX_VALUE)card.put("expiresAtMs",end);
+            }catch(Exception ignored){}
+        }
+        JSONArray sorted=sortItems(items);
+        recordNewResults(sorted);
+        results=sorted.toString();
+        searchInProgress=false;
+        armNextDespawn(sorted);
+        if(selected>=0)hideDetails();
+        getSharedPreferences("prefs",0).edit()
+            .putLong("lastSearchAt",now).putString("lastError","Nenhum").apply();
+        if(r.optBoolean("uncertain"))status("Alguns IVs não puderam ser confirmados.");
+        else if(sorted.length()==0)status("Sem resultados confirmados");
+        else status(sorted.length()+" Pokémon atualizados");
     }
     private void resize(int h){
         if(minimized||params==null)return;
@@ -340,17 +497,17 @@ public class OverlayService extends Service {
         if(show==menuExpanded)return;
         if(show){
             int screen=metrics().widthPixels;
-            int extra=dp(MENU_DP-DOCK_DP);
-            menuLeft=params.x+dp(MENU_DP)>screen;
+            int extra=dp(menuDp()-dockDp());
+            menuLeft=params.x+dp(menuDp())>screen;
             if(menuLeft)params.x=Math.max(0,params.x-extra);
-            params.width=dp(MENU_DP);
+            params.width=dp(menuDp());
         }else{
-            if(menuLeft)params.x=Math.min(metrics().widthPixels-dp(DOCK_DP),params.x+dp(MENU_DP-DOCK_DP));
-            params.width=dp(DOCK_DP);
+            if(menuLeft)params.x=Math.min(metrics().widthPixels-dp(dockDp()),params.x+dp(menuDp()-dockDp()));
+            params.width=dp(dockDp());
         }
         menuExpanded=show;
-        FrameLayout.LayoutParams g=new FrameLayout.LayoutParams(dp(DOCK_DP),dp(27),Gravity.TOP|Gravity.LEFT);
-        g.leftMargin=show&&menuLeft?dp(MENU_DP-DOCK_DP):0;
+        FrameLayout.LayoutParams g=new FrameLayout.LayoutParams(dp(dockDp()),dp(27),Gravity.TOP|Gravity.LEFT);
+        g.leftMargin=show&&menuLeft?dp(menuDp()-dockDp()):0;
         grip.setLayoutParams(g);
         js(panel,panelLoaded,"window.syncMenu("+show+","+JSONObject.quote(show&&menuLeft?"left":"right")+")");
         updateWindow();moveDetail();
@@ -360,10 +517,10 @@ public class OverlayService extends Service {
         if(yes&&menuExpanded)menu(false);
         minimized=yes;
         if(yes)hideDetails();
-        params.width=dp(yes?BUBBLE_DP:DOCK_DP);
+        params.width=dp(yes?BUBBLE_DP:dockDp());
         params.height=dp(yes?BUBBLE_DP:height);
         grip.setLayoutParams(new FrameLayout.LayoutParams(
-                dp(yes?BUBBLE_DP:DOCK_DP),dp(yes?BUBBLE_DP:27),Gravity.TOP|Gravity.LEFT));
+                dp(yes?BUBBLE_DP:dockDp()),dp(yes?BUBBLE_DP:27),Gravity.TOP|Gravity.LEFT));
         js(panel,panelLoaded,"window.setMinimized("+yes+")");
         updateWindow();
     }
@@ -513,6 +670,7 @@ public class OverlayService extends Service {
         if(i!=null&&"com.lucianotoscano.pokesearchoverlay.REFRESH_LOGIN".equals(i.getAction())){
             ++requestGeneration;searchInProgress=false;handler.removeCallbacks(expiryRefresh);
             results="[]";hideDetails();loaded=false;
+            knownSpawns.clear();
             status("Atualizando sessão após login...");
             CookieManager.getInstance().flush();
             if(website!=null)website.loadUrl("https://pogocoordinates.com/search");
@@ -528,6 +686,19 @@ public class OverlayService extends Service {
         if(intervalMinutes!=1&&intervalMinutes!=3&&intervalMinutes!=5&&
            intervalMinutes!=10&&intervalMinutes!=15&&intervalMinutes!=20)intervalMinutes=5;
         schedulePeriodic();
+        spriteSize=pref.getInt("spriteSize",50);
+        if(spriteSize!=32&&spriteSize!=40&&spriteSize!=50&&spriteSize!=60)spriteSize=50;
+        showTimers=pref.getBoolean("showTimers",false);
+        markBorders=pref.getBoolean("markBorders",true);
+        alerts=pref.getBoolean("alerts",false);
+        sort=pref.getString("sort","despawn");
+        if(params!=null&&!menuExpanded){
+            params.width=dp(minimized?BUBBLE_DP:dockDp());
+            params.x=Math.min(params.x,metrics().widthPixels-params.width);
+            grip.setLayoutParams(new FrameLayout.LayoutParams(
+                dp(minimized?BUBBLE_DP:dockDp()),dp(minimized?BUBBLE_DP:27),Gravity.TOP|Gravity.LEFT));
+            updateWindow();
+        }
         mode=getSharedPreferences("prefs",0).getString("mode",mode);
         shiny=getSharedPreferences("prefs",0).getBoolean("shiny",shiny);
         update();

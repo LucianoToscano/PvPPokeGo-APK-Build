@@ -126,7 +126,7 @@ function check(){
  return {ok:true};
 }
 function cardRoots(){
- const btns=elements("button,[role=button]").filter(e=>vis(e)&&/^Get coords$/i.test(text(e)));
+ const btns=elements("button,[role=button]").filter(e=>vis(e)&&/^(?:Get coords|Open in Maps)$/i.test(text(e)));
  return btns.slice(0,10).map((b,i)=>{
   let node=b,chosen=b.parentElement;
   for(let depth=0;depth<10&&node;depth++,node=node.parentElement){
@@ -187,13 +187,21 @@ function collect(){
  const found=cardRoots().map(item=>parseCard(item.node,item.sourceIndex));
  const valid=mode==="iv"?found.filter(x=>x.iv==="15/15/15"||x.ivPercent==="100"):found;
  const uncertain=mode==="iv"&&found.some(x=>!(x.iv==="15/15/15"||x.ivPercent==="100"));
- return JSON.stringify({ok:true,cards:valid,found:found.length,uncertain});
+ const t=text(document.body);
+ const loading=!!document.querySelector('[aria-busy="true"],[role="progressbar"]')||
+   !!oneButton("Searching")||!!oneButton("Loading");
+ const explicitEmpty=/\b(?:no results found|no results|nenhum resultado|sem resultados)\b/i.test(t);
+ return JSON.stringify({ok:true,cards:valid,found:found.length,uncertain,loading,explicitEmpty});
 }
 if(action==="collect")return collect();
 if(action.startsWith("coords:")){
  const index=Number(action.slice(7));
- const btn=elements("button,[role=button]").filter(e=>vis(e)&&/^Get coords$/i.test(text(e)))[index];
- if(!btn)return JSON.stringify({ok:false,status:"Botão Get coords não localizado"});
+ const card=cardRoots().find(c=>c.sourceIndex===index);
+ const btn=card&&Array.from(card.node.querySelectorAll("button,[role=button]")).find(e=>vis(e)&&/^Get coords$/i.test(text(e)));
+ if(!btn){
+  const opened=card&&Array.from(card.node.querySelectorAll("button,a,[role=button]")).some(e=>vis(e)&&/^Open in Maps$/i.test(text(e)));
+  return JSON.stringify({ok:!!opened,status:opened?"Coordenadas já abertas":"Botão Get coords não localizado"});
+ }
  btn.click();
  return JSON.stringify({ok:true,status:"Solicitando coordenadas no site"});
 }
@@ -224,6 +232,12 @@ if(action.startsWith("readCoords:")){
   }
  }
  return JSON.stringify({ok:false,status:"O site ainda não exibiu coordenadas"});
+}
+if(action==="session"){
+ const sw=shinyControl();
+ const login=elements("a,button,[role=button]").some(e=>vis(e)&&/^(?:Log ?in|Sign ?in|Entrar|Fazer login)$/i.test(text(e)));
+ return JSON.stringify({ok:true,auth:sw?"autenticada":login?"login necessário":"não confirmado",
+   shinyAvailable:!!sw,site:location.hostname});
 }
 if(action==="prepareSearch"){
  const target=mode==="iv"?"Stats":"PvP";
