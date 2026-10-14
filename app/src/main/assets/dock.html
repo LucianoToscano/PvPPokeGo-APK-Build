@@ -5,10 +5,9 @@
 html,body{margin:0;padding:0;background:transparent!important;color:#fff;font:10px Roboto,Arial,sans-serif;overflow:hidden}
 button{font:inherit;color:inherit;border:0;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 #shell{width:44px;background:transparent!important;border:0;border-radius:0;box-shadow:none;overflow:visible}
-#handle{width:44px;height:9px;line-height:9px;text-align:center;color:#e1e6eac2;font-size:8px;user-select:none;letter-spacing:0}
 #gear{width:28px;height:27px;margin:0 auto;padding:0;border:0;background:transparent;color:#e9ecf1;display:flex;align-items:center;justify-content:center}
 #gear svg{display:block;width:19px;height:19px;filter:drop-shadow(0 1px 1px #0007)}
-#menu{display:none;position:absolute;top:9px;left:44px;width:203px;height:27px;z-index:3;padding:0 4px;border:0;border-radius:0;background:transparent;box-shadow:none}
+#menu{display:none;position:absolute;top:0;left:44px;width:203px;height:27px;z-index:3;padding:0 4px;border:0;border-radius:0;background:transparent;box-shadow:none}
 #menu.open{display:block}
 body.menu-left #shell{margin-left:203px}
 body.menu-left #menu{left:0}
@@ -29,8 +28,7 @@ body.menu-left #menu{left:0}
 #bubble b{font-size:18px}#bubble small{font-size:10px;color:#ff839a}
 </style></head><body>
 <div id="shell">
- <div id="handle">••••••</div>
- <button id="gear" title="Configurações" aria-label="Abrir opções" aria-expanded="false" onclick="toggleMenu()"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96c-.5-.38-1.03-.69-1.64-.93L14.36 2.8a.49.49 0 0 0-.49-.4h-3.84a.49.49 0 0 0-.49.4l-.36 2.53c-.6.24-1.15.56-1.64.93l-2.39-.96a.49.49 0 0 0-.61.22L2.62 8.84a.5.5 0 0 0 .12.64l2.02 1.58c-.04.3-.07.62-.07.94s.03.64.08.94L2.74 14.5a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.61.22l2.39-.96c.49.38 1.04.7 1.64.93l.36 2.53c.04.24.24.4.49.4h3.84c.25 0 .45-.16.49-.4l.36-2.53c.6-.24 1.15-.55 1.64-.93l2.39.96c.23.09.49 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.02-1.56ZM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"/></svg></button>
+ <button id="gear" title="Configurações" aria-label="Abrir opções" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96c-.5-.38-1.03-.69-1.64-.93L14.36 2.8a.49.49 0 0 0-.49-.4h-3.84a.49.49 0 0 0-.49.4l-.36 2.53c-.6.24-1.15.56-1.64.93l-2.39-.96a.49.49 0 0 0-.61.22L2.62 8.84a.5.5 0 0 0 .12.64l2.02 1.58c-.04.3-.07.62-.07.94s.03.64.08.94L2.74 14.5a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.61.22l2.39-.96c.49.38 1.04.7 1.64.93l.36 2.53c.04.24.24.4.49.4h3.84c.25 0 .45-.16.49-.4l.36-2.53c.6-.24 1.15-.55 1.64-.93l2.39.96c.23.09.49 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.02-1.56ZM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"/></svg></button>
  <div id="menu"><div id="controls">
   <button id="cycle" title="Alternar IV100, GL#1 e UL#1" onclick="Native.cycleMode()">IV100</button>
   <button id="sh" title="Ativar ou desativar Shiny" onclick="Native.shiny()">✨</button>
@@ -53,11 +51,6 @@ function setMenuOpen(open,side){
  document.getElementById("gear").setAttribute("aria-expanded",String(menuOpen));
  if(!menuOpen)document.body.classList.remove("menu-left");
  else if(side)document.body.classList.toggle("menu-left",side==="left");
-}
-function toggleMenu(){
- const next=!menuOpen;
- setMenuOpen(next);
- Native.menu(next);
 }
 window.syncMenu=(open,side)=>setMenuOpen(open,side);
 function fit(){requestAnimationFrame(()=>Native.resize(Math.ceil(document.getElementById("shell").getBoundingClientRect().height)+1));}

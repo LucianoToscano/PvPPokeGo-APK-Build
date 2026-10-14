@@ -167,13 +167,17 @@ public class OverlayService extends Service {
                     }
                     return true;
                 case MotionEvent.ACTION_UP:
-                    if(minimized&&!dragged)minimize(false);
+                    // The same gear is the drag handle and menu toggle.
+                    if(!dragged){
+                        if(minimized)minimize(false);
+                        else menu(!menuExpanded);
+                    }
                     return true;
                 case MotionEvent.ACTION_CANCEL:return true;
             }
             return true;
         });
-        root.addView(grip,new FrameLayout.LayoutParams(dp(DOCK_DP),dp(9),Gravity.TOP|Gravity.LEFT));
+        root.addView(grip,new FrameLayout.LayoutParams(dp(DOCK_DP),dp(27),Gravity.TOP|Gravity.LEFT));
 
         params=new WindowManager.LayoutParams(dp(DOCK_DP),dp(height),
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
@@ -283,7 +287,7 @@ public class OverlayService extends Service {
             params.width=dp(DOCK_DP);
         }
         menuExpanded=show;
-        FrameLayout.LayoutParams g=new FrameLayout.LayoutParams(dp(DOCK_DP),dp(9),Gravity.TOP|Gravity.LEFT);
+        FrameLayout.LayoutParams g=new FrameLayout.LayoutParams(dp(DOCK_DP),dp(27),Gravity.TOP|Gravity.LEFT);
         g.leftMargin=show&&menuLeft?dp(MENU_DP-DOCK_DP):0;
         grip.setLayoutParams(g);
         js(panel,panelLoaded,"window.syncMenu("+show+","+JSONObject.quote(show&&menuLeft?"left":"right")+")");
@@ -297,7 +301,7 @@ public class OverlayService extends Service {
         params.width=dp(yes?BUBBLE_DP:DOCK_DP);
         params.height=dp(yes?BUBBLE_DP:height);
         grip.setLayoutParams(new FrameLayout.LayoutParams(
-                dp(yes?BUBBLE_DP:DOCK_DP),dp(yes?BUBBLE_DP:9),Gravity.TOP|Gravity.LEFT));
+                dp(yes?BUBBLE_DP:DOCK_DP),dp(yes?BUBBLE_DP:27),Gravity.TOP|Gravity.LEFT));
         js(panel,panelLoaded,"window.setMinimized("+yes+")");
         updateWindow();
     }

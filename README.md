@@ -1,7 +1,3 @@
-# Pokésearch Overlay 0.21 Alpha
+# Pokésearch Overlay 0.22 Alpha
 
-Correção de retração: engrenagem fecha somente o menu horizontal; remove imediatamente o deslocamento lateral `menu-left`, sincroniza com a janela nativa e mantém sempre engrenagem + sprites visíveis. Minimizar também limpa o estado lateral.
-
-Intervalo inicial alterado de 10 para 5 minutos, inclusive migração das configurações herdadas da v0.20 que não registravam escolha explícita. Após escolha pelo usuário (1, 3, 5, 10, 15, 20 min), o intervalo é preservado nas próximas aberturas.
-
-Contador de despawn usa o instante em que os dados foram recebidos e não volta ao início por mudanças de status na ficha. Mantidos layout lateral em linha, coluna transparente, filtros e cópia de coordenadas. Alterações ainda precisam de teste em aparelho.
+A engrenagem substitui a antiga alça de pontinhos: toque curto alterna a abertura do submenu horizontal; arrastar a própria engrenagem move toda a coluna do overlay sem abrir ou fechar o menu. Movimento com tolerância de 4 dp para diferenciar toque de arrasto. Hitbox nativa de 44×27 dp, sobreposta à engrenagem desenhada em SVG; excluído o controle antigo de 9 dp. Menu lateral alinhado ao topo da engrenagem, sprites imediatamente abaixo. Com a janela minimizada, toque restaura a coluna normalmente. Atualização padrão 5 minutos mantida. O APK compila em CI, mas os gestos ainda precisam de teste em aparelho.
