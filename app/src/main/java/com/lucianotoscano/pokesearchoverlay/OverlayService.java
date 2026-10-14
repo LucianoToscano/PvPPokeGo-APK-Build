@@ -30,14 +30,14 @@ import java.io.InputStream;
 import java.util.function.Consumer;
 
 public class OverlayService extends Service {
-    private static final int DOCK_DP=52, BUBBLE_DP=45, DETAIL_DP=226;
+    private static final int DOCK_DP=52, BUBBLE_DP=45, DETAIL_DP=226, MENU_DP=168;
     private final Handler handler=new Handler(Looper.getMainLooper());
     private WindowManager wm;
     private WindowManager.LayoutParams params,detailParams;
     private FrameLayout root,detailRoot;
     private View grip;
     private WebView panel,detailPanel,website;
-    private boolean minimized=false,shiny=true,loaded=false,panelLoaded=false,detailLoaded=false,stopped=false;
+    private boolean menuExpanded=false,menuLeft=false,minimized=false,shiny=true,loaded=false,panelLoaded=false,detailLoaded=false,stopped=false;
     private int height=190,detailHeight=225,requestGeneration=0,selected=-1;
     private String mode="iv",results="[]",status="Conectando...";
     private float startRawX,startRawY;
@@ -257,8 +257,29 @@ public class OverlayService extends Service {
         if(Math.abs(target-height)<2)return;
         height=target;params.height=dp(height);updateWindow();moveDetail();
     }
+    private void menu(boolean show){
+        if(params==null||minimized)return;
+        if(show==menuExpanded)return;
+        if(show){
+            int screen=metrics().widthPixels;
+            int extra=dp(MENU_DP-DOCK_DP);
+            menuLeft=params.x+dp(MENU_DP)>screen;
+            if(menuLeft)params.x=Math.max(0,params.x-extra);
+            params.width=dp(MENU_DP);
+        }else{
+            if(menuLeft)params.x+=dp(MENU_DP-DOCK_DP);
+            params.width=dp(DOCK_DP);
+        }
+        menuExpanded=show;
+        FrameLayout.LayoutParams g=new FrameLayout.LayoutParams(dp(DOCK_DP),dp(12),Gravity.TOP|Gravity.LEFT);
+        g.leftMargin=show&&menuLeft?dp(MENU_DP-DOCK_DP):0;
+        grip.setLayoutParams(g);
+        js(panel,panelLoaded,"window.menuSide("+JSONObject.quote(menuLeft?"left":"right")+")");
+        updateWindow();moveDetail();
+    }
     private void minimize(boolean yes){
         if(params==null)return;
+        if(yes&&menuExpanded)menu(false);
         minimized=yes;
         if(yes)hideDetails();
         params.width=dp(yes?BUBBLE_DP:DOCK_DP);
@@ -354,6 +375,7 @@ public class OverlayService extends Service {
             mode=s;getSharedPreferences("prefs",0).edit().putString("mode",s).apply();
             results="[]";hideDetails();update();refresh();
         });}
+        @JavascriptInterface public void menu(boolean open){handler.post(()->OverlayService.this.menu(open));}
         @JavascriptInterface public void cycleMode(){handler.post(()->{
             mode=mode.equals("iv")?"gl":mode.equals("gl")?"ul":"iv";
             getSharedPreferences("prefs",0).edit().putString("mode",mode).apply();

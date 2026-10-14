@@ -4,9 +4,9 @@
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;background:transparent;color:#fff;font-family:Roboto,Arial,sans-serif;font-size:10px;overflow:hidden}
 button{font:inherit;color:inherit;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-#shell{width:100%;background:rgba(11,16,23,.25);border:0;border-radius:7px;overflow:hidden;box-shadow:0 3px 12px #0003;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+#shell{width:52px;background:rgba(11,16,23,.25);border:0;border-radius:7px;overflow:hidden;box-shadow:0 3px 12px #0003;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 #handle{height:12px;text-align:center;padding:0;color:#dce2ecae;font-size:9px;line-height:12px;letter-spacing:1px;user-select:none}
-#controls{display:none;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;padding:0 1px 2px}#controls.open{display:grid}#gear{display:block;margin:0 auto 1px;width:37px;height:29px;border:0;border-radius:6px;background:#131a2270;color:#fff;font-size:23px;line-height:28px;text-align:center}
+#controls{display:none;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;padding:0 1px 2px}#controls.open{display:grid}#gear{display:flex;align-items:center;justify-content:center;margin:0 auto 1px;width:32px;height:27px;border:0;border-radius:7px;background:#131a2255;color:#d8e0e9;line-height:1}#gear svg{width:17px;height:17px;stroke-width:1.65}#menu{display:none;position:absolute;top:13px;left:55px;width:111px;z-index:3;padding:3px;border-radius:8px;background:rgba(18,23,31,.89);border:1px solid #ffffff2b;box-shadow:0 3px 13px #0006}#menu.open{display:block}body.menu-left #shell{margin-left:116px}body.menu-left #menu{left:0}#controls{display:grid!important}#controls button{height:27px!important;min-height:27px!important;font-size:10px!important}#controls button:first-child{grid-column:1 / -1}#spawns{width:52px}#handle{width:52px}
 #controls button{height:19px;min-height:19px;min-width:0;border-radius:2px;border:0;background:#131a2280;font-size:8px;font-weight:700;white-space:nowrap;padding:0 1px}
 #controls button.active{background:#e9294bb3;border-color:#fb718a7d}
 #controls button.shinyOn{color:#ffe4a0;background:#58452280;border-color:#d9b35b91}
@@ -23,8 +23,8 @@ button{font:inherit;color:inherit;border:0;cursor:pointer;-webkit-tap-highlight-
 </style></head><body>
 <div id="shell">
  <div id="handle">••••••</div>
- <button id="gear" title="Configurações" aria-label="Abrir opções" onclick="toggleMenu()">⚙</button>
- <div id="controls">
+ <button id="gear" title="Configurações" aria-label="Abrir opções" onclick="toggleMenu()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8.3a3.7 3.7 0 1 0 0 7.4 3.7 3.7 0 0 0 0-7.4Z"/><path d="M19.1 13.3a7.4 7.4 0 0 0 0-2.6l1.5-1.2-1.7-2.9-1.8.7a7.5 7.5 0 0 0-2.2-1.3l-.3-1.9h-3.4l-.3 1.9a7.5 7.5 0 0 0-2.2 1.3l-1.8-.7-1.7 2.9 1.5 1.2a7.4 7.4 0 0 0 0 2.6l-1.5 1.2 1.7 2.9 1.8-.7a7.5 7.5 0 0 0 2.2 1.3l.3 1.9h3.4l.3-1.9a7.5 7.5 0 0 0 2.2-1.3l1.8.7 1.7-2.9-1.5-1.2Z"/></svg></button>
+ <div id="menu"><div id="controls">
    <button id="cycle" title="Alternar IV100, GL#1, UL#1" onclick="Native.cycleMode()">IV100</button>
    <button id="sh" title="Ativar/desativar Shiny" onclick="Native.shiny()">✨</button>
    <div id="actions">
@@ -32,14 +32,14 @@ button{font:inherit;color:inherit;border:0;cursor:pointer;-webkit-tap-highlight-
     <button title="Minimizar" onclick="Native.minimize()">−</button>
     <button title="Fechar" onclick="Native.close()">×</button>
    </div>
- </div>
+ </div></div>
  <div id="spawns"></div>
  <div id="empty">Aguardando busca</div>
 </div>
 <div id="bubble"><b>◉</b><small id="count">0</small></div>
 <script>
 let cards=[],active=-1,mode="iv",shiny=true,status="",row=36,menuOpen=false;
-function toggleMenu(){menuOpen=!menuOpen;document.getElementById("controls").classList.toggle("open",menuOpen);document.getElementById("gear").setAttribute("aria-expanded",String(menuOpen));fit();}
+function toggleMenu(){menuOpen=!menuOpen;document.getElementById("menu").classList.toggle("open",menuOpen);document.getElementById("gear").setAttribute("aria-expanded",String(menuOpen));Native.menu(menuOpen);}
 function fit(){requestAnimationFrame(()=>Native.resize(Math.ceil(document.getElementById("shell").getBoundingClientRect().height)+1));}
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let longTimer, longDone=false;
@@ -74,10 +74,11 @@ window.onNativeData=(a,s,m,shi,r)=>{
  if(active>=cards.length)active=-1;
  draw();
 };
+window.menuSide=side=>document.body.classList.toggle("menu-left",side==="left");
 window.highlight=i=>{active=i;document.querySelectorAll(".spawn").forEach((e,index)=>e.classList.toggle("active",index===i));};
 window.setMinimized=value=>{
  document.getElementById("shell").style.display=value?"none":"block";
- if(value){menuOpen=false;document.getElementById("controls").classList.remove("open");}
+ if(value){menuOpen=false;document.getElementById("menu").classList.remove("open");}
  document.getElementById("bubble").style.display=value?"flex":"none";
  if(!value)draw();
 };

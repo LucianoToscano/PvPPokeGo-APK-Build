@@ -1,3 +1,3 @@
-# Pokésearch Overlay v0.17
+# Pokésearch Overlay 0.18
 
-Um botão alterna IV100 → GL#1 → UL#1 → IV100. Na modalidade UL procura configurar PvP Top ranking 1 e Ultra League; GL procura Great League. Pesquisa e leitura do site continuam experimentais, e os rankings exibidos dependem de resultados corretamente filtrados pelo PoGoCoordinates. Outras funções anteriores preservadas.
+Ícone de engrenagem vetorial discreta; menu lateral flutuante independente da coluna vertical de Pokémon. Ao abrir, a janela aumenta horizontalmente sem aumentar a altura, e o menu aparece à esquerda ou direita segundo espaço disponível. Botão de modo gira IV100/GL#1/UL#1. Mantido painel transparente, 5 min de atualização e contador de despawn.
