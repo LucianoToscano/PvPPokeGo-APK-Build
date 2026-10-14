@@ -1,23 +1,18 @@
-# Pokésearch Overlay 0.2 Alpha
-Aplicativo Android independente do PvPPokeGo (pacote com.lucianotoscano.pokesearchoverlay).
+# Pokésearch Overlay v0.3 Alpha
 
-## Teste
-1. Desinstale a 0.1 antes de instalar a 0.2: builds debug do GitHub podem usar assinaturas diferentes.
-2. Entre na sua conta em https://pogocoordinates.com/search dentro do próprio APK.
-3. Toque em INICIAR OVERLAY e conceda permissão de exibição sobre outros apps.
-4. Mova a janela com a alça ⠿ à esquerda, não arrastando os botões.
-5. Troque IV100, GL#1 e ✨, atualize, minimize e maximize.
-6. Toque no ícone do Pokémon para abrir informações disponíveis, incluindo IV real capturado do site.
+Independent Android package com.lucianotoscano.pokesearchoverlay.
 
-## Mudanças
-- Painel de largura 270 dp, fundo quase transparente com blur se suportado.
-- Janela compacta com até 10 ícones (duas linhas) ou lista com rolagem.
-- Arrasto nativo com coordenadas absolutas: sem eventos touchmove enviados pela WebView.
-- Extração robusta de IV 60% (0/13/14) e 100% (15/15/15), sem selos de IV falsos.
-- Resultado IV 100 diferente é ocultado em vez de anunciado como 100%.
-- Captura tentativa dos demais detalhes da página sem criar dados sintéticos.
-- Atualização a cada 5 minutos.
+## Changes
+- Vertical ultra-narrow overlay dock (86dp) with stacked controls.
+- Shows all 10 max search results at once, without scrolling, with authentic IV% on each Pokémon icon row.
+- Each icon opens a separate compact detail window adjacent to the dock with name, form, size, gender, CP, level, IV, moves, location, despawn and Get coords where available.
+- Detail window does not make the dock grow or hide any of the ten results.
+- Dynamic row sizing based on device viewport; no false 100% badges.
+- Drag by grip, minimize to bubble and close.
+- Searches powered by authenticated PoGoCoordinates session, automatic 5min refresh.
 
-## Limitações da alpha
-A automação dos controles React e Get coords depende da estrutura real do site e ainda precisa de testes autenticados no aparelho.
-O app não contorna restrições do PoGoCoordinates. Se a consulta não puder ser confirmada, informa o problema em vez de inventar resultados.
+## Limitations
+The app does not currently implement a guaranteed backend/API integration; it reads the site DOM. Login and site filter/Get coords behavior must be tested on device. Website changes can break selectors. Actual coordinates appear only if the site exposes them. A blurred material across other apps is device/API-dependent; transparency is guaranteed.
+
+## Installation
+If debug signing key differs from your existing build, uninstall the previous alpha before installing.

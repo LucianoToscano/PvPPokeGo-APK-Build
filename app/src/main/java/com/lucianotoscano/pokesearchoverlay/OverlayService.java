@@ -15,7 +15,6 @@ import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewConfiguration;
 import android.view.WindowManager;
 import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
@@ -29,19 +28,18 @@ import java.io.InputStream;
 import java.util.function.Consumer;
 
 public class OverlayService extends Service {
-    private static final int WIDTH_DP=270;
-    private static final int BUBBLE_DP=46;
+    private static final int DOCK_DP=86, BUBBLE_DP=45, DETAIL_DP=226;
     private final Handler handler=new Handler(Looper.getMainLooper());
     private WindowManager wm;
-    private WindowManager.LayoutParams params;
-    private FrameLayout root;
-    private View dragHandle;
-    private WebView panel,website;
-    private boolean minimized=false,shiny=true,compact=true,loaded=false,panelLoaded=false,stopped=false;
-    private int height=139,requestGeneration=0;
+    private WindowManager.LayoutParams params,detailParams;
+    private FrameLayout root,detailRoot;
+    private View grip;
+    private WebView panel,detailPanel,website;
+    private boolean minimized=false,shiny=true,loaded=false,panelLoaded=false,detailLoaded=false,stopped=false;
+    private int height=190,detailHeight=225,requestGeneration=0,selected=-1;
     private String mode="iv",results="[]",status="Conectando...";
-    private float downRawX,downRawY;
-    private int initialX,initialY;
+    private float startRawX,startRawY;
+    private int startX,startY;
     private boolean dragged=false;
     private final Runnable periodic=new Runnable(){
         @Override public void run(){
@@ -49,57 +47,86 @@ public class OverlayService extends Service {
         }
     };
     private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
-    private void js(String s){if(panelLoaded&&panel!=null)panel.evaluateJavascript(s,null);}
-    private void update(){js("window.onNativeData("+results+","+JSONObject.quote(status)+","+JSONObject.quote(mode)+","+shiny+","+compact+")");}
-    private void status(String value){status=value;update();}
+    private DisplayMetrics metrics(){
+        DisplayMetrics m=new DisplayMetrics();
+        wm.getDefaultDisplay().getMetrics(m);
+        return m;
+    }
+    private int screenWidthDp(){DisplayMetrics m=metrics();return Math.round(m.widthPixels/m.density);}
+    private int screenHeightDp(){DisplayMetrics m=metrics();return Math.round(m.heightPixels/m.density);}
+    private void js(WebView web,boolean ready,String code){
+        if(web!=null&&ready)web.evaluateJavascript(code,null);
+    }
+    private int count(){
+        try{return new JSONArray(results).length();}catch(Exception e){return 0;}
+    }
+    private int rowDp(){
+        int n=Math.max(1,count());
+        int available=screenHeightDp()-125-156;
+        return Math.max(24,Math.min(39,available/n));
+    }
+    private void update(){
+        js(panel,panelLoaded,"window.onNativeData("+results+","+JSONObject.quote(status)+","+
+                JSONObject.quote(mode)+","+shiny+","+rowDp()+")");
+        if(selected>=0)showDetails(selected);
+    }
+    private void status(String s){status=s;update();}
     private void updateWindow(){
-        if(wm!=null && params!=null && root!=null){
+        if(wm!=null&&root!=null&&params!=null){
             try{wm.updateViewLayout(root,params);}catch(Exception ignored){}
         }
+    }
+    private void moveDetail(){
+        if(detailRoot==null||detailParams==null||params==null)return;
+        int w=screenWidthDp(),h=screenHeightDp(),gap=5;
+        int right=params.x/dp(1)+DOCK_DP+gap;
+        int left=params.x/dp(1)-DETAIL_DP-gap;
+        int preferred=right+DETAIL_DP<=w-4?right:left;
+        detailParams.x=dp(Math.max(0,Math.min(w-DETAIL_DP,preferred)));
+        int dockY=params.y/dp(1);
+        detailParams.y=dp(Math.max(0,Math.min(h-detailHeight-45,dockY+18)));
+        try{wm.updateViewLayout(detailRoot,detailParams);}catch(Exception ignored){}
+    }
+    private void newWebsite(){
+        website=new WebView(this);
+        website.getSettings().setJavaScriptEnabled(true);
+        website.getSettings().setDomStorageEnabled(true);
+        website.setAlpha(0);
+        website.setFocusable(false);
+        website.setClickable(false);
+        website.setOnTouchListener((v,e)->true);
+        CookieManager.getInstance().setAcceptCookie(true);
+        CookieManager.getInstance().setAcceptThirdPartyCookies(website,true);
+        root.addView(website,new FrameLayout.LayoutParams(dp(390),dp(690),Gravity.TOP|Gravity.LEFT));
+        website.setWebViewClient(new WebViewClient(){
+            @Override public void onPageFinished(WebView view,String url){
+                if(url!=null&&url.startsWith("https://pogocoordinates.com/")){
+                    loaded=true;
+                    handler.postDelayed(()->{if(!stopped)refresh();},2500);
+                }
+            }
+        });
     }
     @Override public void onCreate(){
         super.onCreate();
         NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);
-        nm.createNotificationChannel(new NotificationChannel("pokesearch","Pokésearch Overlay",NotificationManager.IMPORTANCE_LOW));
+        nm.createNotificationChannel(new NotificationChannel("pokesearch","Pokésearch Overlay",
+                NotificationManager.IMPORTANCE_LOW));
         PendingIntent pi=PendingIntent.getActivity(this,0,new Intent(this,MainActivity.class),
                 PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);
-        Notification n=new Notification.Builder(this,"pokesearch")
-                .setSmallIcon(android.R.drawable.ic_menu_search).setContentTitle("Pokésearch Overlay ativo")
-                .setContentText("Abra para autenticar no PoGoCoordinates").setContentIntent(pi)
-                .setOngoing(true).build();
-        startForeground(73,n);
+        Notification note=new Notification.Builder(this,"pokesearch")
+                .setSmallIcon(android.R.drawable.ic_menu_search)
+                .setContentTitle("Pokésearch Overlay ativo")
+                .setContentText("Toque para abrir o PoGoCoordinates")
+                .setContentIntent(pi).setOngoing(true).build();
+        startForeground(73,note);
         wm=(WindowManager)getSystemService(WINDOW_SERVICE);
         root=new FrameLayout(this);
         root.setBackgroundColor(Color.TRANSPARENT);
         root.setClipChildren(true);
-
-        // Hidden authenticated browser. It never receives user gestures; the window
-        // itself occupies only the compact, visible overlay bounds.
-        website=new WebView(this);
-        website.getSettings().setJavaScriptEnabled(true);
-        website.getSettings().setDomStorageEnabled(true);
-        website.setClickable(false);
-        website.setFocusable(false);
-        website.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        website.setAlpha(0f);
-        website.setOnTouchListener((v,event)->true);
-        CookieManager.getInstance().setAcceptCookie(true);
-        CookieManager.getInstance().setAcceptThirdPartyCookies(website,true);
-        root.addView(website,new FrameLayout.LayoutParams(dp(370),dp(680),Gravity.TOP|Gravity.LEFT));
-        website.setWebViewClient(new WebViewClient(){
-            @Override public void onPageFinished(WebView v,String url){
-                if(url!=null&&url.startsWith("https://pogocoordinates.com/")){
-                    loaded=true;
-                    handler.postDelayed(()->{
-                        if(!stopped)refresh();
-                    },2500L);
-                }
-            }
-        });
-
+        newWebsite();
         panel=new WebView(this);
         panel.setBackgroundColor(Color.TRANSPARENT);
-        panel.setLayerType(View.LAYER_TYPE_HARDWARE,null);
         panel.getSettings().setJavaScriptEnabled(true);
         panel.addJavascriptInterface(new Bridge(),"Native");
         root.addView(panel,new FrameLayout.LayoutParams(-1,-1));
@@ -110,28 +137,25 @@ public class OverlayService extends Service {
                 }
             }
         });
-
-        // Native drag zone. Using raw screen coordinates prevents the feedback
-        // jitter caused by moving a window during WebView touchmove events.
-        dragHandle=new View(this);
-        dragHandle.setBackgroundColor(Color.TRANSPARENT);
-        dragHandle.setOnTouchListener((v,event)->{
+        grip=new View(this);
+        grip.setBackgroundColor(Color.TRANSPARENT);
+        grip.setOnTouchListener((v,event)->{
             if(params==null)return true;
             switch(event.getActionMasked()){
                 case MotionEvent.ACTION_DOWN:
-                    downRawX=event.getRawX(); downRawY=event.getRawY();
-                    initialX=params.x;initialY=params.y;dragged=false;return true;
+                    startRawX=event.getRawX();startRawY=event.getRawY();
+                    startX=params.x;startY=params.y;dragged=false;return true;
                 case MotionEvent.ACTION_MOVE:
-                    int dx=Math.round(event.getRawX()-downRawX);
-                    int dy=Math.round(event.getRawY()-downRawY);
-                    if(Math.abs(dx)+Math.abs(dy)>dp(3))dragged=true;
+                    int dx=Math.round(event.getRawX()-startRawX);
+                    int dy=Math.round(event.getRawY()-startRawY);
+                    if(Math.abs(dx)+Math.abs(dy)>dp(4))dragged=true;
                     if(dragged){
-                        DisplayMetrics d=getResources().getDisplayMetrics();
-                        int width=dp(minimized?BUBBLE_DP:WIDTH_DP);
-                        int currentHeight=dp(minimized?BUBBLE_DP:height);
-                        params.x=Math.max(0,Math.min(d.widthPixels-width,initialX+dx));
-                        params.y=Math.max(0,Math.min(d.heightPixels-currentHeight,initialY+dy));
-                        updateWindow();
+                        DisplayMetrics d=metrics();
+                        int winWidth=dp(minimized?BUBBLE_DP:DOCK_DP);
+                        int winHeight=dp(minimized?BUBBLE_DP:height);
+                        params.x=Math.max(0,Math.min(d.widthPixels-winWidth,startX+dx));
+                        params.y=Math.max(0,Math.min(d.heightPixels-winHeight,startY+dy));
+                        updateWindow();moveDetail();
                     }
                     return true;
                 case MotionEvent.ACTION_UP:
@@ -141,17 +165,41 @@ public class OverlayService extends Service {
             }
             return true;
         });
-        root.addView(dragHandle,new FrameLayout.LayoutParams(dp(23),dp(36),Gravity.TOP|Gravity.LEFT));
+        root.addView(grip,new FrameLayout.LayoutParams(dp(22),dp(23),Gravity.TOP|Gravity.LEFT));
 
-        params=new WindowManager.LayoutParams(dp(WIDTH_DP),dp(height),
+        params=new WindowManager.LayoutParams(dp(DOCK_DP),dp(height),
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
                 PixelFormat.TRANSLUCENT);
         params.gravity=Gravity.TOP|Gravity.LEFT;
-        params.x=dp(8);params.y=dp(152);
-        try{wm.addView(root,params);}
-        catch(Exception e){stopSelf();return;}
-        panel.loadUrl("file:///android_asset/overlay.html");
+        params.x=dp(Math.max(0,screenWidthDp()-DOCK_DP-7));params.y=dp(120);
+        try{wm.addView(root,params);}catch(Exception e){stopSelf();return;}
+
+        detailRoot=new FrameLayout(this);
+        detailRoot.setBackgroundColor(Color.TRANSPARENT);
+        detailPanel=new WebView(this);
+        detailPanel.setBackgroundColor(Color.TRANSPARENT);
+        detailPanel.getSettings().setJavaScriptEnabled(true);
+        detailPanel.addJavascriptInterface(new Bridge(),"Native");
+        detailRoot.addView(detailPanel,new FrameLayout.LayoutParams(-1,-1));
+        detailPanel.setWebViewClient(new WebViewClient(){
+            @Override public void onPageFinished(WebView v,String url){
+                if(url!=null&&url.startsWith("file:///android_asset/")){
+                    detailLoaded=true;
+                    if(selected>=0)showDetails(selected);
+                }
+            }
+        });
+        detailParams=new WindowManager.LayoutParams(dp(DETAIL_DP),dp(detailHeight),
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                PixelFormat.TRANSLUCENT);
+        detailParams.gravity=Gravity.TOP|Gravity.LEFT;
+        detailParams.x=dp(15);detailParams.y=dp(135);
+        detailRoot.setVisibility(View.GONE);
+        try{wm.addView(detailRoot,detailParams);}catch(Exception e){detailRoot=null;}
+        panel.loadUrl("file:///android_asset/dock.html");
+        if(detailRoot!=null)detailPanel.loadUrl("file:///android_asset/detail.html");
         website.loadUrl("https://pogocoordinates.com/search");
         handler.postDelayed(periodic,300000L);
     }
@@ -164,83 +212,118 @@ public class OverlayService extends Service {
         }catch(Exception e){return "null";}
     }
     private void execute(String action,Consumer<JSONObject> callback){
-        if(!loaded||website==null){
-            status("Faça login no aplicativo.");return;
-        }
+        if(!loaded||website==null){status("Abra o app e faça login.");return;}
         String code=script().replace("__ACTION__",JSONObject.quote(action))
-                .replace("__MODE__",JSONObject.quote(mode)).replace("__SHINY__",shiny?"true":"false");
+                .replace("__MODE__",JSONObject.quote(mode))
+                .replace("__SHINY__",shiny?"true":"false");
         website.evaluateJavascript(code,raw->{
             try{
                 String decoded=new JSONArray("["+raw+"]").getString(0);
-                JSONObject obj=new JSONObject(decoded);
-                if(callback!=null)callback.accept(obj);
-            }catch(Exception e){status("Não foi possível ler os dados do site.");}
+                JSONObject r=new JSONObject(decoded);
+                if(callback!=null)callback.accept(r);
+            }catch(Exception e){status("Falha ao ler resultados no site.");}
         });
     }
     private void refresh(){
         if(!loaded){status("Aguardando login...");return;}
-        final int generation=++requestGeneration;
-        status("Pesquisando no site...");
-        execute("search",response->{
+        int generation=++requestGeneration;
+        status("Pesquisando...");
+        execute("search",r->{
             if(generation!=requestGeneration)return;
-            if(!response.optBoolean("ok"))status("Filtro não confirmado; verifique no site.");
-            handler.postDelayed(()->{if(!stopped&&generation==requestGeneration)collect(generation);},4500L);
+            if(!r.optBoolean("ok"))status("Verifique filtros no site");
+            handler.postDelayed(()->{
+                if(!stopped&&generation==requestGeneration)collect(generation);
+            },4500);
         });
     }
     private void collect(int generation){
-        execute("collect",response->{
+        execute("collect",r->{
             if(stopped||generation!=requestGeneration)return;
-            JSONArray cards=response.optJSONArray("cards");
-            int count=cards==null?0:Math.min(10,cards.length());
-            results=cards==null?"[]":cards.toString();
-            boolean uncertain=response.optBoolean("uncertain");
-            if(uncertain)status("IV100: resultados diferentes foram ocultados");
-            else if(count==0)status("Sem resultados · confira a busca no site");
-            else status(count+" resultado"+(count==1?"":"s")+" · PoGoCoordinates");
+            JSONArray items=r.optJSONArray("cards");
+            results=items==null?"[]":items.toString();
+            int n=count();
+            if(selected>=n)hideDetails();
+            if(r.optBoolean("uncertain"))status("IV não confirmado");
+            else if(n==0)status("Sem resultados");
+            else status(n+" Pokémon");
         });
     }
-    private void resize(int cssHeight){
+    private void resize(int h){
         if(minimized||params==null)return;
-        int target=Math.max(65,Math.min(315,cssHeight));
+        int target=Math.max(78,Math.min(screenHeightDp()-95,h));
         if(Math.abs(target-height)<2)return;
-        height=target;
-        params.height=dp(height);
-        updateWindow();
+        height=target;params.height=dp(height);updateWindow();moveDetail();
     }
     private void minimize(boolean yes){
         if(params==null)return;
         minimized=yes;
-        params.width=dp(yes?BUBBLE_DP:WIDTH_DP);
+        if(yes)hideDetails();
+        params.width=dp(yes?BUBBLE_DP:DOCK_DP);
         params.height=dp(yes?BUBBLE_DP:height);
-        FrameLayout.LayoutParams h=new FrameLayout.LayoutParams(dp(yes?BUBBLE_DP:23),dp(yes?BUBBLE_DP:36),Gravity.TOP|Gravity.LEFT);
-        dragHandle.setLayoutParams(h);
+        grip.setLayoutParams(new FrameLayout.LayoutParams(
+                dp(yes?BUBBLE_DP:22),dp(yes?BUBBLE_DP:23),Gravity.TOP|Gravity.LEFT));
+        js(panel,panelLoaded,"window.setMinimized("+yes+")");
         updateWindow();
-        js("window.setMinimized("+yes+")");
     }
-    public class Bridge {
-        @JavascriptInterface public void select(String value){handler.post(()->{
-            if(!value.equals("iv")&&!value.equals("gl"))return;
-            mode=value;results="[]";update();refresh();
+    private void showDetails(int index){
+        if(detailRoot==null||detailPanel==null||!detailLoaded||minimized)return;
+        try{
+            JSONArray a=new JSONArray(results);
+            if(index<0||index>=a.length()){hideDetails();return;}
+            selected=index;
+            JSONObject obj=a.getJSONObject(index);
+            js(detailPanel,true,"window.showDetails("+obj.toString()+","+JSONObject.quote(mode)+")");
+            detailRoot.setVisibility(View.VISIBLE);
+            moveDetail();
+            js(panel,panelLoaded,"window.highlight("+index+")");
+        }catch(Exception e){hideDetails();}
+    }
+    private void hideDetails(){
+        selected=-1;
+        if(detailRoot!=null)detailRoot.setVisibility(View.GONE);
+        js(panel,panelLoaded,"window.highlight(-1)");
+    }
+    private void resizeDetail(int heightDp){
+        detailHeight=Math.max(90,Math.min(310,heightDp));
+        if(detailParams!=null&&detailRoot!=null){
+            detailParams.height=dp(detailHeight);moveDetail();
+        }
+    }
+    public class Bridge{
+        @JavascriptInterface public void select(String s){handler.post(()->{
+            if(!s.equals("iv")&&!s.equals("gl"))return;
+            mode=s;getSharedPreferences("prefs",0).edit().putString("mode",s).apply();
+            results="[]";hideDetails();update();refresh();
         });}
         @JavascriptInterface public void shiny(){handler.post(()->{
-            shiny=!shiny;results="[]";update();refresh();
+            shiny=!shiny;getSharedPreferences("prefs",0).edit().putBoolean("shiny",shiny).apply();
+            results="[]";hideDetails();update();refresh();
         });}
         @JavascriptInterface public void refresh(){handler.post(OverlayService.this::refresh);}
         @JavascriptInterface public void minimize(){handler.post(()->OverlayService.this.minimize(true));}
         @JavascriptInterface public void restore(){handler.post(()->OverlayService.this.minimize(false));}
         @JavascriptInterface public void close(){handler.post(()->stopSelf());}
-        @JavascriptInterface public void compact(){handler.post(()->{compact=!compact;update();});}
-        @JavascriptInterface public void resize(int h){handler.post(()->OverlayService.this.resize(h));}
-        @JavascriptInterface public void coords(int index){
-            handler.post(()->execute("coords:"+index,response->status(
-                response.optString("status",response.optBoolean("ok")?"Get coords acionado":"Get coords indisponível"))));
-        }
+        @JavascriptInterface public void resize(int size){handler.post(()->OverlayService.this.resize(size));}
+        @JavascriptInterface public void resizeDetail(int size){handler.post(()->OverlayService.this.resizeDetail(size));}
+        @JavascriptInterface public void toggleDetail(int index){handler.post(()->{
+            if(selected==index)hideDetails();else showDetails(index);
+        });}
+        @JavascriptInterface public void hideDetail(){handler.post(OverlayService.this::hideDetails);}
+        @JavascriptInterface public void coords(int sourceIndex){handler.post(()->execute(
+                "coords:"+sourceIndex,r->status(r.optString("status",r.optBoolean("ok")?"Get coords acionado":"Get coords indisponível"))));}
     }
-    @Override public int onStartCommand(Intent intent,int flags,int id){return START_STICKY;}
+    @Override public int onStartCommand(Intent i,int flags,int id){
+        mode=getSharedPreferences("prefs",0).getString("mode",mode);
+        shiny=getSharedPreferences("prefs",0).getBoolean("shiny",shiny);
+        update();
+        return START_STICKY;
+    }
     @Override public void onDestroy(){
         stopped=true;handler.removeCallbacksAndMessages(null);
         if(wm!=null&&root!=null){try{wm.removeView(root);}catch(Exception ignored){}}
+        if(wm!=null&&detailRoot!=null){try{wm.removeView(detailRoot);}catch(Exception ignored){}}
         if(panel!=null){panel.removeJavascriptInterface("Native");panel.destroy();panel=null;}
+        if(detailPanel!=null){detailPanel.removeJavascriptInterface("Native");detailPanel.destroy();detailPanel=null;}
         if(website!=null){website.destroy();website=null;}
         super.onDestroy();
     }

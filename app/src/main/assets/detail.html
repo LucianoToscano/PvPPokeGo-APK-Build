@@ -1,0 +1,47 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;background:transparent;color:#fff;font:11px Roboto,Arial,sans-serif;overflow:hidden}
+button{font:inherit;color:inherit;border:0;cursor:pointer}
+#panel{border:1px solid #ffffff50;border-radius:13px;background:rgba(9,13,20,.73);box-shadow:0 5px 18px #0007;padding:9px;backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px)}
+#header{display:flex;align-items:center;gap:5px;min-width:0}
+#img{width:35px;height:35px;object-fit:contain}
+#names{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+#names b{white-space:nowrap;text-overflow:ellipsis;overflow:hidden;font-size:12px}
+#names small{color:#bfc8d4;font-size:9px}
+#x{border-radius:6px;background:#ffffff22;font-size:13px;width:23px;height:23px}
+#major{font-weight:bold;color:#fff;line-height:1.5;margin-top:5px;display:flex;flex-wrap:wrap;gap:4px}
+#major span{border-radius:5px;background:#ffffff1b;padding:2px 5px;font-size:10px}
+#major .red{color:#ff9bb0}
+#info{color:#d8e0ea;line-height:1.38;margin-top:5px;font-size:10px;overflow-wrap:anywhere}
+#info div{margin:2px 0}
+#info em{color:#afb9c8;font-style:normal}
+#coords{margin-top:7px;width:100%;border-radius:7px;padding:7px;background:#eb2850ce;font-weight:bold}
+</style></head><body><div id="panel">
+ <div id="header">
+  <img id="img" alt="" style="display:none">
+  <div id="names"><b id="name">Pokémon</b><small id="sub"></small></div>
+  <button id="x" onclick="Native.hideDetail()">×</button>
+ </div>
+ <div id="major"></div><div id="info"></div>
+ <button id="coords" onclick="Native.coords(currentIndex)">⌖ Get coords</button>
+</div>
+<script>
+let currentIndex=-1;
+const h=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const item=(k,v)=>v?'<div><em>'+h(k)+':</em> '+h(v)+'</div>':"";
+window.showDetails=(c,mode)=>{
+ currentIndex=Number(c.sourceIndex);
+ document.getElementById("name").textContent=String(c.name||"Pokémon")+(c.shiny?" ✨":"");
+ document.getElementById("sub").textContent=[c.number,c.gender,c.size,c.form].filter(Boolean).join(" · ");
+ const img=document.getElementById("img");
+ if(/^https:\/\//.test(c.image||"")){img.src=c.image;img.style.display="block"}else{img.style.display="none"}
+ const stat=(label,value,css="")=>value?'<span class="'+css+'">'+h(label)+" "+h(value)+"</span>":"";
+ document.getElementById("major").innerHTML=
+  stat("PC",c.cp)+stat("Nv.",c.level)+stat("IV",c.ivPercent?c.ivPercent+"%"+(c.iv?" ("+c.iv+")":""):c.iv,"red")+
+  stat("Rank",c.rank);
+ document.getElementById("info").innerHTML=
+  item("Golpes",c.moves)+item("Local",c.location)+item("Despawn",c.despawn)+item("Coordenadas",c.coords);
+ requestAnimationFrame(()=>Native.resizeDetail(Math.ceil(document.getElementById("panel").getBoundingClientRect().height)+2));
+};
+</script></body></html>
