@@ -258,6 +258,19 @@ public class MainActivity extends Activity {
             new AlertDialog.Builder(this).setTitle("Diagnóstico do Pokésearch")
                 .setMessage(message).setPositiveButton("OK",null).show();
         });
+        Button stop=new Button(this);
+        stop.setText("Encerrar overlay");
+        stop.setAllCaps(false);
+        stop.setTextColor(Color.rgb(250,122,137));
+        body.addView(stop);
+        stop.setOnClickListener(v->new AlertDialog.Builder(this)
+            .setTitle("Encerrar PokeSearch?")
+            .setMessage("A janela flutuante e as buscas automáticas serão interrompidas. Seus favoritos ficam salvos.")
+            .setPositiveButton("Encerrar",(dialog,which)->{
+                stopService(new Intent(this,OverlayService.class));
+                Toast.makeText(this,"Overlay encerrado",Toast.LENGTH_SHORT).show();
+            })
+            .setNegativeButton("Cancelar",null).show());
         return sc;
     }
     private void buildWatchButton(LinearLayout root){

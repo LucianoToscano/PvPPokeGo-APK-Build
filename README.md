@@ -17,3 +17,10 @@ O applicationId `com.lucianotoscano.pokesearchoverlay` foi preservado para mante
 
 ## Limitações
 As buscas usam a página do PoGoCoordinates e a sessão do navegador integrado; não há captura garantida de autenticação do Chrome. O DOM do site pode mudar, afetando pesquisa ou ranking. Não é possível garantir detecção de resultados, alarmes ou gestos até testes em aparelho Android autenticado. A lista de favoritos observa somente os resultados do modo de busca selecionado; não consulta simultaneamente os três modos.
+
+## Interface v0.31
+- A própria engrenagem vira **X** quando as opções estão abertas; toque no X para fechar apenas o menu, sem encerrar o serviço.
+- O botão **⌃**, na ponta oposta à engrenagem, recolhe toda a lista, mantendo somente a engrenagem; toque nela para restaurar.
+- **AUTO 5m** deixa claro o intervalo automático. **↻** continua sendo a atualização manual.
+- O sino abre a lista visual dos procurados; nela há uma caixa explícita para ativar ou pausar o som.
+- **Encerrar overlay** está nas configurações, mediante confirmação.

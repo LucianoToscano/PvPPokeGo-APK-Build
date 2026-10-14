@@ -177,6 +177,16 @@ public final class PokemonPicker {
         search.setHint("Buscar por nome ou número da Pokédex");
         search.setTextSize(15);
         root.addView(search,new LinearLayout.LayoutParams(-1,dp(activity,54)));
+        android.widget.CheckBox notify=new android.widget.CheckBox(activity);
+        notify.setText("🔔 Avisar com som quando encontrar um procurado válido");
+        notify.setTextColor(Color.WHITE);
+        notify.setTextSize(12);
+        notify.setChecked(WatchAlerts.enabled(activity));
+        notify.setOnCheckedChangeListener((button,enabled)->{
+            activity.getSharedPreferences("prefs",0).edit()
+                .putBoolean(WatchAlerts.PREF_ENABLED,enabled).apply();
+        });
+        root.addView(notify);
         TextView count=new TextView(activity);
         count.setTextSize(12);count.setTextColor(Color.rgb(94,223,157));
         count.setPadding(dp(activity,4),0,0,dp(activity,5));
