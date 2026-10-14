@@ -1,3 +1,3 @@
-# Pokésearch Overlay v0.19 Alpha
+# Pokésearch Overlay v0.20 Alpha
 
-Visual ultracompacto: faixa principal sem fundo, sombra ou efeito blur; engrenagem vetorial fina centralizada; sprites alinhados e mais próximos, intervalos de ~30 dp, sprites 34 dp; coluna com apenas 44 dp, alça de 9 dp. Menu lateral continua abrindo à esquerda/direita e fica com fundo próprio para legibilidade. Indicação compacta de status quando vazio. Atualização 5 min, copiar coordenadas e despawn conservados. Necessária validação em aparelho real.
+O submenu da engrenagem agora abre lateralmente na MESMA LINHA, sem colunas empilhadas, com os controles justapostos: [IV100/GL#1/UL#1] [✨] [10] [↻] [−] [×]. Intervalo de atualização configurável em minutos por toque no número: 1, 3, 5, 10, 15, 20. Padrão 10 min; preferência persistida no Android e reagendamento da busca automática. Engrenagem SVG Material simétrica, centrada. Sprites 32dp em linhas 34dp, sem sobreposição. Coluna transparente 44dp, submenu lateral compacto, ancorado ao nível da engrenagem. Necessário testar interface e leitura do site no celular; 1 min pode ser intenso, use conforme limites do serviço.

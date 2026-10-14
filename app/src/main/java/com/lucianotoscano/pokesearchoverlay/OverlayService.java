@@ -30,7 +30,7 @@ import java.io.InputStream;
 import java.util.function.Consumer;
 
 public class OverlayService extends Service {
-    private static final int DOCK_DP=44, BUBBLE_DP=45, DETAIL_DP=226, MENU_DP=159;
+    private static final int DOCK_DP=44, BUBBLE_DP=45, DETAIL_DP=226, MENU_DP=247;
     private final Handler handler=new Handler(Looper.getMainLooper());
     private WindowManager wm;
     private WindowManager.LayoutParams params,detailParams;
@@ -38,16 +38,20 @@ public class OverlayService extends Service {
     private View grip;
     private WebView panel,detailPanel,website;
     private boolean menuExpanded=false,menuLeft=false,minimized=false,shiny=true,loaded=false,panelLoaded=false,detailLoaded=false,stopped=false;
-    private int height=68,detailHeight=225,requestGeneration=0,selected=-1;
+    private int height=68,detailHeight=225,requestGeneration=0,selected=-1,intervalMinutes=10;
     private String mode="iv",results="[]",status="Conectando...";
     private float startRawX,startRawY;
     private int startX,startY;
     private boolean dragged=false;
     private final Runnable periodic=new Runnable(){
         @Override public void run(){
-            if(!stopped){refresh();handler.postDelayed(this,300000L);}
+            if(!stopped){refresh();handler.postDelayed(this,intervalMinutes*60000L);}
         }
     };
+    private void schedulePeriodic(){
+        handler.removeCallbacks(periodic);
+        if(!stopped)handler.postDelayed(periodic,intervalMinutes*60000L);
+    }
     private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
     private DisplayMetrics metrics(){
         DisplayMetrics m=new DisplayMetrics();
@@ -65,11 +69,11 @@ public class OverlayService extends Service {
     private int rowDp(){
         int n=Math.max(1,count());
         int available=screenHeightDp()-160;
-        return Math.max(27,Math.min(30,available/n));
+        return Math.max(32,Math.min(34,available/n));
     }
     private void update(){
         js(panel,panelLoaded,"window.onNativeData("+results+","+JSONObject.quote(status)+","+
-                JSONObject.quote(mode)+","+shiny+","+rowDp()+")");
+                JSONObject.quote(mode)+","+shiny+","+rowDp()+","+intervalMinutes+")");
         if(selected>=0)showDetails(selected);
     }
     private void status(String s){status=s;update();}
@@ -81,8 +85,9 @@ public class OverlayService extends Service {
     private void moveDetail(){
         if(detailRoot==null||detailParams==null||params==null)return;
         int w=screenWidthDp(),h=screenHeightDp(),gap=5;
-        int right=params.x/dp(1)+DOCK_DP+gap;
-        int left=params.x/dp(1)-DETAIL_DP-gap;
+        int dockPos=params.x/dp(1)+(menuExpanded&&menuLeft?MENU_DP-DOCK_DP:0);
+        int right=dockPos+DOCK_DP+gap;
+        int left=dockPos-DETAIL_DP-gap;
         int preferred=right+DETAIL_DP<=w-4?right:left;
         detailParams.x=dp(Math.max(0,Math.min(w-DETAIL_DP,preferred)));
         int dockY=params.y/dp(1);
@@ -204,7 +209,7 @@ public class OverlayService extends Service {
         panel.loadUrl("file:///android_asset/dock.html");
         if(detailRoot!=null)detailPanel.loadUrl("file:///android_asset/detail.html");
         website.loadUrl("https://pogocoordinates.com/search");
-        handler.postDelayed(periodic,300000L);
+        schedulePeriodic();
     }
     private String script(){
         try(InputStream in=getAssets().open("probe.js")){
@@ -381,6 +386,16 @@ public class OverlayService extends Service {
             getSharedPreferences("prefs",0).edit().putString("mode",mode).apply();
             results="[]";hideDetails();update();refresh();
         });}
+        @JavascriptInterface public void cycleInterval(){handler.post(()->{
+            int[] options={1,3,5,10,15,20};
+            int next=0;
+            for(int j=0;j<options.length;j++){
+                if(options[j]==intervalMinutes){next=(j+1)%options.length;break;}
+            }
+            intervalMinutes=options[next];
+            getSharedPreferences("prefs",0).edit().putInt("intervalMinutes",intervalMinutes).apply();
+            schedulePeriodic();update();
+        });}
         @JavascriptInterface public void shiny(){handler.post(()->{
             shiny=!shiny;getSharedPreferences("prefs",0).edit().putBoolean("shiny",shiny).apply();
             results="[]";hideDetails();update();refresh();
@@ -428,6 +443,8 @@ public class OverlayService extends Service {
             CookieManager.getInstance().flush();
             if(website!=null)website.loadUrl("https://pogocoordinates.com/search");
         }
+        intervalMinutes=getSharedPreferences("prefs",0).getInt("intervalMinutes",10);
+        schedulePeriodic();
         mode=getSharedPreferences("prefs",0).getString("mode",mode);
         shiny=getSharedPreferences("prefs",0).getBoolean("shiny",shiny);
         update();
