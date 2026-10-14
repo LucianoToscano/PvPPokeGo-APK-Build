@@ -48,7 +48,7 @@ public final class PixSupport {
             .setPositiveButton("⧉ Copiar Pix",(dialog,which)->{
                 ClipboardManager clipboard=(ClipboardManager)a.getSystemService(Context.CLIPBOARD_SERVICE);
                 if(clipboard!=null){
-                    clipboard.setPrimaryClip(ClipData.newPlainText("Pix · Pokésearch Overlay",PAYLOAD));
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Pix · PokeSearch",PAYLOAD));
                     Toast.makeText(a,"Código Pix copiado. Escolha o valor no seu banco.",Toast.LENGTH_LONG).show();
                 }
             })

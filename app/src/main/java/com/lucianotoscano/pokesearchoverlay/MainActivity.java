@@ -31,54 +31,140 @@ import java.text.SimpleDateFormat;
 import java.util.Locale;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.ImageButton;
+import android.widget.ImageView;
+import android.view.Gravity;
+import android.graphics.Typeface;
 
 public class MainActivity extends Activity {
     private WebView website;
-    @Override public void onCreate(Bundle b) {
+    private TextView watchSummary;
+    @Override public void onCreate(Bundle b){
         super.onCreate(b);
-        getWindow().setStatusBarColor(Color.rgb(12,12,16));
+        getWindow().setStatusBarColor(Color.rgb(11,13,18));
+        getWindow().setNavigationBarColor(Color.rgb(11,13,18));
         LinearLayout root=new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.rgb(17,18,22));
-        TextView help=new TextView(this);
-        help.setText("POKÉSEARCH OVERLAY · ALPHA 0.29\nFaça login AQUI no PoGoCoordinates, mesmo que já tenha entrado pelo navegador.\nToque em INICIAR OVERLAY. Toque na engrenagem para abrir ou fechar o menu; segure e arraste a engrenagem para mover.");
-        help.setTextColor(Color.WHITE);help.setTextSize(13);help.setPadding(16,16,16,12);
-        root.addView(help);
-        Button start=new Button(this);start.setText("INICIAR OVERLAY");root.addView(start);
+        root.setBackgroundColor(Color.rgb(11,13,18));
+        root.setPadding(d(12),d(3),d(12),0);
+        LinearLayout header=new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        TextView brand=new TextView(this);
+        brand.setText("PokeSearch");
+        brand.setTextColor(Color.WHITE);
+        brand.setTextSize(22);
+        brand.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+        brand.setPadding(d(7),0,0,0);
+        header.addView(brand,new LinearLayout.LayoutParams(0,d(51),1));
+        ImageButton heart=makeIcon(R.drawable.ic_heart_outline,"Contribuir com um café via Pix");
+        heart.setOnClickListener(v->PixSupport.show(this));
+        header.addView(heart,new LinearLayout.LayoutParams(d(45),d(45)));
+        ImageButton gear=makeIcon(R.drawable.ic_settings_outline,"Preferências, histórico e diagnóstico");
+        gear.setOnClickListener(v->showPreferencesDialog());
+        header.addView(gear,new LinearLayout.LayoutParams(d(45),d(45)));
+        root.addView(header);
+        Button start=new Button(this);
+        start.setText("Ativar overlay");
+        start.setTextColor(Color.WHITE);
+        start.setTextSize(15);
+        start.setAllCaps(false);
+        start.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+        start.setBackground(round(Color.rgb(213,45,79),12));
+        LinearLayout.LayoutParams startParams=new LinearLayout.LayoutParams(-1,d(49));
+        startParams.setMargins(d(2),d(3),d(2),d(9));
+        root.addView(start,startParams);
         start.setOnClickListener(v->startOverlay());
-        buildWatchButton(root);
-        Button pix=new Button(this);
-        pix.setText("☕ Gostou do aplicativo? Apoie com um café!");
-        root.addView(pix);
-        pix.setOnClickListener(v->PixSupport.show(this));
+        LinearLayout watchRow=new LinearLayout(this);
+        watchRow.setOrientation(LinearLayout.HORIZONTAL);
+        watchRow.setGravity(Gravity.CENTER_VERTICAL);
+        watchRow.setPadding(d(11),d(5),d(10),d(5));
+        watchRow.setBackground(round(Color.rgb(24,28,36),11));
+        ImageView bell=new ImageView(this);
+        bell.setImageResource(R.drawable.ic_bell_outline);
+        watchRow.addView(bell,new LinearLayout.LayoutParams(d(27),d(27)));
+        LinearLayout watchTexts=new LinearLayout(this);
+        watchTexts.setOrientation(LinearLayout.VERTICAL);
+        watchTexts.setPadding(d(9),0,0,0);
+        TextView watchTitle=new TextView(this);
+        watchTitle.setText("Pokémon procurados");
+        watchTitle.setTextColor(Color.WHITE);
+        watchTitle.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+        watchTitle.setTextSize(13);
+        watchTexts.addView(watchTitle);
+        watchSummary=new TextView(this);
+        watchSummary.setTextSize(11);
+        watchSummary.setTextColor(Color.rgb(159,169,183));
+        watchTexts.addView(watchSummary);
+        watchRow.addView(watchTexts,new LinearLayout.LayoutParams(0,-2,1));
+        TextView arrow=new TextView(this);
+        arrow.setText("›");
+        arrow.setTextColor(Color.rgb(175,184,195));
+        arrow.setTextSize(23);
+        watchRow.addView(arrow);
+        LinearLayout.LayoutParams rowParams=new LinearLayout.LayoutParams(-1,d(60));
+        rowParams.setMargins(d(2),0,d(2),d(10));
+        root.addView(watchRow,rowParams);
+        watchRow.setOnClickListener(v->openPicker());
+        refreshWatchCount();
         website=new WebView(this);
         website.getSettings().setJavaScriptEnabled(true);
         website.getSettings().setDomStorageEnabled(true);
         website.getSettings().setDatabaseEnabled(true);
+        website.setBackgroundColor(Color.rgb(12,14,20));
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(website,true);
         website.setWebViewClient(new WebViewClient(){
             @Override public void onPageFinished(WebView view,String url){
-                if(url!=null&&url.startsWith("https://pogocoordinates.com/")){
+                if(url!=null&&url.startsWith("https://pogocoordinates.com/"))
                     view.evaluateJavascript(readAsset("presets.js"),null);
-                }
             }
         });
         root.addView(website,new LinearLayout.LayoutParams(-1,0,1));
         setContentView(root);
         website.loadUrl("https://pogocoordinates.com/search");
         if("com.lucianotoscano.pokesearchoverlay.EDIT_WATCH_LIST".equals(getIntent().getAction()))
-            root.post(this::showWatchDialog);
+            root.post(this::openPicker);
         if("com.lucianotoscano.pokesearchoverlay.OPEN_SETTINGS".equals(getIntent().getAction()))
             root.post(this::showPreferencesDialog);
+        if("com.lucianotoscano.pokesearchoverlay.OPEN_PIX".equals(getIntent().getAction()))
+            root.post(()->PixSupport.show(this));
+    }
+    private ImageButton makeIcon(int drawable,String description){
+        ImageButton button=new ImageButton(this);
+        button.setImageResource(drawable);
+        button.setContentDescription(description);
+        button.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        button.setPadding(d(10),d(10),d(10),d(10));
+        button.setBackgroundColor(Color.TRANSPARENT);
+        return button;
+    }
+    private android.graphics.drawable.GradientDrawable round(int color,int radius){
+        android.graphics.drawable.GradientDrawable bg=new android.graphics.drawable.GradientDrawable();
+        bg.setColor(color);bg.setCornerRadius(d(radius));return bg;
+    }
+    private void refreshWatchCount(){
+        if(watchSummary==null)return;
+        int size=WatchAlerts.watched(this).size();
+        watchSummary.setText(size==0?"Nenhum selecionado · toque para adicionar":
+            size+" monitorado"+(size==1?"":"s")+" · toque para editar");
+    }
+    private void openPicker(){
+        PokemonPicker.show(this,this::refreshWatchCount);
+    }
+    @Override protected void onResume(){
+        super.onResume();
+        refreshWatchCount();
     }
     @Override protected void onNewIntent(Intent intent){
         super.onNewIntent(intent);
         setIntent(intent);
         if("com.lucianotoscano.pokesearchoverlay.EDIT_WATCH_LIST".equals(intent.getAction()))
-            getWindow().getDecorView().post(this::showWatchDialog);
+            getWindow().getDecorView().post(this::openPicker);
         if("com.lucianotoscano.pokesearchoverlay.OPEN_SETTINGS".equals(intent.getAction()))
             getWindow().getDecorView().post(this::showPreferencesDialog);
+        if("com.lucianotoscano.pokesearchoverlay.OPEN_PIX".equals(intent.getAction()))
+            getWindow().getDecorView().post(()->PixSupport.show(this));
     }
     private int d(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
     private void showPreferencesDialog(){
@@ -97,6 +183,16 @@ public class MainActivity extends Activity {
         body.setOrientation(LinearLayout.VERTICAL);
         body.setPadding(d(14),d(8),d(14),d(12));
         sc.addView(body);
+        Button picker=new Button(this);
+        picker.setText("🔔 Procurados · buscar na Pokédex");
+        picker.setAllCaps(false);
+        body.addView(picker);
+        picker.setOnClickListener(v->openPicker());
+        Button textMode=new Button(this);
+        textMode.setText("Editar nomes manualmente");
+        textMode.setAllCaps(false);
+        body.addView(textMode);
+        textMode.setOnClickListener(v->showWatchDialog());
         android.widget.TextView subtitle=new android.widget.TextView(this);
         subtitle.setText("Tamanho do Pokémon · altere também por P / M / G no overlay");
         subtitle.setTextColor(Color.LTGRAY);body.addView(subtitle);
