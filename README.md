@@ -37,3 +37,9 @@ As buscas usam a página do PoGoCoordinates e a sessão do navegador integrado; 
 - **Sino** liga/desliga apenas as notificações gerais de novos Pokémon válidos no filtro selecionado. **Estrela** abre favoritos com busca por sprite/número/nome; alertas exclusivos de favoritos ficam configuráveis dentro dessa lista. A lista antiga é mantida.
 - Retirados histórico, diagnóstico, confirmação de encerramento e edição manual dos nomes. Preferências incluem apenas tamanho P/M/G, ordenação e relógio individual.
 - Coração continua representando Pix voluntário, AUTO 5m e ↻ preservados.
+
+## v0.34 · Ações acima da engrenagem e favoritos separados
+- **X** (vermelho) e **minimizar todas as janelas** aparecem verticalmente **acima da engrenagem** apenas quando o menu está aberto, separados da barra horizontal. O ícone de minimizar mostra uma janela e uma seta para baixo; deixa apenas a engrenagem para restaurar. O X encerra o serviço completamente.
+- A janela reserva 54 dp de espaço acima da engrenagem ao abrir as opções. Reposicionamento nativo preserva a posição dos sprites e evita interceptar o toque na engrenagem; menu à esquerda também foi corrigido para ficar realmente à esquerda.
+- Editor de favoritos com **duas seções**: "★ Meus favoritos (n/50)" em cima, sempre visível, com sprite, Pokédex, nome e estrela; "Adicionar Pokémon" embaixo, com pesquisa de 1.025 espécies. Selecionar move imediatamente para a lista de cima; tocar na área superior remove. A lista de procurados e os alertas existentes são preservados.
+- A lista superior ocupa até 3 linhas com rolagem, e a pesquisa inferior mostra até cinco sugestões por vez, separadas por divisória e títulos.
