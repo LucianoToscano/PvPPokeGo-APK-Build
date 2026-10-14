@@ -1,7 +1,7 @@
 name: Build PokeSearch Android APK
 on:
   push:
-    branches: [pokesearch-no-staging-trigger]
+    branches: [pokesearch-overlay-alpha]
   workflow_dispatch:
 permissions:
   contents: read

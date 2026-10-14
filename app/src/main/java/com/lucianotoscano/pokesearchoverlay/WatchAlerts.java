@@ -77,7 +77,7 @@ public final class WatchAlerts {
         NotificationManager manager=(NotificationManager)context.getSystemService(Context.NOTIFICATION_SERVICE);
         if(manager==null)return;
         NotificationChannel channel=new NotificationChannel(CHANNEL_ID,
-            "Pokémon procurados · som",NotificationManager.IMPORTANCE_HIGH);
+            "PokeSearch · Pokémon procurados",NotificationManager.IMPORTANCE_HIGH);
         channel.setDescription("Som quando um Pokémon cadastrado aparece numa busca");
         channel.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
             new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION_EVENT).build());

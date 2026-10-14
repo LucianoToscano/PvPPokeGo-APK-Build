@@ -9,17 +9,18 @@ button{font:inherit;color:inherit;border:0;cursor:pointer;touch-action:manipulat
 #gear svg{display:block;width:21px;height:21px;filter:drop-shadow(0 1px 1px #0007)}
 #gear.busy svg{animation:gearbusy 1.25s linear infinite}
 @keyframes gearbusy{to{transform:rotate(360deg)}}
-#menu{display:none;position:absolute;top:0;left:var(--dock);width:282px;height:25px;z-index:3;padding:0 2px;border:0;border-radius:0;background:transparent;box-shadow:none}
+#menu{display:none;position:absolute;top:0;left:var(--dock);width:301px;height:25px;z-index:3;padding:0 2px;border:0;border-radius:0;background:transparent;box-shadow:none}
 #menu.open{display:block}
-body.menu-left #shell{margin-left:282px}
+body.menu-left #shell{margin-left:301px}
 body.menu-left #menu{left:0}
-#controls{width:278px;display:grid;grid-template-columns:40px 27px 22px 25px 23px 23px 26px 27px 23px 23px;gap:2px;padding:0;margin:0;align-items:center}
+#controls{width:297px;display:grid;grid-template-columns:38px 25px 22px 24px 24px 25px 25px 25px 25px 22px 22px;gap:2px;padding:0;margin:0;align-items:center}
 body.menu-left #controls{direction:rtl}
 #controls button{direction:ltr}
 #controls button{height:25px;width:100%;min-width:0;padding:0;background:#151b26e6;border:1px solid #ffffff23;border-radius:5px;font-size:10px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:center;white-space:nowrap}
 #controls button.active{background:#db2d4bdb}
 #controls #cycle.ivOn{background:#136b3bdf;border-color:#69df97a6;color:#e9fff2}
 #controls #close{background:#971f2add;border-color:#ff738baa;color:white}
+#controls #donate{color:#fa94a7}
 #controls button svg{width:16px;height:16px;display:block;pointer-events:none}
 #controls #cycle{font-size:11px;font-weight:800}
 #controls #cycle .league{display:inline-flex;gap:2px;align-items:center;justify-content:center}
@@ -53,6 +54,7 @@ body.menu-left #controls{direction:rtl}
     <button id="clock" title="Mostrar ou ocultar tempo individual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
     <button id="watch" title="Toque: ligar/desligar alertas · Segure: editar lista de procurados" onclick="watchTap()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg></button>
     <button id="settings" title="Preferências, histórico e diagnóstico" onclick="Native.openSettings()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l1.7 2.3 2.7-.5.8 2.7 2.7.8-.5 2.7L22 12l-2.6 1.7.5 2.7-2.7.8-.8 2.7-2.7-.5L12 22l-1.7-2.6-2.7.5-.8-2.7-2.7-.8.5-2.7L2 12l2.6-2.0-.5-2.7 2.7-.8.8-2.7 2.7.5Z"/><circle cx="12" cy="12" r="3"/></svg></button>
+    <button id="donate" title="Gostou do PokeSearch? Apoie com um café · Pix voluntário" onclick="Native.openPix()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78Z"/></svg></button>
     <button id="minimize" title="Recolher apenas à engrenagem" onclick="Native.minimize()">▁</button>
     <button id="close" title="Fechar overlay" onclick="Native.close()">×</button>
   </div> </div></div>
