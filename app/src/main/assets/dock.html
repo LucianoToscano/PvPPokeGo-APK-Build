@@ -1,25 +1,27 @@
 <!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <style>
-:root{--row:52px;--sprite:50px;--dock:58px}
+:root{--row:46px;--sprite:45px;--dock:53px}
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;background:transparent!important;color:#fff;font:10px Roboto,Arial,sans-serif;overflow:hidden}
 button{font:inherit;color:inherit;border:0;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 #shell{width:var(--dock);background:transparent!important;border:0;border-radius:0;box-shadow:none;overflow:visible}
-#gear{width:28px;height:27px;margin:0 auto;padding:0;border:0;background:transparent;color:#e9ecf1;display:flex;align-items:center;justify-content:center}
-#gear svg{display:block;width:19px;height:19px;filter:drop-shadow(0 1px 1px #0007)}
+#gear{width:28px;height:23px;margin:0 auto;padding:0;border:0;background:transparent;color:#e9ecf1;display:flex;align-items:center;justify-content:center}
+#gear svg{display:block;width:21px;height:21px;filter:drop-shadow(0 1px 1px #0007)}
 #gear.busy svg{animation:gearbusy 1.25s linear infinite}
 @keyframes gearbusy{to{transform:rotate(360deg)}}
-#menu{display:none;position:absolute;top:0;left:var(--dock);width:203px;height:27px;z-index:3;padding:0 4px;border:0;border-radius:0;background:transparent;box-shadow:none}
+#menu{display:none;position:absolute;top:0;left:var(--dock);width:282px;height:25px;z-index:3;padding:0 2px;border:0;border-radius:0;background:transparent;box-shadow:none}
 #menu.open{display:block}
-body.menu-left #shell{margin-left:203px}
+body.menu-left #shell{margin-left:282px}
 body.menu-left #menu{left:0}
-#controls{width:195px;display:grid;grid-template-columns:43px 29px 29px 30px 27px 27px;gap:2px;padding:0;margin:0;align-items:center}
-#controls button{height:27px;width:100%;min-width:0;padding:0;background:#151b26e6;border:1px solid #ffffff23;border-radius:5px;font-size:10px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:center;white-space:nowrap}
+#controls{width:278px;display:grid;grid-template-columns:40px 27px 22px 25px 23px 23px 26px 27px 23px 23px;gap:2px;padding:0;margin:0;align-items:center}
+#controls button{height:25px;width:100%;min-width:0;padding:0;background:#151b26e6;border:1px solid #ffffff23;border-radius:5px;font-size:10px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:center;white-space:nowrap}
 #controls button.active{background:#db2d4bdb}
 #controls button.shinyOn{color:#ffe5a0;background:#564627e9}
 #actions{display:contents}
 #actions button{font-size:16px;font-weight:500}
 #period{font-size:11px!important}
+#watch.watchOn,#clock.timerOn{background:#76601ccf;border-color:#ffe5a04d;color:#ffe5a0}
+#sizeplus,#sizeminus{font-size:16px!important}
 #spawns{width:var(--dock);display:flex;flex-direction:column;align-items:center;gap:0;padding:0;margin:0}
 .spawn{width:var(--dock);height:var(--row);position:relative;min-height:var(--row);display:flex;align-items:center;justify-content:center;margin:0;padding:0;background:transparent;border:1px solid transparent;border-radius:4px}
 .spawn.active{border-color:#ff718b91}
@@ -29,7 +31,7 @@ body.menu-left #menu{left:0}
 .spawn.shiny.marked{border-color:#e8bb3fda}
 .timer{position:absolute;right:0;bottom:0;padding:1px 2px;border-radius:3px;background:#111924c4;color:#fff;font-size:8px;line-height:10px;pointer-events:none;min-width:23px;text-align:center}
 .spawn.expired{opacity:.38}
-.sprite{display:block;width:min(var(--sprite),calc(var(--row) - 2px));height:min(var(--sprite),calc(var(--row) - 2px));object-fit:contain;flex-shrink:0;pointer-events:none;filter:drop-shadow(0 1px 1px #0006)}
+.sprite{display:block;width:min(var(--sprite),calc(var(--row) - 1px));height:min(var(--sprite),calc(var(--row) - 1px));object-fit:contain;flex-shrink:0;pointer-events:none;filter:drop-shadow(0 1px 1px #0006)}
 .fallback{font-size:20px}
 #empty{display:block;width:var(--dock);height:18px;line-height:18px;text-align:center;color:#dce1e9b8;font-size:12px;overflow:hidden}
 #bubble{display:none;width:45px;height:45px;border:0;background:transparent;box-shadow:none;border-radius:0;align-items:center;justify-content:center}
@@ -43,7 +45,11 @@ body.menu-left #menu{left:0}
   <button id="period" title="Atualização automática a cada 5 minutos; toque para alterar" onclick="Native.cycleInterval()">5</button>
   <div id="actions">
     <button title="Atualizar agora" onclick="Native.refresh()">↻</button>
-    <button title="Minimizar" onclick="Native.minimize()">−</button>
+    <button id="sizeplus" title="Aumentar Pokémon" onclick="Native.changeSpriteSize(1)">+</button>
+    <button id="sizeminus" title="Diminuir Pokémon" onclick="Native.changeSpriteSize(-1)">−</button>
+    <button id="clock" title="Exibir ou ocultar os despawns" onclick="Native.toggleTimers()">◷</button>
+    <button id="watch" title="Toque: ligar/desligar alertas · Segure: editar a lista" onclick="watchTap()" oncontextmenu="return false">🔔</button>
+    <button title="Recolher apenas à engrenagem" onclick="Native.minimize()">▁</button>
     <button title="Fechar" onclick="Native.close()">×</button>
   </div>
  </div></div>
@@ -52,7 +58,7 @@ body.menu-left #menu{left:0}
 </div>
 <div id="bubble" role="button" aria-label="Restaurar overlay"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96c-.5-.38-1.03-.69-1.64-.93L14.36 2.8a.49.49 0 0 0-.49-.4h-3.84a.49.49 0 0 0-.49.4l-.36 2.53c-.6.24-1.15.56-1.64.93l-2.39-.96a.49.49 0 0 0-.61.22L2.62 8.84a.5.5 0 0 0 .12.64l2.02 1.58c-.04.3-.07.62-.07.94s.03.64.08.94L2.74 14.5a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.61.22l2.39-.96c.49.38 1.04.7 1.64.93l.36 2.53c.04.24.24.4.49.4h3.84c.25 0 .45-.16.49-.4l.36-2.53c.6-.24 1.15-.55 1.64-.93l2.39.96c.23.09.49 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.02-1.56ZM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"/></svg></div>
 <script>
-let cards=[],active=-1,mode="iv",shiny=true,status="",row=52,menuOpen=false,period=5,spriteSize=50,showTimers=false,markBorders=true;
+let cards=[],active=-1,mode="iv",shiny=true,status="",row=46,menuOpen=false,period=5,spriteSize=45,showTimers=false,markBorders=true,watchEnabled=true;
 function setMenuOpen(open,side){
  menuOpen=!!open;
  document.getElementById("menu").classList.toggle("open",menuOpen);
@@ -73,12 +79,27 @@ function attachLongPress(){
   el.addEventListener('contextmenu',e=>{e.preventDefault();longDone=true;Native.longPressCoords(i)});
  });
 }
+let watchHoldTimer=0,watchHeld=false;
+function watchTap(){if(watchHeld){watchHeld=false;return;}Native.toggleWatchAlerts();}
+function attachWatchHold(){
+ const btn=document.getElementById("watch");if(!btn)return;
+ btn.addEventListener("touchstart",()=>{
+  watchHeld=false;clearTimeout(watchHoldTimer);
+  watchHoldTimer=setTimeout(()=>{watchHeld=true;Native.openWatchList();},600);
+ },{passive:true});
+ ["touchend","touchcancel","touchmove"].forEach(name=>btn.addEventListener(name,()=>clearTimeout(watchHoldTimer),{passive:true}));
+ btn.addEventListener("contextmenu",event=>{event.preventDefault();clearTimeout(watchHoldTimer);watchHeld=true;Native.openWatchList();});
+}
 function draw(){
  document.documentElement.style.setProperty("--row",row+"px");
  document.documentElement.style.setProperty("--sprite",spriteSize+"px");
  document.documentElement.style.setProperty("--dock",(spriteSize+8)+"px");
  const cy=document.getElementById("cycle");cy.textContent=mode==="gl"?"GL#1":mode==="ul"?"UL#1":"IV100";cy.classList.add("active");
  document.getElementById("sh").classList.toggle("shinyOn",shiny);
+ document.getElementById("clock").classList.toggle("timerOn",showTimers);
+ const w=document.getElementById("watch");
+ w.classList.toggle("watchOn",watchEnabled);
+ w.textContent=watchEnabled?"🔔":"🔕";
  const p=document.getElementById("period");p.textContent=String(period);p.title="Atualização a cada "+period+" min · toque para alterar";
  document.getElementById("spawns").innerHTML=cards.map((c,i)=>{
   const label=[c.name,c.ivPercent?c.ivPercent+"%":"IV não disponível",c.iv,c.rank?"Rank "+c.rank:""].filter(Boolean).join(" · ");
@@ -105,9 +126,9 @@ function updateTimers(){
  });
 }
 setInterval(updateTimers,1000);
-window.onNativeData=(a,s,m,shi,r,interval,sprite,timers,borders)=>{
+window.onNativeData=(a,s,m,shi,r,interval,sprite,timers,borders,watch)=>{
  cards=Array.isArray(a)?a.slice(0,10):[];
- mode=m;status=String(s||"");shiny=!!shi;row=Number(r)||52;period=Number(interval)||5;spriteSize=Number(sprite)||50;showTimers=!!timers;markBorders=borders!==false;
+ mode=m;status=String(s||"");shiny=!!shi;row=Number(r)||46;period=Number(interval)||5;spriteSize=Number(sprite)||45;showTimers=!!timers;markBorders=borders!==false;watchEnabled=watch!==false;
  if(active>=cards.length)active=-1;
  draw();
 };
@@ -119,5 +140,6 @@ window.setMinimized=value=>{
  document.getElementById("bubble").style.display=value?"flex":"none";
  if(!value)draw();
 };
+attachWatchHold();
 draw();
 </script></body></html>

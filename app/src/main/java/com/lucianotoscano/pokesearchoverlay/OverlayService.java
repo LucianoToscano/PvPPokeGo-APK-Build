@@ -31,9 +31,9 @@ import java.util.function.Consumer;
 
 public class OverlayService extends Service {
     private static final int BUBBLE_DP=45, DETAIL_DP=226;
-    private int spriteSize=50;
+    private int spriteSize=45;
     private int dockDp(){return spriteSize+8;}
-    private int menuDp(){return dockDp()+203;}
+    private int menuDp(){return dockDp()+282;}
     private final Handler handler=new Handler(Looper.getMainLooper());
     private WindowManager wm;
     private WindowManager.LayoutParams params,detailParams;
@@ -125,11 +125,11 @@ public class OverlayService extends Service {
     private int rowDp(){
         int n=Math.max(1,count());
         int available=screenHeightDp()-160;
-        return Math.max(28,Math.min(spriteSize+2,available/n));
+        return Math.max(28,Math.min(spriteSize+1,available/n));
     }
     private void update(){
         js(panel,panelLoaded,"window.onNativeData("+results+","+JSONObject.quote(status)+","+
-                JSONObject.quote(mode)+","+shiny+","+rowDp()+","+intervalMinutes+","+spriteSize+","+showTimers+","+markBorders+")");
+                JSONObject.quote(mode)+","+shiny+","+rowDp()+","+intervalMinutes+","+spriteSize+","+showTimers+","+markBorders+","+WatchAlerts.enabled(this)+")");
         if(selected>=0)showDetails(selected);
     }
     private void status(String s){
@@ -241,7 +241,7 @@ public class OverlayService extends Service {
             }
             return true;
         });
-        root.addView(grip,new FrameLayout.LayoutParams(dp(dockDp()),dp(27),Gravity.TOP|Gravity.LEFT));
+        root.addView(grip,new FrameLayout.LayoutParams(dp(dockDp()),dp(23),Gravity.TOP|Gravity.LEFT));
 
         params=new WindowManager.LayoutParams(dp(dockDp()),dp(height),
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
@@ -640,6 +640,52 @@ public class OverlayService extends Service {
             getSharedPreferences("prefs",0).edit().putString("mode",mode).apply();
             results="[]";hideDetails();update();refresh();
         });}
+        @JavascriptInterface public void changeSpriteSize(int direction){handler.post(()->{
+            if(direction!=1&&direction!=-1)return;
+            int[] sizes={32,40,45,50,60},at=2;
+            for(int j=0;j<sizes.length;j++)if(sizes[j]==spriteSize)at=j;
+            int size=sizes[Math.max(0,Math.min(sizes.length-1,at+direction))];
+            if(size==spriteSize)return;
+            boolean keepMenu=menuExpanded;
+            if(keepMenu)menu(false);
+            spriteSize=size;
+            getSharedPreferences("prefs",0).edit().putInt("spriteSize",size).apply();
+            if(params!=null){
+                params.width=dp(minimized?BUBBLE_DP:dockDp());
+                params.x=Math.max(0,Math.min(metrics().widthPixels-params.width,params.x));
+                grip.setLayoutParams(new FrameLayout.LayoutParams(
+                    dp(minimized?BUBBLE_DP:dockDp()),dp(minimized?BUBBLE_DP:23),
+                    Gravity.TOP|Gravity.LEFT));
+                updateWindow();
+            }
+            update();
+            if(keepMenu)menu(true);
+            android.widget.Toast.makeText(OverlayService.this,"Sprites: "+size+" × "+size,
+                android.widget.Toast.LENGTH_SHORT).show();
+        });}
+        @JavascriptInterface public void toggleTimers(){handler.post(()->{
+            showTimers=!showTimers;
+            getSharedPreferences("prefs",0).edit().putBoolean("showTimers",showTimers).apply();
+            update();
+        });}
+        @JavascriptInterface public void toggleWatchAlerts(){handler.post(()->{
+            boolean enabled=!WatchAlerts.enabled(OverlayService.this);
+            getSharedPreferences("prefs",0).edit()
+                .putBoolean(WatchAlerts.PREF_ENABLED,enabled).apply();
+            update();
+            android.widget.Toast.makeText(OverlayService.this,
+                enabled?"Alertas de procurados ativados":"Alertas de procurados pausados",
+                android.widget.Toast.LENGTH_SHORT).show();
+        });}
+        @JavascriptInterface public void openWatchList(){handler.post(()->{
+            Intent i=new Intent(OverlayService.this,MainActivity.class);
+            i.setAction("com.lucianotoscano.pokesearchoverlay.EDIT_WATCH_LIST");
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_SINGLE_TOP|Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            try{startActivity(i);}catch(Exception e){
+                android.widget.Toast.makeText(OverlayService.this,"Abra a lista no aplicativo",
+                    android.widget.Toast.LENGTH_SHORT).show();
+            }
+        });}
         @JavascriptInterface public void cycleInterval(){handler.post(()->{
             int[] options={1,3,5,10,15,20};
             int next=0;
@@ -710,8 +756,8 @@ public class OverlayService extends Service {
         if(intervalMinutes!=1&&intervalMinutes!=3&&intervalMinutes!=5&&
            intervalMinutes!=10&&intervalMinutes!=15&&intervalMinutes!=20)intervalMinutes=5;
         schedulePeriodic();
-        spriteSize=pref.getInt("spriteSize",50);
-        if(spriteSize!=32&&spriteSize!=40&&spriteSize!=50&&spriteSize!=60)spriteSize=50;
+        spriteSize=pref.getInt("spriteSize",45);
+        if(spriteSize!=32&&spriteSize!=40&&spriteSize!=45&&spriteSize!=50&&spriteSize!=60)spriteSize=45;
         showTimers=pref.getBoolean("showTimers",false);
         markBorders=pref.getBoolean("markBorders",true);
         alerts=pref.getBoolean("alerts",false);
@@ -720,7 +766,7 @@ public class OverlayService extends Service {
             params.width=dp(minimized?BUBBLE_DP:dockDp());
             params.x=Math.min(params.x,metrics().widthPixels-params.width);
             grip.setLayoutParams(new FrameLayout.LayoutParams(
-                dp(minimized?BUBBLE_DP:dockDp()),dp(minimized?BUBBLE_DP:27),Gravity.TOP|Gravity.LEFT));
+                dp(minimized?BUBBLE_DP:dockDp()),dp(minimized?BUBBLE_DP:23),Gravity.TOP|Gravity.LEFT));
             updateWindow();
         }
         mode=getSharedPreferences("prefs",0).getString("mode",mode);

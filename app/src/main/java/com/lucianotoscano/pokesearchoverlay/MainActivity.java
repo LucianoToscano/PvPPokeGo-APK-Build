@@ -41,7 +41,7 @@ public class MainActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(Color.rgb(17,18,22));
         TextView help=new TextView(this);
-        help.setText("POKÉSEARCH OVERLAY · ALPHA 0.26\nFaça login AQUI no PoGoCoordinates, mesmo que já tenha entrado pelo navegador.\nToque em INICIAR OVERLAY. Toque na engrenagem para abrir ou fechar o menu; segure e arraste a engrenagem para mover.");
+        help.setText("POKÉSEARCH OVERLAY · ALPHA 0.27\nFaça login AQUI no PoGoCoordinates, mesmo que já tenha entrado pelo navegador.\nToque em INICIAR OVERLAY. Toque na engrenagem para abrir ou fechar o menu; segure e arraste a engrenagem para mover.");
         help.setTextColor(Color.WHITE);help.setTextSize(13);help.setPadding(16,16,16,12);
         root.addView(help);
         Button start=new Button(this);start.setText("INICIAR OVERLAY");root.addView(start);
@@ -64,6 +64,14 @@ public class MainActivity extends Activity {
         root.addView(website,new LinearLayout.LayoutParams(-1,0,1));
         setContentView(root);
         website.loadUrl("https://pogocoordinates.com/search");
+        if("com.lucianotoscano.pokesearchoverlay.EDIT_WATCH_LIST".equals(getIntent().getAction()))
+            root.post(this::showWatchDialog);
+    }
+    @Override protected void onNewIntent(Intent intent){
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if("com.lucianotoscano.pokesearchoverlay.EDIT_WATCH_LIST".equals(intent.getAction()))
+            getWindow().getDecorView().post(this::showWatchDialog);
     }
     private int d(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
     private void buildPreferences(LinearLayout parent){
@@ -87,13 +95,13 @@ public class MainActivity extends Activity {
         subtitle.setText("Tamanho do Pokémon · alterações aplicadas ao iniciar o overlay");
         subtitle.setTextColor(Color.LTGRAY);body.addView(subtitle);
         Spinner sizes=new Spinner(this);
-        String[] sizeLabels={"32 × 32","40 × 40","50 × 50","60 × 60"};
+        String[] sizeLabels={"32 × 32","40 × 40","45 × 45","50 × 50","60 × 60"};
         sizes.setAdapter(new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,sizeLabels));
-        int current=prefs.getInt("spriteSize",50);
-        sizes.setSelection(current==32?0:current==40?1:current==60?3:2);
+        int current=prefs.getInt("spriteSize",45);
+        sizes.setSelection(current==32?0:current==40?1:current==50?3:current==60?4:2);
         sizes.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){
             @Override public void onItemSelected(android.widget.AdapterView<?> p,android.view.View v,int pos,long id){
-                prefs.edit().putInt("spriteSize",new int[]{32,40,50,60}[pos]).apply();
+                prefs.edit().putInt("spriteSize",new int[]{32,40,45,50,60}[pos]).apply();
             }
             @Override public void onNothingSelected(android.widget.AdapterView<?> p){}
         });

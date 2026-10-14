@@ -1,3 +1,7 @@
-# Pokésearch Overlay v0.26-alpha
-Botão '🔔 Pokémon procurados · alerta sonoro' na tela inicial. Até 50 nomes de Pokémon, separados por vírgulas, ponto-e-vírgula ou linha. Som do canal Android específico para novas ocorrências monitoradas detectadas nas buscas que o app obtém do PoGoCoordinates; um único alerta por lote de busca evita excesso de notificações. Botão '🔊 Testar som' para confirmar permissão e volume. Ficha de detalhes também tem botão para adicionar/remover Pokémon da lista. Comparação ignora maiúsculas e acentos, corresponde ao nome completo ou nome seguido de forma; não confunde Mew com Mewtwo.
-O Android 13+ exige autorização de notificações e permite silenciar ou trocar o som do canal. A lista fica salva localmente em SharedPreferences. Alertas gerais continuam independentes. O serviço deve estar ativo para fazer buscas periódicas, por despawn ou manuais. Não foi validado em um aparelho real nem contra sessão ativa do site.
+# Pokésearch Overlay 0.27 Alpha
+
+Sprites padrão 45×45 CSS px, em linhas de 46 px, coluna de 53 dp sem fundo. Menos distância da engrenagem de 23 px ao primeiro Pokémon e sem gaps entre linhas.
+
+Submenu horizontal de dez controles: [IV100] [✨] [5] [↻] [+] [−] [◷] [🔔] [▁] [×]. +/−: alternam 32/40/45/50/60 px, salvo nas preferências; ◷: liga/desliga relógios individuais; 🔔: toque ativa/pausa alertas sonoros da lista de procurados, segurar abre editor de até 50 espécies na tela inicial; ▁ minimiza somente para engrenagem. Tocar na engrenagem abre/fecha e arrastar move overlay.
+
+Na ficha de cada Pokémon, 🔔 adiciona ou remove a espécie da lista. Alarmes são disparados somente para novas ocorrências dos nomes cadastrados nos resultados atualmente consultados (não é uma busca independente de qualquer filtro). A permissão do Android e som do canal são necessários para ouvir avisos. Verificar interface visual em aparelho Samsung antes de considerar final.
