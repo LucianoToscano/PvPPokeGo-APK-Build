@@ -21,9 +21,9 @@ body.menu-left #controls{direction:rtl}
 #controls #cycle.ivOn{background:#136b3bdf;border-color:#69df97a6;color:#e9fff2}
 #gear .gear-icon{display:block}
 #gear .close-icon{display:none}
-#topActions{position:absolute;top:2px;left:calc((var(--dock) - 30px) / 2);width:30px;display:none;flex-direction:column;gap:4px;z-index:4}
+#topActions{position:absolute;top:0;left:calc((var(--dock) - 27px) / 2);width:27px;display:none;flex-direction:column;gap:1px;z-index:4}
 body.menu-open #topActions{display:flex}
-#topActions button{width:30px;height:16px;display:flex;align-items:center;justify-content:center;background:transparent;border:0;border-radius:0;padding:0;box-shadow:none;filter:drop-shadow(0 1px 2px #000a)}
+#topActions button{width:27px;height:16px;display:flex;align-items:center;justify-content:center;background:transparent;border:0;border-radius:0;padding:0;box-shadow:none;filter:drop-shadow(0 1px 2px #000a)}
 #topActions button svg{width:16px;height:16px;display:block}
 #topActions #close{background:transparent;border:0;color:#ff566e;font-size:19px;font-weight:700}
 #topActions #collapse{color:#e5eef8}
@@ -48,7 +48,7 @@ body.menu-open #topActions{display:flex}
 .spawn.active .sprite{filter:drop-shadow(0 0 3px #ffffff77)}
 .timer{position:absolute;right:0;bottom:0;padding:1px 2px;border-radius:3px;background:#111924c4;color:#fff;font-size:8px;line-height:10px;pointer-events:none;min-width:23px;text-align:center}
 .spawn.expired{opacity:.38}
-.sprite{display:block;width:min(var(--sprite),calc(var(--row) - 1px));height:min(var(--sprite),calc(var(--row) - 1px));object-fit:contain;flex-shrink:0;pointer-events:none;filter:drop-shadow(0 1px 1px #0006)}
+.sprite{display:block;width:var(--sprite);height:var(--sprite);object-fit:contain;flex-shrink:0;pointer-events:none;filter:drop-shadow(0 1px 1px #0006)}
 .fallback{font-size:20px}
 #empty{display:block;width:var(--dock);height:18px;line-height:18px;text-align:center;color:#dce1e9b8;font-size:12px;overflow:hidden}
 #bubble{display:none;width:45px;height:45px;border:0;background:transparent;box-shadow:none;border-radius:0;align-items:center;justify-content:center}
@@ -69,7 +69,7 @@ body.menu-open #topActions{display:flex}
  </div></div>
  <div id="topActions">
   <button id="close" title="Fechar todo o overlay" aria-label="Encerrar overlay" onclick="Native.close()">×</button>
-  <button id="collapse" title="Recolher tudo · mostrar só a engrenagem" aria-label="Minimizar overlay" onclick="Native.minimize()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><path d="m9 10 3 3 3-3"/></svg></button>
+  <button id="collapse" title="Recolher tudo e deixar apenas a engrenagem" aria-label="Minimizar overlay" onclick="Native.minimize()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="14" rx="2"/><path d="m9 11 3 3 3-3"/></svg></button>
  </div>
  <div id="spawns"></div>
  <div id="empty">Aguardando busca</div>
@@ -88,7 +88,7 @@ function setMenuOpen(open,side,pad){
  else if(side)document.body.classList.toggle("menu-left",side==="left");
 }
 window.syncMenu=(open,side,pad)=>setMenuOpen(open,side,pad);
-function fit(){requestAnimationFrame(()=>Native.resize(Math.ceil(document.getElementById("shell").getBoundingClientRect().height)+1));}
+let lastHeight=0;function fit(){requestAnimationFrame(()=>{const h=Math.ceil(document.getElementById("shell").getBoundingClientRect().height)+1;if(Math.abs(h-lastHeight)>1){lastHeight=h;Native.resize(h);}});}
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let longTimer, longDone=false;
 function spriteClick(i){if(longDone){longDone=false;return;}Native.toggleDetail(i);}
@@ -100,6 +100,7 @@ function attachLongPress(){
   el.addEventListener('contextmenu',e=>{e.preventDefault();longDone=true;Native.longPressCoords(i)});
  });
 }
+let lastListKey="";
 function draw(){
  document.documentElement.style.setProperty("--row",row+"px");
  document.documentElement.style.setProperty("--sprite",spriteSize+"px");
@@ -127,6 +128,8 @@ function draw(){
  star.classList.toggle("favoritesOn",hasFavorites);
  star.title=hasFavorites?"Editar favoritos e alertas específicos":"Adicionar Pokémon favoritos e alertas específicos";
  const p=document.getElementById("period");p.querySelector(".autoTime").textContent=String(period)+"m";p.title="Atualização automática a cada "+period+" minutos · toque para alterar";p.setAttribute("aria-label","Atualização automática a cada "+period+" minutos");
+ const listKey=JSON.stringify([cards,row,spriteSize,showTimers]);
+ if(listKey!==lastListKey){lastListKey=listKey;
  document.getElementById("spawns").innerHTML=cards.map((c,i)=>{
   const label=[c.name,c.ivPercent?c.ivPercent+"%":"IV não disponível",c.iv,c.rank?"Rank "+c.rank:""].filter(Boolean).join(" · ");
   const icon=/^(https:\/\/|data:image\/(?:png|webp|gif|jpeg);base64,)/i.test(c.image||"")?'<img class="sprite" src="'+esc(c.image)+'" alt="" loading="eager">':'<span class="fallback">◉</span>';
@@ -136,13 +139,14 @@ function draw(){
  }).join("");
  attachLongPress();
  updateTimers();
+ }
  const empty=document.getElementById("empty");
  empty.style.display=cards.length?"none":"block";
  empty.textContent=/sem resultados/i.test(status)?"0":/falha|erro|não|login/i.test(status)?"!":"…";
  empty.title=status||"Aguardando busca";
  document.getElementById("gear").title=menuOpen?"Recolher menu · arrastar para mover":status?("Abrir menu · "+status):"Abrir menu · arrastar para mover";
  document.getElementById("gear").classList.toggle("busy",/(atualizando|buscando|busca manual|pesquisa)/i.test(status));
- requestAnimationFrame(()=>Native.resize(Math.ceil(document.getElementById("shell").getBoundingClientRect().height)+1));
+ fit();
 }
 function updateTimers(){
  document.querySelectorAll(".timer").forEach(e=>{

@@ -53,3 +53,9 @@ As buscas usam a página do PoGoCoordinates e a sessão do navegador integrado; 
 - Identidade de pacote para testers: com.lucianotoscano.pokesearch (não conflita com o APK antigo). Preferências antigas não migram para o novo pacote.
 - Para futuras atualizações assinadas, conservar cópia privada da chave de assinatura. Nunca incluí-la no repositório.
 - Ainda é necessário testar login, webview, overlay e filtros com usuário real; a auditoria não consegue executar o serviço no Samsung remoto.
+
+## Revisão final v0.35
+- Ícone PokeSearch adicionado ao launcher (PNG original otimizado para o Android).
+- Botões acima da engrenagem sem fundos, espaço superior reduzido para 35dp, apenas 1dp entre ações.
+- Evita reconstruir sprites e recarregar imagens a cada mensagem de status; script de busca em cache fora de I/O; reduz atualizações de janela repetidas.
+- Assinatura de distribuição Android v2/v3 com chave estável; incompatível com assinaturas alpha antigas, pacote novo instalado em paralelo.

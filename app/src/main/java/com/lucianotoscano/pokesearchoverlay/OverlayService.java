@@ -125,8 +125,8 @@ public class OverlayService extends Service {
     }
     private int rowDp(){
         int n=Math.max(1,count());
-        int available=screenHeightDp()-160;
-        return Math.max(28,Math.min(spriteSize+1,available/n));
+        int available=Math.max(170,screenHeightDp()-155);
+        return Math.max(27,Math.min(spriteSize-5,available/n));
     }
     private void update(){
         js(panel,panelLoaded,"window.onNativeData("+results+","+JSONObject.quote(status)+","+
@@ -168,6 +168,10 @@ public class OverlayService extends Service {
         website.setFocusable(false);
         website.setClickable(false);
         website.setOnTouchListener((v,e)->true);
+        website.getSettings().setAllowContentAccess(false);
+        website.getSettings().setAllowFileAccess(false);
+        website.getSettings().setAllowFileAccessFromFileURLs(false);
+        website.getSettings().setAllowUniversalAccessFromFileURLs(false);
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(website,true);
         root.addView(website,new FrameLayout.LayoutParams(dp(390),dp(690),Gravity.TOP|Gravity.LEFT));
@@ -201,6 +205,9 @@ public class OverlayService extends Service {
         panel=new WebView(this);
         panel.setBackgroundColor(Color.TRANSPARENT);
         panel.getSettings().setJavaScriptEnabled(true);
+        panel.getSettings().setAllowContentAccess(false);
+        panel.getSettings().setAllowFileAccessFromFileURLs(false);
+        panel.getSettings().setAllowUniversalAccessFromFileURLs(false);
         panel.addJavascriptInterface(new Bridge(),"Native");
         root.addView(panel,new FrameLayout.LayoutParams(-1,-1));
         panel.setWebViewClient(new WebViewClient(){
@@ -257,6 +264,9 @@ public class OverlayService extends Service {
         detailPanel=new WebView(this);
         detailPanel.setBackgroundColor(Color.TRANSPARENT);
         detailPanel.getSettings().setJavaScriptEnabled(true);
+        detailPanel.getSettings().setAllowContentAccess(false);
+        detailPanel.getSettings().setAllowFileAccessFromFileURLs(false);
+        detailPanel.getSettings().setAllowUniversalAccessFromFileURLs(false);
         detailPanel.addJavascriptInterface(new Bridge(),"Native");
         detailRoot.addView(detailPanel,new FrameLayout.LayoutParams(-1,-1));
         detailPanel.setWebViewClient(new WebViewClient(){
@@ -281,8 +291,8 @@ public class OverlayService extends Service {
         schedulePeriodic();
     }
     private String script(){
+        if(probeScriptCache!=null)return probeScriptCache;
         try(InputStream in=getAssets().open("probe.js")){
-            if(probeScriptCache!=null)return probeScriptCache;
             ByteArrayOutputStream out=new ByteArrayOutputStream();
             byte[] buf=new byte[4096];int n;
             while((n=in.read(buf))!=-1)out.write(buf,0,n);
@@ -303,6 +313,7 @@ public class OverlayService extends Service {
                 .replace("__MODE__",JSONObject.quote(mode))
                 .replace("__SHINY__",shiny?"true":"false");
         website.evaluateJavascript(code,raw->{
+            if(stopped)return;
             try{
                 String decoded=new JSONArray("["+raw+"]").getString(0);
                 JSONObject r=new JSONObject(decoded);
@@ -553,7 +564,7 @@ public class OverlayService extends Service {
             params.width=dp(menuDp());
             // Reserve vertical space for two actions ABOVE the gear, keeping
             // the gear and Pokémon at the original screen position when possible.
-            menuPadDp=41;
+            menuPadDp=35;
             params.y=Math.max(0,params.y-dp(menuPadDp));
             height+=menuPadDp;
         }else{
