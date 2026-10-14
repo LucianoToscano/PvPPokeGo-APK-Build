@@ -4,7 +4,7 @@
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;background:transparent;color:#fff;font-family:Roboto,Arial,sans-serif;font-size:10px;overflow:hidden}
 button{font:inherit;color:inherit;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-#shell{width:100%;background:rgba(11,16,23,.18);border:0;border-radius:7px;overflow:hidden;box-shadow:0 3px 12px #0003;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+#shell{width:100%;background:rgba(11,16,23,.25);border:0;border-radius:7px;overflow:hidden;box-shadow:0 3px 12px #0003;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 #handle{height:12px;text-align:center;padding:0;color:#dce2ecae;font-size:9px;line-height:12px;letter-spacing:1px;user-select:none}
 #controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;padding:0 1px 1px}
 #controls button{height:19px;min-height:19px;min-width:0;border-radius:2px;border:0;background:#131a2280;font-size:8px;font-weight:700;white-space:nowrap;padding:0 1px}
@@ -40,6 +40,16 @@ button{font:inherit;color:inherit;border:0;cursor:pointer;-webkit-tap-highlight-
 <script>
 let cards=[],active=-1,mode="iv",shiny=true,status="",row=36;
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let longTimer, longDone=false;
+function spriteClick(i){if(longDone){longDone=false;return;}Native.toggleDetail(i);}
+function attachLongPress(){
+ document.querySelectorAll('.spawn').forEach(el=>{
+  const i=Number(el.dataset.index);
+  el.addEventListener('touchstart',()=>{longDone=false;clearTimeout(longTimer);longTimer=setTimeout(()=>{longDone=true;Native.longPressCoords(i);},580);},{passive:true});
+  ['touchend','touchmove','touchcancel'].forEach(t=>el.addEventListener(t,()=>clearTimeout(longTimer),{passive:true}));
+  el.addEventListener('contextmenu',e=>{e.preventDefault();longDone=true;Native.longPressCoords(i)});
+ });
+}
 function draw(){
  document.documentElement.style.setProperty("--row",row+"px");
  document.getElementById("iv").classList.toggle("active",mode==="iv");
@@ -49,8 +59,9 @@ function draw(){
  document.getElementById("spawns").innerHTML=cards.map((c,i)=>{
   const label=[c.name,c.ivPercent?c.ivPercent+"%":"IV não disponível",c.iv,c.rank?"Rank "+c.rank:""].filter(Boolean).join(" · ");
   const icon=/^https:\/\//.test(c.image||"")?'<img class="sprite" src="'+esc(c.image)+'" alt="">':'<span class="fallback">◉</span>';
-  return '<button title="'+esc(label)+'" aria-label="'+esc(label)+'" class="spawn '+(active===i?"active":"")+'" onclick="Native.toggleDetail('+i+')">'+icon+'</button>';
+  return '<button title="'+esc(label)+'" aria-label="'+esc(label)+'" class="spawn '+(active===i?"active":"")+'" data-index="'+i+'" onclick="spriteClick('+i+')" oncontextmenu="return false">'+icon+'</button>';
  }).join("");
+ attachLongPress();
  const empty=document.getElementById("empty");
  empty.style.display=cards.length?"none":"block";
  empty.textContent=status||"Sem resultados";

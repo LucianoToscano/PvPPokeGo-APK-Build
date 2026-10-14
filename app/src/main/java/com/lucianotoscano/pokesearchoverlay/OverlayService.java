@@ -93,6 +93,7 @@ public class OverlayService extends Service {
         website=new WebView(this);
         website.getSettings().setJavaScriptEnabled(true);
         website.getSettings().setDomStorageEnabled(true);
+        website.getSettings().setDatabaseEnabled(true);
         website.setAlpha(0);
         website.setFocusable(false);
         website.setClickable(false);
@@ -291,7 +292,7 @@ public class OverlayService extends Service {
             detailParams.height=dp(detailHeight);moveDetail();
         }
     }
-    private void pollCoordinates(JSONObject target,int attempt){
+    private void pollCoordinates(JSONObject target,int attempt,boolean autoCopy){
         JSONObject query=new JSONObject();
         try{
             query.put("name",target.optString("name",""));
@@ -311,14 +312,20 @@ public class OverlayService extends Service {
                     }
                     results=existing.toString();
                 }catch(Exception ignored){}
-                deliverCoords(coords,"Coordenadas obtidas");return;
+                if(autoCopy)copyCoordinatesInternal(coords);
+                deliverCoords(coords,autoCopy?"Coordenadas copiadas":"Coordenadas obtidas");return;
             }
             if(attempt<8){
-                handler.postDelayed(()->pollCoordinates(target,attempt+1),450L);
+                handler.postDelayed(()->pollCoordinates(target,attempt+1,autoCopy),450L);
             }else{
                 deliverCoords("","O site não retornou coordenadas. Confira no navegador interno.");
             }
         });
+    }
+    private void copyCoordinatesInternal(String value){
+        String coords=extractCoordinates(value);
+        ClipboardManager cb=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+        if(cb!=null&&!coords.isEmpty())cb.setPrimaryClip(ClipData.newPlainText("Pokémon coordinates",coords));
     }
     private String extractCoordinates(String input){
         java.util.regex.Matcher m=java.util.regex.Pattern.compile("(-?\\d{1,2}(?:\\.\\d+)?)\\s*[,;]\\s*(-?\\d{1,3}(?:\\.\\d+)?)").matcher(input);
@@ -361,27 +368,31 @@ public class OverlayService extends Service {
             if(selected==index)hideDetails();else showDetails(index);
         });}
         @JavascriptInterface public void hideDetail(){handler.post(OverlayService.this::hideDetails);}
-        @JavascriptInterface public void coords(int sourceIndex){handler.post(()->{
-            JSONObject chosen;
+        @JavascriptInterface public void longPressCoords(int i){handler.post(()->{
             try{
-                JSONArray list=new JSONArray(results);
-                chosen=null;
-                for(int i=0;i<list.length();i++){
-                    JSONObject item=list.getJSONObject(i);
-                    if(item.optInt("sourceIndex",-1)==sourceIndex){chosen=item;break;}
-                }
-            }catch(Exception e){chosen=null;}
-            if(chosen==null){deliverCoords("","Pokémon não encontrado nesta busca");return;}
-            final JSONObject target=chosen;
-            execute("coords:"+sourceIndex,response->{
-                if(!response.optBoolean("ok")){
-                    deliverCoords("",response.optString("status","Get coords indisponível"));return;
-                }
-                pollCoordinates(target,0);
-            });
+                JSONArray a=new JSONArray(results);
+                if(i>=0&&i<a.length())requestCoordinates(a.getJSONObject(i).optInt("sourceIndex",-1),true);
+            }catch(Exception ignored){}
         });}
-
-
+        @JavascriptInterface public void coords(int sourceIndex){handler.post(()->requestCoordinates(sourceIndex,false));}
+    }
+    private void requestCoordinates(int sourceIndex,boolean autoCopy){
+        JSONObject chosen=null;
+        try{
+            JSONArray a=new JSONArray(results);
+            for(int i=0;i<a.length();i++){
+                JSONObject item=a.getJSONObject(i);
+                if(item.optInt("sourceIndex",-1)==sourceIndex){chosen=item;break;}
+            }
+        }catch(Exception ignored){}
+        if(chosen==null){deliverCoords("","Pokémon indisponível");return;}
+        JSONObject target=chosen;
+        execute("coords:"+sourceIndex,response->{
+            if(!response.optBoolean("ok")){
+                deliverCoords("",response.optString("status","Get coords indisponível"));return;
+            }
+            pollCoordinates(target,0,autoCopy);
+        });
     }
     @Override public int onStartCommand(Intent i,int flags,int id){
         mode=getSharedPreferences("prefs",0).getString("mode",mode);
