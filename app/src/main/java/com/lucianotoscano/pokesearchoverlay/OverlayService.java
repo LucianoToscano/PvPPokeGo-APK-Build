@@ -28,7 +28,7 @@ import java.io.InputStream;
 import java.util.function.Consumer;
 
 public class OverlayService extends Service {
-    private static final int DOCK_DP=88, BUBBLE_DP=45, DETAIL_DP=226;
+    private static final int DOCK_DP=52, BUBBLE_DP=45, DETAIL_DP=226;
     private final Handler handler=new Handler(Looper.getMainLooper());
     private WindowManager wm;
     private WindowManager.LayoutParams params,detailParams;
@@ -62,7 +62,7 @@ public class OverlayService extends Service {
     }
     private int rowDp(){
         int n=Math.max(1,count());
-        int available=screenHeightDp()-195;
+        int available=screenHeightDp()-160;
         return Math.max(25,Math.min(37,available/n));
     }
     private void update(){
@@ -165,7 +165,7 @@ public class OverlayService extends Service {
             }
             return true;
         });
-        root.addView(grip,new FrameLayout.LayoutParams(dp(DOCK_DP),dp(18),Gravity.TOP|Gravity.LEFT));
+        root.addView(grip,new FrameLayout.LayoutParams(dp(DOCK_DP),dp(12),Gravity.TOP|Gravity.LEFT));
 
         params=new WindowManager.LayoutParams(dp(DOCK_DP),dp(height),
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
@@ -261,7 +261,7 @@ public class OverlayService extends Service {
         params.width=dp(yes?BUBBLE_DP:DOCK_DP);
         params.height=dp(yes?BUBBLE_DP:height);
         grip.setLayoutParams(new FrameLayout.LayoutParams(
-                dp(yes?BUBBLE_DP:DOCK_DP),dp(yes?BUBBLE_DP:18),Gravity.TOP|Gravity.LEFT));
+                dp(yes?BUBBLE_DP:DOCK_DP),dp(yes?BUBBLE_DP:12),Gravity.TOP|Gravity.LEFT));
         js(panel,panelLoaded,"window.setMinimized("+yes+")");
         updateWindow();
     }
