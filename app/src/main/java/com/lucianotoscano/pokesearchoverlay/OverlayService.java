@@ -226,23 +226,29 @@ public class OverlayService extends Service {
     }
     private void refresh(){
         if(!loaded){status("Aguardando login...");return;}
-        int generation=++requestGeneration;
-        status("Pesquisando...");
-        execute("prepare",r->{
+        final int generation=++requestGeneration;
+        results="[]";hideDetails();status("Configurando...");
+        execute("prepare",prepared->{
             if(generation!=requestGeneration)return;
-            if(!r.optBoolean("ok")){results="[]";status("Não foi possível selecionar o modo");return;}
-            handler.postDelayed(()->execute("configure",config->{
+            if(!prepared.optBoolean("ok")){status("Aba Stats/PvP não encontrada");return;}
+            handler.postDelayed(()->execute("setShiny",sh->{
                 if(generation!=requestGeneration)return;
-                if(!config.optBoolean("ok")){
-                    results="[]";
-                    status("Filtros não confirmados no site");
-                    return;
-                }
-                execute("submit",sent->{
-                    if(!sent.optBoolean("ok")){results="[]";status("Busca não iniciada");return;}
-                    handler.postDelayed(()->{if(!stopped&&generation==requestGeneration)collect(generation);},4200);
-                });
-            }),650);
+                if(!sh.optBoolean("ok")){status(sh.optString("reason","Shiny não confirmado"));return;}
+                handler.postDelayed(()->execute("setFilters",filters->{
+                    if(generation!=requestGeneration)return;
+                    if(!filters.optBoolean("ok")){status("Não foi possível ajustar IV/PvP");return;}
+                    handler.postDelayed(()->execute("validate",validated->{
+                        if(generation!=requestGeneration)return;
+                        if(!validated.optBoolean("ok")){status(validated.optString("reason","Filtro não confirmado"));return;}
+                        execute("submit",submitted->{
+                            if(generation!=requestGeneration)return;
+                            if(!submitted.optBoolean("ok")){status(submitted.optString("reason","Busca não iniciou"));return;}
+                            status("Buscando...");
+                            handler.postDelayed(()->{if(!stopped&&generation==requestGeneration)collect(generation);},4500L);
+                        });
+                    }),600L);
+                }),650L);
+            }),550L);
         });
     }
     private void collect(int generation){

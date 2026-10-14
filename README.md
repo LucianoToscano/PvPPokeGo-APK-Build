@@ -1,3 +1,3 @@
-# Pokésearch Overlay 0.7 Alpha
+# Pokésearch Overlay v0.8 Alpha
 
-Correções experimentais para filtros: automação em etapas (modo, Shiny, IV ou PvP e Search) com validação de estado, sem aceitar falha silenciosa. A página React do PoGoCoordinates pode alterar sua estrutura. Se algum controle não puder ser confirmado, mostra aviso e não promete resultados confiáveis.
+Sequência assíncrona explícita para configurar Stats/PvP, Shiny e filtros. Nova validação dos controles antes de iniciar Search. Mostra status se os controles não puderem ser confirmados. Requer teste autenticado no dispositivo; não garante automação sob futuras alterações do site.

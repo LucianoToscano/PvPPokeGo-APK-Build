@@ -21,109 +21,109 @@ function valueInput(input,value){
  return true;
  }catch(_){return false;}
 }
-function inputNear(label){
- const matches=labels(document,new RegExp("^"+label+"$","i"));
- for(const e of matches){
-  let p=e;
-  for(let i=0;i<5&&p;i++,p=p.parentElement){
-   const ins=Array.from(p.querySelectorAll('input:not([type="checkbox"]):not([type="radio"])')).filter(vis);
-   if(ins.length===1)return ins[0];
+function field(label){
+ const re=new RegExp("^"+label+"$","i");
+ const found=elements("label,span,div,p,strong").filter(e=>vis(e)&&re.test(text(e))&&e.children.length<3);
+ for(const el of found){
+  let p=el.parentElement;
+  for(let i=0;i<5&&p;p=p.parentElement,i++){
+   const controls=Array.from(p.querySelectorAll('input:not([type=hidden]),select,[role=combobox],button[aria-haspopup]')).filter(vis);
+   if(controls.length===1)return controls[0];
   }
  }
  return null;
 }
-function customSelect(label,want){
- const found=labels(document,new RegExp("^"+label+"$","i"));
- for(const e of found){
-  let p=e;
-  for(let i=0;i<5&&p;i++,p=p.parentElement){
-   const select=p.querySelector("select");
-   if(select){const o=Array.from(select.options).find(x=>text(x).toLowerCase()===want.toLowerCase());
-     if(o){select.value=o.value;select.dispatchEvent(new Event("change",{bubbles:true}));return true;}}
-   const b=p.querySelector('button[role="combobox"],[role="combobox"]');
-   if(b){
-    if(text(b).toLowerCase().includes(want.toLowerCase()))return true;
-    b.click();
-    const opt=elements('[role="option"]').find(x=>vis(x)&&text(x).toLowerCase()===want.toLowerCase());
-    if(opt){opt.click();return true;}return false;
-   }
-  }
+function inputNear(label){const e=field(label);return e&&e.matches("input")?e:null;}
+function choice(label,want){
+ const e=field(label);
+ if(!e)return false;
+ if(e.tagName==="SELECT"){
+  const opt=Array.from(e.options).find(o=>text(o).toLowerCase()===want.toLowerCase());
+  if(!opt)return false;
+  e.value=opt.value;e.dispatchEvent(new Event("input",{bubbles:true}));e.dispatchEvent(new Event("change",{bubbles:true}));
+  return true;
  }
- return false;
+ if(text(e).toLowerCase()===want.toLowerCase())return true;
+ e.click();
+ const opt=elements('[role=option],option').find(o=>vis(o)&&text(o).toLowerCase()===want.toLowerCase());
+ if(!opt)return false;opt.click();return true;
 }
-function nearby(label,pattern){
- const matches=labels(document,pattern);
- for(const e of matches){
-  let p=e;
-  for(let depth=0;depth<6&&p;p=p.parentElement,depth++){
-   const controls=Array.from(p.querySelectorAll('input,[role="switch"],[role="checkbox"],button,select,[role="combobox"]')).filter(vis);
-   if(controls.length>0 && controls.length<12)return {root:p,controls,label:e};
-  }
+function readChoice(label){
+ const e=field(label);
+ if(!e)return null;
+ if(e.tagName==="SELECT")return text(e.selectedOptions[0]);
+ return text(e);
+}
+function tab(label){
+ const b=oneButton(label);
+ if(!b)return false;
+ if(b.getAttribute("aria-selected")==="true"||b.getAttribute("data-state")==="active")return true;
+ b.click();return true;
+}
+function currentMode(){
+ if(field("Top ranking"))return "gl";
+ if(elements("input").some(e=>e.value==="15")&&labels(document,/^Raw IV$/i).length)return "iv";
+ return null;
+}
+function shinyControl(){
+ const lab=elements("label,span,strong,div").filter(e=>vis(e)&&/^\s*(?:✨\s*)?Shiny only\s*$/i.test(text(e))).sort((a,b)=>a.querySelectorAll("*").length-b.querySelectorAll("*").length)[0];
+ if(!lab)return null;
+ for(let p=lab,i=0;p&&i<5;p=p.parentElement,i++){
+  const controls=Array.from(p.querySelectorAll('input[type=checkbox],[role=switch],[role=checkbox],button[aria-checked]'));
+  if(controls.length===1)return controls[0];
+  const toggle=p.querySelector('button[data-state],button[aria-pressed]');
+  if(toggle)return toggle;
  }
  return null;
 }
 function readShiny(){
- const match=nearby("Shiny",/Shiny only/i);
- if(!match)return null;
- const candidates=[...match.controls].filter(x=>x.matches('input[type=checkbox],[role=switch],[role=checkbox],[aria-checked],[data-state]'));
- for(const x of candidates){
-  if(x.matches('input[type=checkbox]'))return x.checked;
-  const aria=x.getAttribute('aria-checked'),state=x.getAttribute('data-state');
-  if(aria==="true"||state==="checked")return true;
-  if(aria==="false"||state==="unchecked")return false;
- }
- // Custom switch without ARIA: inspect track background classes only as an auxiliary heuristic.
- const track=match.controls.find(x=>x.matches("button,[role=switch]"));
- if(track){
-  const c=String(track.className||"");
-  if(/\bbg-(?:red|rose|pink)-[4-9]\d\d\b/.test(c))return true;
-  if(/\bbg-(?:gray|zinc|slate)-[5-9]\d\d\b/.test(c))return false;
- }
+ const sw=shinyControl();if(!sw)return null;
+ if(sw.matches('input[type=checkbox]'))return sw.checked;
+ if(sw.getAttribute("aria-checked")!==null)return sw.getAttribute("aria-checked")==="true";
+ if(sw.getAttribute("aria-pressed")!==null)return sw.getAttribute("aria-pressed")==="true";
+ if(sw.getAttribute("data-state")!==null)return sw.getAttribute("data-state")==="checked";
  return null;
 }
 function setShiny(want){
+ const sw=shinyControl();if(!sw)return {ok:false,reason:"Shiny switch não encontrado"};
  const before=readShiny();
- if(before===want)return true;
- const match=nearby("Shiny",/Shiny only/i);
- if(!match)return false;
- let sw=match.controls.find(x=>x.matches('input[type=checkbox],[role=switch],[role=checkbox],[aria-checked],[data-state]'));
- if(!sw)sw=match.controls.find(x=>x.matches('button'));
- if(!sw)return false;
- sw.click();
- return readShiny()===want;
+ if(before===want)return {ok:true,changed:false};
+ if(before===null)return {ok:false,reason:"Estado do Shiny não identificável"};
+ sw.click();return {ok:true,changed:true};
+}
+function rawIVInputs(){
+ const list=labels(document,/^IV$/i);
+ for(const el of list){
+  for(let p=el.parentElement,i=0;p&&i<6;p=p.parentElement,i++){
+   const inputs=Array.from(p.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio])')).filter(vis);
+   if(inputs.length===3)return inputs;
+  }
+ }
+ return [];
 }
 function applyIv(){
- click("Stats");click("Raw IV");
- let done=false;
- for(const el of labels(document,/^IV$/i)){
-  let p=el;
-  for(let depth=0;depth<7&&p;depth++,p=p.parentElement){
-   const ins=Array.from(p.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio])')).filter(vis);
-   if(ins.length>=3&&ins.length<=5){
-    done=ins.slice(0,3).every(input=>valueInput(input,15));
-    if(done)done=ins.slice(0,3).every(input=>input.value==="15");
-    break;
-   }
-  }
-  if(done)break;
- }
- return done;
+ tab("Stats");tab("Raw IV");
+ const ins=rawIVInputs();
+ if(ins.length!==3)return false;
+ return ins.every(x=>valueInput(x,"15"));
 }
 function applyGl(){
- const tab=click("PvP");
- const ranking=inputNear("Top ranking");
- const ok=ranking?valueInput(ranking,1)&&ranking.value==="1":false;
- const league=customSelect("League","Great League");
- const prior=customSelect("Include previous evolutions","Yes");
- return {ok,league,prior,tab};
-}
-function getModeState(){
- const shiny=readShiny();
  const rank=inputNear("Top ranking");
- const leagueLabel=nearby("League",/^League$/i);
- const evolutionLabel=nearby("Include previous evolutions",/^Include previous evolutions$/i);
- function selected(m){if(!m)return "";const el=m.controls.find(x=>x.matches('select,[role=combobox]'))||m.root.querySelector("select,button");return el?(el.tagName==="SELECT"?text(el.selectedOptions[0]):text(el)):"";}
- return {shiny,ranking:rank?rank.value:null,league:selected(leagueLabel),evolutions:selected(evolutionLabel)};
+ return !!rank&&valueInput(rank,"1")&&choice("League","Great League")&&choice("Include previous evolutions","Yes");
+}
+function check(){
+ const currentShiny=readShiny();
+ if(currentShiny!==shinyOnly)return {ok:false,reason:"Shiny não confirmado",shiny:currentShiny};
+ if(mode==="iv"){
+  const ins=rawIVInputs();
+  if(ins.length!==3||ins.some(x=>x.value!=="15"))return {ok:false,reason:"Raw IV 15/15/15 não confirmado"};
+  return {ok:true};
+ }
+ const rank=inputNear("Top ranking");
+ const league=readChoice("League"),prior=readChoice("Include previous evolutions");
+ if(!rank||rank.value!=="1"||league!=="Great League"||prior!=="Yes")
+  return {ok:false,reason:"Grande Liga R1 não confirmada",rank:rank?rank.value:null,league,prior};
+ return {ok:true};
 }
 function cardRoots(){
  const btns=elements("button,[role=button]").filter(e=>vis(e)&&/^Get coords$/i.test(text(e)));
@@ -198,20 +198,21 @@ if(action.startsWith("coords:")){
  return JSON.stringify({ok:true,status:"Botão Get coords acionado no PoGoCoordinates"});
 }
 if(action==="prepare"){
- const tab=click(mode==="iv"?"Stats":"PvP");
- return JSON.stringify({ok:tab,mode});
+ return JSON.stringify({ok:tab(mode==="iv"?"Stats":"PvP")});
 }
-if(action==="configure"){
- const shinyDone=setShiny(shinyOnly);
- const filters=mode==="iv"?{ok:applyIv()}:applyGl();
- return JSON.stringify({ok:shinyDone&&filters.ok,shinyDone,filters,state:getModeState()});
+if(action==="setShiny"){
+ return JSON.stringify(setShiny(shinyOnly));
+}
+if(action==="setFilters"){
+ return JSON.stringify({ok:mode==="iv"?applyIv():applyGl()});
+}
+if(action==="validate"){
+ return JSON.stringify(check());
 }
 if(action==="submit"){
- const pressed=click("Search");
- return JSON.stringify({ok:pressed,state:getModeState()});
-}
-if(action==="state"){
- return JSON.stringify({ok:true,state:getModeState()});
+ const valid=check();
+ if(!valid.ok)return JSON.stringify(valid);
+ return JSON.stringify({ok:click("Search")});
 }
 return JSON.stringify({ok:false});
 })()
