@@ -40,7 +40,7 @@ public class OverlayService extends Service {
     private FrameLayout root,detailRoot;
     private View grip;
     private WebView panel,detailPanel,website;
-    private boolean menuExpanded=false,menuLeft=false,minimized=false,shiny=true,loaded=false,panelLoaded=false,detailLoaded=false,stopped=false;
+    private boolean menuExpanded=false,menuLeft=false,minimized=false,shiny=false,loaded=false,panelLoaded=false,detailLoaded=false,stopped=false;
     private int height=72,detailHeight=225,requestGeneration=0,selected=-1,intervalMinutes=5;
     private boolean searchInProgress=false;
     private boolean showTimers=false,alerts=false;
@@ -322,7 +322,7 @@ public class OverlayService extends Service {
             if(stopped||generation!=requestGeneration)return;
             final String auth=session.optString("auth","não confirmado");
             getSharedPreferences("prefs",0).edit().putString("sessionStatus",auth).apply();
-            if(auth.equals("login necessário")){
+            if(shiny&&auth.equals("login necessário")){
                 searchInProgress=false;
                 diagnosticError("Login necessário. Abra o Pokésearch e autentique-se.");
                 return;
@@ -728,8 +728,30 @@ public class OverlayService extends Service {
             schedulePeriodic();update();
         });}
         @JavascriptInterface public void shiny(){handler.post(()->{
-            shiny=!shiny;getSharedPreferences("prefs",0).edit().putBoolean("shiny",shiny).apply();
-            results="[]";hideDetails();update();refresh();
+            shiny=!shiny;
+            getSharedPreferences("prefs",0).edit().putBoolean("shiny",shiny).apply();
+            ++requestGeneration;
+            searchInProgress=false;
+            results="[]";hideDetails();update();
+            if(shiny){
+                // Open the real site switch and login in a visible WebView after explicit opt-in.
+                Intent intent=new Intent(OverlayService.this,MainActivity.class);
+                intent.setAction("com.lucianotoscano.pokesearchoverlay.OPEN_SHINY_LOGIN");
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP|Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                try{
+                    startActivity(intent);
+                    status("✨ Shiny selecionado. O site pode solicitar login.");
+                }catch(Exception e){
+                    shiny=false;
+                    getSharedPreferences("prefs",0).edit().putBoolean("shiny",false).apply();
+                    diagnosticError("Não foi possível abrir a página de login.");
+                }
+                update();
+            }else{
+                status("Shiny desativado.");
+                refresh();
+            }
         });}
         @JavascriptInterface public void refresh(){handler.post(()->OverlayService.this.refresh(true));}
         @JavascriptInterface public void minimize(){handler.post(()->OverlayService.this.minimize(true));}
@@ -778,6 +800,10 @@ public class OverlayService extends Service {
         }
         // v0.20 saved 10 as the implicit default; only keep a rate the user explicitly chose.
         android.content.SharedPreferences pref=getSharedPreferences("prefs",0);
+        if(!pref.getBoolean("shinyOptInV32",false)){
+            pref.edit().putBoolean("shiny",false).putBoolean("shinyOptInV32",true).apply();
+            shiny=false;
+        }
         if(!pref.getBoolean("intervalExplicit",false)){
             intervalMinutes=5;
             pref.edit().putInt("intervalMinutes",5).apply();
@@ -800,7 +826,7 @@ public class OverlayService extends Service {
             updateWindow();
         }
         mode=getSharedPreferences("prefs",0).getString("mode",mode);
-        shiny=getSharedPreferences("prefs",0).getBoolean("shiny",shiny);
+        shiny=getSharedPreferences("prefs",0).getBoolean("shiny",false);
         update();
         return START_STICKY;
     }

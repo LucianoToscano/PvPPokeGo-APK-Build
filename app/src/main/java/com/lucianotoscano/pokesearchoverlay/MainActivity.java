@@ -39,6 +39,7 @@ import android.graphics.Typeface;
 public class MainActivity extends Activity {
     private WebView website;
     private TextView watchSummary;
+    private boolean shinyLoginRequested=false;
     @Override public void onCreate(Bundle b){
         super.onCreate(b);
         getWindow().setStatusBarColor(Color.rgb(11,13,18));
@@ -116,13 +117,16 @@ public class MainActivity extends Activity {
         CookieManager.getInstance().setAcceptThirdPartyCookies(website,true);
         website.setWebViewClient(new WebViewClient(){
             @Override public void onPageFinished(WebView view,String url){
-                if(url!=null&&url.startsWith("https://pogocoordinates.com/"))
+                if(url!=null&&url.startsWith("https://pogocoordinates.com/")){
                     view.evaluateJavascript(readAsset("presets.js"),null);
+                    if(shinyLoginRequested)runRequestedShinyLogin();
+                }
             }
         });
         root.addView(website,new LinearLayout.LayoutParams(-1,0,1));
         setContentView(root);
         website.loadUrl("https://pogocoordinates.com/search");
+        handleShinyLoginIntent(getIntent());
         if("com.lucianotoscano.pokesearchoverlay.EDIT_WATCH_LIST".equals(getIntent().getAction()))
             root.post(this::openPicker);
         if("com.lucianotoscano.pokesearchoverlay.OPEN_SETTINGS".equals(getIntent().getAction()))
@@ -156,9 +160,29 @@ public class MainActivity extends Activity {
         super.onResume();
         refreshWatchCount();
     }
+    private void handleShinyLoginIntent(Intent intent){
+        if(intent==null||!"com.lucianotoscano.pokesearchoverlay.OPEN_SHINY_LOGIN".equals(intent.getAction()))return;
+        shinyLoginRequested=true;
+        if(website!=null){
+            String current=website.getUrl();
+            if(current!=null&&current.startsWith("https://pogocoordinates.com/search"))
+                runRequestedShinyLogin();
+            else if(current!=null&&!current.startsWith("https://pogocoordinates.com/"))
+                website.loadUrl("https://pogocoordinates.com/search");
+        }
+    }
+    private void runRequestedShinyLogin(){
+        if(!shinyLoginRequested||website==null)return;
+        shinyLoginRequested=false;
+        website.postDelayed(()->{
+            if(website!=null&&website.getUrl()!=null&&website.getUrl().startsWith("https://pogocoordinates.com/"))
+                website.evaluateJavascript(readAsset("shiny_login.js"),null);
+        },900);
+    }
     @Override protected void onNewIntent(Intent intent){
         super.onNewIntent(intent);
         setIntent(intent);
+        handleShinyLoginIntent(intent);
         if("com.lucianotoscano.pokesearchoverlay.EDIT_WATCH_LIST".equals(intent.getAction()))
             getWindow().getDecorView().post(this::openPicker);
         if("com.lucianotoscano.pokesearchoverlay.OPEN_SETTINGS".equals(intent.getAction()))

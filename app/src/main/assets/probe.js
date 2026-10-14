@@ -256,7 +256,8 @@ if(action.startsWith("readCoords:")){
 if(action==="session"){
  const sw=shinyControl();
  const login=elements("a,button,[role=button]").some(e=>vis(e)&&/^(?:Log ?in|Sign ?in|Entrar|Fazer login)$/i.test(text(e)));
- return JSON.stringify({ok:true,auth:sw?"autenticada":login?"login necessário":"não confirmado",
+ const loggedIn=elements("a,button,[role=button]").some(e=>vis(e)&&/^(?:Log ?out|Sign ?out|Sair|Desconectar)$/i.test(text(e)));
+ return JSON.stringify({ok:true,auth:loggedIn?"autenticada":login?"login necessário":"não confirmado",
    shinyAvailable:!!sw,site:location.hostname});
 }
 if(action==="prepareSearch"){

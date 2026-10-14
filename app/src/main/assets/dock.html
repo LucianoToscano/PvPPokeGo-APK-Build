@@ -54,7 +54,7 @@ body.menu-left #controls{direction:rtl}
  <button id="gear" title="Abrir opções · arrastar para mover" aria-label="Abrir opções" aria-expanded="false"><svg class="gear-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96c-.5-.38-1.03-.69-1.64-.93L14.36 2.8a.49.49 0 0 0-.49-.4h-3.84a.49.49 0 0 0-.49.4l-.36 2.53c-.6.24-1.15.56-1.64.93l-2.39-.96a.49.49 0 0 0-.61.22L2.62 8.84a.5.5 0 0 0 .12.64l2.02 1.58c-.04.3-.07.62-.07.94s.03.64.08.94L2.74 14.5a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.61.22l2.39-.96c.49.38 1.04.7 1.64.93l.36 2.53c.04.24.24.4.49.4h3.84c.25 0 .45-.16.49-.4l.36-2.53c.6-.24 1.15-.55 1.64-.93l2.39.96c.23.09.49 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.02-1.56ZM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"/></svg><svg class="close-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg></button>
  <div id="menu"><div id="controls">
   <button id="cycle" title="Alternar: IV100 / Grande Liga #1 / Ultra Liga #1" onclick="Native.cycleMode()">100%</button>
-  <button id="sh" title="Ativar ou desativar Shiny" onclick="Native.shiny()">✨</button>
+  <button id="sh" title="Shiny desativado · tocar para ativar no site (pode solicitar login)" onclick="Native.shiny()">✨</button>
   <button id="period" title="Atualização automática a cada 5 minutos · toque para alterar" aria-label="Atualização automática, 5 minutos" onclick="Native.cycleInterval()"><span class="autoLabel">AUTO</span><span class="autoTime">5m</span></button>
   <div id="actions">
     <button title="Atualizar agora" onclick="Native.refresh()">↻</button>
@@ -70,7 +70,7 @@ body.menu-left #controls{direction:rtl}
 </div>
 <div id="bubble" role="button" aria-label="Restaurar overlay"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96c-.5-.38-1.03-.69-1.64-.93L14.36 2.8a.49.49 0 0 0-.49-.4h-3.84a.49.49 0 0 0-.49.4l-.36 2.53c-.6.24-1.15.56-1.64.93l-2.39-.96a.49.49 0 0 0-.61.22L2.62 8.84a.5.5 0 0 0 .12.64l2.02 1.58c-.04.3-.07.62-.07.94s.03.64.08.94L2.74 14.5a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.61.22l2.39-.96c.49.38 1.04.7 1.64.93l.36 2.53c.04.24.24.4.49.4h3.84c.25 0 .45-.16.49-.4l.36-2.53c.6-.24 1.15-.55 1.64-.93l2.39.96c.23.09.49 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.02-1.56ZM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"/></svg></div>
 <script>
-let cards=[],active=-1,mode="iv",shiny=true,status="",row=46,menuOpen=false,period=5,spriteSize=45,showTimers=false,watchEnabled=true;
+let cards=[],active=-1,mode="iv",shiny=false,status="",row=46,menuOpen=false,period=5,spriteSize=45,showTimers=false,watchEnabled=true;
 function setMenuOpen(open,side){
  menuOpen=!!open;
  document.getElementById("menu").classList.toggle("open",menuOpen);
@@ -108,6 +108,8 @@ function draw(){
  }
  document.getElementById("size").textContent=spriteSize<=35?"P":spriteSize>=55?"G":"M";
  document.getElementById("sh").classList.toggle("shinyOn",shiny);
+ document.getElementById("sh").setAttribute("aria-pressed",String(shiny));
+ document.getElementById("sh").title=shiny?"Shiny ativado · tocar para desativar":"Shiny desativado · tocar para ativar no site (pode solicitar login)";
  document.getElementById("clock").classList.toggle("timerOn",showTimers);
  const w=document.getElementById("watch");
  w.classList.toggle("watchOn",watchEnabled);
