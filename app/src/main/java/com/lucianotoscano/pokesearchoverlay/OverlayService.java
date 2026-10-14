@@ -38,7 +38,7 @@ public class OverlayService extends Service {
     private View grip;
     private WebView panel,detailPanel,website;
     private boolean menuExpanded=false,menuLeft=false,minimized=false,shiny=true,loaded=false,panelLoaded=false,detailLoaded=false,stopped=false;
-    private int height=68,detailHeight=225,requestGeneration=0,selected=-1,intervalMinutes=10;
+    private int height=68,detailHeight=225,requestGeneration=0,selected=-1,intervalMinutes=5;
     private String mode="iv",results="[]",status="Conectando...";
     private float startRawX,startRawY;
     private int startX,startY;
@@ -248,6 +248,13 @@ public class OverlayService extends Service {
         execute("collect",r->{
             if(stopped||generation!=requestGeneration)return;
             JSONArray items=r.optJSONArray("cards");
+            if(items!=null){
+                long receivedAt=System.currentTimeMillis();
+                for(int i=0;i<items.length();i++){
+                    JSONObject card=items.optJSONObject(i);
+                    if(card!=null)try{card.put("sampledAt",receivedAt);}catch(Exception ignored){}
+                }
+            }
             results=items==null?"[]":items.toString();
             int n=count();
             if(selected>=n)hideDetails();
@@ -279,7 +286,7 @@ public class OverlayService extends Service {
         FrameLayout.LayoutParams g=new FrameLayout.LayoutParams(dp(DOCK_DP),dp(9),Gravity.TOP|Gravity.LEFT);
         g.leftMargin=show&&menuLeft?dp(MENU_DP-DOCK_DP):0;
         grip.setLayoutParams(g);
-        js(panel,panelLoaded,"window.menuSide("+JSONObject.quote(menuLeft?"left":"right")+")");
+        js(panel,panelLoaded,"window.syncMenu("+show+","+JSONObject.quote(show&&menuLeft?"left":"right")+")");
         updateWindow();moveDetail();
     }
     private void minimize(boolean yes){
@@ -393,7 +400,7 @@ public class OverlayService extends Service {
                 if(options[j]==intervalMinutes){next=(j+1)%options.length;break;}
             }
             intervalMinutes=options[next];
-            getSharedPreferences("prefs",0).edit().putInt("intervalMinutes",intervalMinutes).apply();
+            getSharedPreferences("prefs",0).edit().putInt("intervalMinutes",intervalMinutes).putBoolean("intervalExplicit",true).apply();
             schedulePeriodic();update();
         });}
         @JavascriptInterface public void shiny(){handler.post(()->{
@@ -443,7 +450,16 @@ public class OverlayService extends Service {
             CookieManager.getInstance().flush();
             if(website!=null)website.loadUrl("https://pogocoordinates.com/search");
         }
-        intervalMinutes=getSharedPreferences("prefs",0).getInt("intervalMinutes",10);
+        // v0.20 saved 10 as the implicit default; only keep a rate the user explicitly chose.
+        android.content.SharedPreferences pref=getSharedPreferences("prefs",0);
+        if(!pref.getBoolean("intervalExplicit",false)){
+            intervalMinutes=5;
+            pref.edit().putInt("intervalMinutes",5).apply();
+        }else{
+            intervalMinutes=pref.getInt("intervalMinutes",5);
+        }
+        if(intervalMinutes!=1&&intervalMinutes!=3&&intervalMinutes!=5&&
+           intervalMinutes!=10&&intervalMinutes!=15&&intervalMinutes!=20)intervalMinutes=5;
         schedulePeriodic();
         mode=getSharedPreferences("prefs",0).getString("mode",mode);
         shiny=getSharedPreferences("prefs",0).getBoolean("shiny",shiny);

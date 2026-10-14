@@ -34,7 +34,7 @@ body.menu-left #menu{left:0}
  <div id="menu"><div id="controls">
   <button id="cycle" title="Alternar IV100, GL#1 e UL#1" onclick="Native.cycleMode()">IV100</button>
   <button id="sh" title="Ativar ou desativar Shiny" onclick="Native.shiny()">✨</button>
-  <button id="period" title="Atualização automática a cada 10 minutos; toque para alterar" onclick="Native.cycleInterval()">10</button>
+  <button id="period" title="Atualização automática a cada 10 minutos; toque para alterar" onclick="Native.cycleInterval()">5</button>
   <div id="actions">
     <button title="Atualizar agora" onclick="Native.refresh()">↻</button>
     <button title="Minimizar" onclick="Native.minimize()">−</button>
@@ -46,8 +46,20 @@ body.menu-left #menu{left:0}
 </div>
 <div id="bubble"><b>◉</b><small id="count">0</small></div>
 <script>
-let cards=[],active=-1,mode="iv",shiny=true,status="",row=34,menuOpen=false,period=10;
-function toggleMenu(){menuOpen=!menuOpen;document.getElementById("menu").classList.toggle("open",menuOpen);document.getElementById("gear").setAttribute("aria-expanded",String(menuOpen));Native.menu(menuOpen);}
+let cards=[],active=-1,mode="iv",shiny=true,status="",row=34,menuOpen=false,period=5;
+function setMenuOpen(open,side){
+ menuOpen=!!open;
+ document.getElementById("menu").classList.toggle("open",menuOpen);
+ document.getElementById("gear").setAttribute("aria-expanded",String(menuOpen));
+ if(!menuOpen)document.body.classList.remove("menu-left");
+ else if(side)document.body.classList.toggle("menu-left",side==="left");
+}
+function toggleMenu(){
+ const next=!menuOpen;
+ setMenuOpen(next);
+ Native.menu(next);
+}
+window.syncMenu=(open,side)=>setMenuOpen(open,side);
 function fit(){requestAnimationFrame(()=>Native.resize(Math.ceil(document.getElementById("shell").getBoundingClientRect().height)+1));}
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let longTimer, longDone=false;
@@ -81,15 +93,15 @@ function draw(){
 }
 window.onNativeData=(a,s,m,shi,r,interval)=>{
  cards=Array.isArray(a)?a.slice(0,10):[];
- mode=m;status=String(s||"");shiny=!!shi;row=Number(r)||34;period=Number(interval)||10;
+ mode=m;status=String(s||"");shiny=!!shi;row=Number(r)||34;period=Number(interval)||5;
  if(active>=cards.length)active=-1;
  draw();
 };
-window.menuSide=side=>document.body.classList.toggle("menu-left",side==="left");
+window.menuSide=side=>document.body.classList.toggle("menu-left",menuOpen&&side==="left");
 window.highlight=i=>{active=i;document.querySelectorAll(".spawn").forEach((e,index)=>e.classList.toggle("active",index===i));};
 window.setMinimized=value=>{
  document.getElementById("shell").style.display=value?"none":"block";
- if(value){menuOpen=false;document.getElementById("menu").classList.remove("open");}
+ if(value)setMenuOpen(false);
  document.getElementById("bubble").style.display=value?"flex":"none";
  if(!value)draw();
 };
