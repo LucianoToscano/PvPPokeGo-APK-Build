@@ -1,7 +1,7 @@
-name: Build standalone Pokésearch Overlay APK
+name: Build PokeSearch Android APK
 on:
   push:
-    branches: [pokesearch-overlay-alpha]
+    branches: [pokesearch-no-staging-trigger]
   workflow_dispatch:
 permissions:
   contents: read
@@ -22,6 +22,24 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
+      - name: Validate JavaScript sources
+        run: |
+          node --check app/src/main/assets/probe.js
+          node --check app/src/main/assets/presets.js
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path('app/src/main/assets/dock.html').read_text()
+          assert text.count('<script>') == 1
+          Path('/tmp/pokesearch-dock.js').write_text(text.split('<script>')[1].split('</script>')[0])
+          PY
+          node --check /tmp/pokesearch-dock.js
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          d=json.loads(Path('app/src/main/assets/pokemon_catalog.json').read_text())
+          assert len(d)>1000 and d[0]==[1,"Bulbasaur"]
+          print(f'Catálogo validado: {len(d)} espécies')
+          PY
       - name: Assemble installable debug APK
         run: gradle --no-daemon --stacktrace :app:assembleDebug
       - name: Validate APK
@@ -29,10 +47,10 @@ jobs:
           test -s app/build/outputs/apk/debug/app-debug.apk
           unzip -t app/build/outputs/apk/debug/app-debug.apk >/dev/null
           mkdir -p delivery
-          cp app/build/outputs/apk/debug/app-debug.apk delivery/PokeSearch-Overlay-0.29-alpha.apk
+          cp app/build/outputs/apk/debug/app-debug.apk delivery/PokeSearch-0.30-alpha.apk
           sha256sum delivery/*.apk > delivery/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: PokeSearch-Overlay-0.29-alpha-APK
+          name: PokeSearch-0.30-alpha-APK
           path: delivery/
           retention-days: 30
