@@ -41,13 +41,17 @@ public class MainActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(Color.rgb(17,18,22));
         TextView help=new TextView(this);
-        help.setText("POKÉSEARCH OVERLAY · ALPHA 0.27\nFaça login AQUI no PoGoCoordinates, mesmo que já tenha entrado pelo navegador.\nToque em INICIAR OVERLAY. Toque na engrenagem para abrir ou fechar o menu; segure e arraste a engrenagem para mover.");
+        help.setText("POKÉSEARCH OVERLAY · ALPHA 0.28\nFaça login AQUI no PoGoCoordinates, mesmo que já tenha entrado pelo navegador.\nToque em INICIAR OVERLAY. Toque na engrenagem para abrir ou fechar o menu; segure e arraste a engrenagem para mover.");
         help.setTextColor(Color.WHITE);help.setTextSize(13);help.setPadding(16,16,16,12);
         root.addView(help);
         Button start=new Button(this);start.setText("INICIAR OVERLAY");root.addView(start);
         start.setOnClickListener(v->startOverlay());
         buildPreferences(root);
         buildWatchButton(root);
+        Button pix=new Button(this);
+        pix.setText("❤️ Apoiar o aplicativo · Pix (qualquer valor)");
+        root.addView(pix);
+        pix.setOnClickListener(v->PixSupport.show(this));
         website=new WebView(this);
         website.getSettings().setJavaScriptEnabled(true);
         website.getSettings().setDomStorageEnabled(true);
@@ -179,7 +183,7 @@ public class MainActivity extends Activity {
         content.setPadding(d(18),d(8),d(18),d(6));
         content.setOrientation(LinearLayout.VERTICAL);
         TextView help=new TextView(this);
-        help.setText("Cadastre até 50 Pokémon por nome, separados por vírgulas ou uma por linha. Ex.: Frigibax, Gible, Axew. Avisamos quando aparecer uma ocorrência nova.");
+        help.setText("Cadastre até 50 Pokémon por nome, separados por vírgulas ou uma por linha. Ex.: Frigibax, Gible, Axew. Avisamos somente quando a nova ocorrência atender IV100, GL#1 ou UL#1, com dados confirmados no filtro ativo.");
         help.setTextColor(Color.WHITE);content.addView(help);
         EditText edit=new EditText(this);
         edit.setText(p.getString(WatchAlerts.PREF_LIST,""));

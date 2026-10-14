@@ -417,7 +417,18 @@ public class OverlayService extends Service {
         try{return Integer.parseInt(card.optString("rank","999999"));}
         catch(Exception ignored){return 999999;}
     }
-    private void recordNewResults(JSONArray cards){
+    private boolean verifiedTargetCriteria(JSONObject card){
+        if(card==null)return false;
+        if("iv".equals(mode)){
+            return "15/15/15".equals(card.optString("iv","")) ||
+                "100".equals(card.optString("ivPercent",""));
+        }
+        if("gl".equals(mode)||"ul".equals(mode)){
+            return "1".equals(card.optString("rank","").trim());
+        }
+        return false;
+    }
+    private void recordNewResults(JSONArray cards,boolean leagueConfirmed){
         android.content.SharedPreferences preferences=getSharedPreferences("prefs",0);
         JSONArray history;
         try{history=new JSONArray(preferences.getString("history","[]"));}
@@ -436,7 +447,10 @@ public class OverlayService extends Service {
             current.add(key);
             if(knownSpawns.contains(key))continue;
             if(firstNew.isEmpty())firstNew=c.optString("name","Pokémon");
-            if(WatchAlerts.enabled(this)&&WatchAlerts.matches(c.optString("name",""),wanted)){
+            if(WatchAlerts.enabled(this) &&
+                ("iv".equals(mode)||leagueConfirmed) &&
+                verifiedTargetCriteria(c) &&
+                WatchAlerts.matches(c.optString("name",""),wanted)){
                 watchedCount++;
                 if(firstWatched.isEmpty()){
                     firstWatched=c.optString("name","Pokémon");
@@ -495,7 +509,7 @@ public class OverlayService extends Service {
             }catch(Exception ignored){}
         }
         JSONArray sorted=sortItems(items);
-        recordNewResults(sorted);
+        recordNewResults(sorted,r.optBoolean("leagueConfirmed",false));
         results=sorted.toString();
         searchInProgress=false;
         armNextDespawn(sorted);

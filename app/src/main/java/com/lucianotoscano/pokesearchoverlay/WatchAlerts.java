@@ -99,7 +99,7 @@ public final class WatchAlerts {
     }
     public static boolean test(Context context){
         return send(context,"🔔 Teste: Pokémon procurado",
-            "O som do Pokésearch está configurado. Você receberá alertas de novas ocorrências.",11999);
+            "Som de teste. Alertas reais exigem Pokémon cadastrado e IV100 ou ranking 1 confirmado.",11999);
     }
     public static boolean match(Context context,String pokemon,String info){
         return send(context,"🔔 Encontrado: "+pokemon,info,

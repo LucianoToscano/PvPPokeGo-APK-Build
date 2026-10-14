@@ -196,13 +196,22 @@ function parseCard(box,sourceIndex){
 }
 function collect(){
  const found=cardRoots().map(item=>parseCard(item.node,item.sourceIndex));
- const valid=mode==="iv"?found.filter(x=>x.iv==="15/15/15"||x.ivPercent==="100"):found;
- const uncertain=mode==="iv"&&found.some(x=>!(x.iv==="15/15/15"||x.ivPercent==="100"));
+ const valid=mode==="iv"?
+  found.filter(x=>x.iv==="15/15/15"||x.ivPercent==="100"):
+  found.filter(x=>String(x.rank).trim()==="1");
+ const uncertain=mode==="iv"?
+   found.some(x=>!(x.iv==="15/15/15"||x.ivPercent==="100")):
+   found.some(x=>String(x.rank).trim()!=="1");
+ const targetLeague=mode==="ul"?"Ultra League":"Great League";
+ const fieldRank=inputNear("Top ranking");
+ const activeLeague=readChoice("League");
+ const leagueConfirmed=mode==="iv" ||
+  (!!fieldRank&&fieldRank.value==="1"&&activeLeague===targetLeague);
  const t=text(document.body);
  const loading=!!document.querySelector('[aria-busy="true"],[role="progressbar"]')||
    !!oneButton("Searching")||!!oneButton("Loading");
  const explicitEmpty=/\b(?:no results found|no results|nenhum resultado|sem resultados)\b/i.test(t);
- return JSON.stringify({ok:true,cards:valid,found:found.length,uncertain,loading,explicitEmpty});
+ return JSON.stringify({ok:true,cards:valid,found:found.length,uncertain,loading,explicitEmpty,leagueConfirmed});
 }
 if(action==="collect")return collect();
 if(action.startsWith("coords:")){
