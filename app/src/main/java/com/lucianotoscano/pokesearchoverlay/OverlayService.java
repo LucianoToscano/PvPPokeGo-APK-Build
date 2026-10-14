@@ -30,7 +30,7 @@ import java.io.InputStream;
 import java.util.function.Consumer;
 
 public class OverlayService extends Service {
-    private static final int DOCK_DP=44, BUBBLE_DP=45, DETAIL_DP=226, MENU_DP=247;
+    private static final int DOCK_DP=68, BUBBLE_DP=45, DETAIL_DP=226, MENU_DP=271;
     private final Handler handler=new Handler(Looper.getMainLooper());
     private WindowManager wm;
     private WindowManager.LayoutParams params,detailParams;
@@ -38,7 +38,7 @@ public class OverlayService extends Service {
     private View grip;
     private WebView panel,detailPanel,website;
     private boolean menuExpanded=false,menuLeft=false,minimized=false,shiny=true,loaded=false,panelLoaded=false,detailLoaded=false,stopped=false;
-    private int height=68,detailHeight=225,requestGeneration=0,selected=-1,intervalMinutes=5;
+    private int height=72,detailHeight=225,requestGeneration=0,selected=-1,intervalMinutes=5;
     private boolean searchInProgress=false;
     private long armedDespawnMillis=0L;
     private final Runnable expiryRefresh=new Runnable(){
@@ -105,7 +105,7 @@ public class OverlayService extends Service {
     private int rowDp(){
         int n=Math.max(1,count());
         int available=screenHeightDp()-160;
-        return Math.max(32,Math.min(34,available/n));
+        return Math.max(38,Math.min(62,available/n));
     }
     private void update(){
         js(panel,panelLoaded,"window.onNativeData("+results+","+JSONObject.quote(status)+","+

@@ -1,15 +1,15 @@
 <!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <style>
-:root{--row:34px}
+:root{--row:62px}
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;background:transparent!important;color:#fff;font:10px Roboto,Arial,sans-serif;overflow:hidden}
 button{font:inherit;color:inherit;border:0;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
-#shell{width:44px;background:transparent!important;border:0;border-radius:0;box-shadow:none;overflow:visible}
+#shell{width:68px;background:transparent!important;border:0;border-radius:0;box-shadow:none;overflow:visible}
 #gear{width:28px;height:27px;margin:0 auto;padding:0;border:0;background:transparent;color:#e9ecf1;display:flex;align-items:center;justify-content:center}
 #gear svg{display:block;width:19px;height:19px;filter:drop-shadow(0 1px 1px #0007)}
 #gear.busy svg{animation:gearbusy 1.25s linear infinite}
 @keyframes gearbusy{to{transform:rotate(360deg)}}
-#menu{display:none;position:absolute;top:0;left:44px;width:203px;height:27px;z-index:3;padding:0 4px;border:0;border-radius:0;background:transparent;box-shadow:none}
+#menu{display:none;position:absolute;top:0;left:68px;width:203px;height:27px;z-index:3;padding:0 4px;border:0;border-radius:0;background:transparent;box-shadow:none}
 #menu.open{display:block}
 body.menu-left #shell{margin-left:203px}
 body.menu-left #menu{left:0}
@@ -20,12 +20,12 @@ body.menu-left #menu{left:0}
 #actions{display:contents}
 #actions button{font-size:16px;font-weight:500}
 #period{font-size:11px!important}
-#spawns{width:44px;display:flex;flex-direction:column;align-items:center;gap:0;padding:0;margin:0}
-.spawn{width:44px;height:var(--row);min-height:var(--row);display:flex;align-items:center;justify-content:center;margin:0;padding:0;background:transparent;border:1px solid transparent;border-radius:4px}
+#spawns{width:68px;display:flex;flex-direction:column;align-items:center;gap:0;padding:0;margin:0}
+.spawn{width:68px;height:var(--row);min-height:var(--row);display:flex;align-items:center;justify-content:center;margin:0;padding:0;background:transparent;border:1px solid transparent;border-radius:4px}
 .spawn.active{border-color:#ff718b91}
-.sprite{display:block;width:32px;height:32px;object-fit:contain;flex-shrink:0;pointer-events:none;filter:drop-shadow(0 1px 1px #0006)}
+.sprite{display:block;width:min(60px,calc(var(--row) - 2px));height:min(60px,calc(var(--row) - 2px));object-fit:contain;flex-shrink:0;pointer-events:none;filter:drop-shadow(0 1px 1px #0006)}
 .fallback{font-size:20px}
-#empty{display:block;width:44px;height:18px;line-height:18px;text-align:center;color:#dce1e9b8;font-size:12px;overflow:hidden}
+#empty{display:block;width:68px;height:18px;line-height:18px;text-align:center;color:#dce1e9b8;font-size:12px;overflow:hidden}
 #bubble{display:none;width:45px;height:45px;border:0;background:transparent;box-shadow:none;border-radius:0;align-items:center;justify-content:center}
 #bubble svg{width:20px;height:20px;color:#e9ecf1;filter:drop-shadow(0 1px 1px #0009)}
 </style></head><body>
@@ -46,7 +46,7 @@ body.menu-left #menu{left:0}
 </div>
 <div id="bubble" role="button" aria-label="Restaurar overlay"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96c-.5-.38-1.03-.69-1.64-.93L14.36 2.8a.49.49 0 0 0-.49-.4h-3.84a.49.49 0 0 0-.49.4l-.36 2.53c-.6.24-1.15.56-1.64.93l-2.39-.96a.49.49 0 0 0-.61.22L2.62 8.84a.5.5 0 0 0 .12.64l2.02 1.58c-.04.3-.07.62-.07.94s.03.64.08.94L2.74 14.5a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.61.22l2.39-.96c.49.38 1.04.7 1.64.93l.36 2.53c.04.24.24.4.49.4h3.84c.25 0 .45-.16.49-.4l.36-2.53c.6-.24 1.15-.55 1.64-.93l2.39.96c.23.09.49 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.02-1.56ZM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"/></svg></div>
 <script>
-let cards=[],active=-1,mode="iv",shiny=true,status="",row=34,menuOpen=false,period=5;
+let cards=[],active=-1,mode="iv",shiny=true,status="",row=62,menuOpen=false,period=5;
 function setMenuOpen(open,side){
  menuOpen=!!open;
  document.getElementById("menu").classList.toggle("open",menuOpen);
@@ -88,7 +88,7 @@ function draw(){
 }
 window.onNativeData=(a,s,m,shi,r,interval)=>{
  cards=Array.isArray(a)?a.slice(0,10):[];
- mode=m;status=String(s||"");shiny=!!shi;row=Number(r)||34;period=Number(interval)||5;
+ mode=m;status=String(s||"");shiny=!!shi;row=Number(r)||62;period=Number(interval)||5;
  if(active>=cards.length)active=-1;
  draw();
 };

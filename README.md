@@ -1,7 +1,7 @@
-# Pokésearch Overlay 0.23 Alpha
+# Pokésearch Overlay v0.24 Alpha
 
-- O botão − minimiza somente para a mesma engrenagem (ícone vetorial), não a bolha ◉; tocá-la restaura sprites e menu recolhido.
-- ↻ inicia pesquisa manual genuína em fases separadas: selecionar Stats/PvP, aplicar filtros, clicar Search, aguardar resultados e ler novamente. Feedback visual de pesquisa em andamento.
-- Ao vencer o despawn mais próximo entre os Pokémon da busca atual, faz nova busca automaticamente, sem esperar o intervalo periódico. Reagenda a partir dos dados frescos; não agenda repetidamente os casos já vencidos.
-- A frequência automática padrão permanece em 5 minutos, com opções 1, 3, 5, 10, 15 e 20 min.
-- Integração continua dependente dos controles do PoGoCoordinates; teste autenticado real ainda necessário para garantir sucesso da busca.
+Sprites aumentados de 32×32 para até 60×60 unidades CSS (87,5% maiores), com redução dinâmica proporcional apenas em telas de menor altura ou com muitos Pokémon. Linha de cada sprite até 62 CSS px, com sprites centralizados e gap 0. Largura de coluna de 44 para 68 dp, ainda totalmente transparente e sem fundos entre os Pokémon.
+
+Menu lateral continua ancorado à coluna, agora com janela expandida para 271 dp (68 + 203). Engrenagem centralizada mantém tamanho discreto, toque para abrir/fechar menu, arrasto para mover. Permanecem busca manual, atualização automática a cada 5 minutos e por despawn, opção de minimizar deixando apenas a engrenagem.
+
+A compilação automática verifica se o APK compila; é necessário testar alinhamento e legibilidade em um celular real.
