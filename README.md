@@ -1,18 +1,12 @@
-# Pokésearch Overlay v0.3 Alpha
+# Pokésearch Overlay v0.4 Alpha
 
-Independent Android package com.lucianotoscano.pokesearchoverlay.
+Aplicativo Android independente de PvPPokeGo.
 
-## Changes
-- Vertical ultra-narrow overlay dock (86dp) with stacked controls.
-- Shows all 10 max search results at once, without scrolling, with authentic IV% on each Pokémon icon row.
-- Each icon opens a separate compact detail window adjacent to the dock with name, form, size, gender, CP, level, IV, moves, location, despawn and Get coords where available.
-- Detail window does not make the dock grow or hide any of the ten results.
-- Dynamic row sizing based on device viewport; no false 100% badges.
-- Drag by grip, minimize to bubble and close.
-- Searches powered by authenticated PoGoCoordinates session, automatic 5min refresh.
+- Dock lateral ultra compacto, 54 dp, com até dez sprites de Pokémon em coluna, sem qualquer badge/texto de IV ao lado.
+- Ao tocar no sprite, abre a ficha com IV real, rank, PC, nível, ataques, localização e despawn, além do Get coords quando disponível.
+- Controles verticais IV100, GL#1, ✨, atualizar, minimizar e fechar; alça nativa para arrastar.
+- Fundo semitransparente, atualização automática a cada cinco minutos enquanto ativo.
+- Filtros e resultados dependem da sessão autenticada e da estrutura do PoGoCoordinates. A leitura do site e Get coords são experimentais.
 
-## Limitations
-The app does not currently implement a guaranteed backend/API integration; it reads the site DOM. Login and site filter/Get coords behavior must be tested on device. Website changes can break selectors. Actual coordinates appear only if the site exposes them. A blurred material across other apps is device/API-dependent; transparency is guaranteed.
-
-## Installation
-If debug signing key differs from your existing build, uninstall the previous alpha before installing.
+## Instalação
+Instale o APK debug. Se a assinatura do build anterior for diferente, remova primeiro a 0.3.

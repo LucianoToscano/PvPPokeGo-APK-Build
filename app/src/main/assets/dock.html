@@ -2,64 +2,58 @@
 <style>
 :root{--row:36px}
 *{box-sizing:border-box}
-html,body{margin:0;padding:0;background:transparent;color:white;font-family:Roboto,Arial,sans-serif;font-size:10px;overflow:hidden}
+html,body{margin:0;padding:0;background:transparent;color:#fff;font-family:Roboto,Arial,sans-serif;font-size:10px;overflow:hidden}
 button{font:inherit;color:inherit;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-#shell{width:100%;background:rgba(12,17,24,.35);border:1px solid #ffffff42;border-radius:12px;overflow:hidden;box-shadow:0 4px 16px #0003;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
-#handle{height:21px;text-align:left;padding-left:6px;padding-top:1px;color:#e3e6ee88;font-weight:700;letter-spacing:2px;font-size:15px;user-select:none;line-height:20px}
-#controls{display:flex;flex-direction:column;align-items:stretch;gap:2px;padding:0 4px 4px}
-#controls button{height:22px;border-radius:6px;border:1px solid #ffffff20;background:#131722a8;font-size:10px;font-weight:700;padding:0 3px}
-#controls button.active{background:#ef294dbb;border-color:#ff8aa0a1}
-#controls button.shinyOn{color:#ffe6a1;background:#5745228f;border-color:#e8c45d9e}
+#shell{width:100%;background:rgba(11,16,23,.28);border:1px solid #ffffff35;border-radius:12px;overflow:hidden;box-shadow:0 3px 12px #0003;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+#handle{height:18px;text-align:left;padding:0 0 0 5px;color:#dce2ecae;font-size:15px;line-height:18px;letter-spacing:1px;user-select:none}
+#controls{display:flex;flex-direction:column;gap:2px;padding:0 3px 3px}
+#controls button{height:21px;min-height:21px;border-radius:5px;border:1px solid #ffffff21;background:#151b25a3;font-size:9px;font-weight:700;white-space:nowrap;padding:0 2px}
+#controls button.active{background:#e9294bb3;border-color:#fb718a7d}
+#controls button.shinyOn{color:#ffe4a0;background:#58452280;border-color:#d9b35b91}
 #actions{display:flex;flex-direction:column;gap:2px}
-#actions button{height:21px;font-size:13px}
-#status{margin:0 3px 2px;padding:2px 1px;font-size:9px;color:#eff2f5b0;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid #ffffff24}
-#spawns{display:flex;flex-direction:column;gap:1px;padding:1px 3px 4px;overflow:visible}
-.spawn{width:100%;height:var(--row);min-height:0;display:flex;align-items:center;justify-content:flex-start;gap:2px;background:#11172257;border-radius:6px;border:1px solid transparent;padding:0 2px;overflow:hidden}
-.spawn.active{border-color:#ff53769a;background:#4b24309a}
-.sprite{width:calc(var(--row) - 5px);height:calc(var(--row) - 5px);min-width:0;max-width:38px;object-fit:contain}
-.ivbox{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;text-align:center;align-items:center;justify-content:center;color:#f0f3f9;font-size:10px;font-weight:700;line-height:10px;letter-spacing:-.5px}
-.ivbox .rank{font-size:8px;color:#cdd4e5;letter-spacing:0}
-#empty{font-size:9px;line-height:1.4;color:#e3e5eebb;padding:5px 3px 8px;text-align:center;overflow-wrap:anywhere}
-#bubble{width:45px;height:45px;border:1px solid #ffffff70;background:#1b1c28bf;box-shadow:0 3px 12px #0006;border-radius:50%;display:none;align-items:center;justify-content:center;flex-direction:column;gap:1px}
+#actions button{height:19px;min-height:19px;font-size:12px}
+#spawns{display:flex;flex-direction:column;align-items:center;gap:1px;padding:3px 2px 4px}
+.spawn{width:100%;height:var(--row);display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid transparent;border-radius:6px;padding:1px}
+.spawn.active{border-color:#ff6b86a9;background:#53303955}
+.sprite{display:block;width:min(calc(var(--row) - 2px),39px);height:min(calc(var(--row) - 2px),39px);object-fit:contain;filter:drop-shadow(0 1px 2px #0005)}
+.fallback{font-size:22px;line-height:1}
+#empty{color:#dce4eda9;text-align:center;padding:4px 2px 7px;font-size:9px;line-height:1.4;overflow-wrap:anywhere}
+#bubble{display:none;width:45px;height:45px;border:1px solid #ffffff70;background:#1b1c28bf;box-shadow:0 3px 12px #0006;border-radius:50%;align-items:center;justify-content:center;flex-direction:column;gap:1px}
 #bubble b{font-size:18px;line-height:18px}#bubble small{font-size:10px;font-weight:bold;color:#ff839a}
 </style></head><body>
 <div id="shell">
  <div id="handle">⠿</div>
  <div id="controls">
-   <button id="iv" onclick="Native.select('iv')">IV100</button>
-   <button id="gl" onclick="Native.select('gl')">GL#1</button>
-   <button id="sh" title="Shiny only" onclick="Native.shiny()">✨</button>
+   <button id="iv" title="Filtrar IV 100%" onclick="Native.select('iv')">IV100</button>
+   <button id="gl" title="Filtrar Grande Liga rank 1" onclick="Native.select('gl')">GL#1</button>
+   <button id="sh" title="Ativar/desativar Shiny" onclick="Native.shiny()">✨</button>
    <div id="actions">
     <button title="Atualizar" onclick="Native.refresh()">↻</button>
     <button title="Minimizar" onclick="Native.minimize()">−</button>
     <button title="Fechar" onclick="Native.close()">×</button>
    </div>
  </div>
- <div id="status">Aguardando</div>
  <div id="spawns"></div>
- <div id="empty">Faça login no aplicativo</div>
+ <div id="empty">Aguardando busca</div>
 </div>
 <div id="bubble"><b>◉</b><small id="count">0</small></div>
 <script>
 let cards=[],active=-1,mode="iv",shiny=true,status="",row=36;
-const h=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-function badge(c){
- const iv=c.ivPercent?c.ivPercent+"%":"IV?";
- if(mode==="gl")return '<span>'+h(iv)+'</span><span class="rank">'+h(c.rank?"R"+c.rank:"GL")+'</span>';
- return '<span>'+h(iv)+'</span>';
-}
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function draw(){
  document.documentElement.style.setProperty("--row",row+"px");
  document.getElementById("iv").classList.toggle("active",mode==="iv");
  document.getElementById("gl").classList.toggle("active",mode==="gl");
  document.getElementById("sh").classList.toggle("shinyOn",shiny);
  document.getElementById("count").textContent=String(cards.length);
- document.getElementById("status").textContent=cards.length?cards.length+"/10":(status||"Sem resultados");
  document.getElementById("spawns").innerHTML=cards.map((c,i)=>{
-  const src=/^https:\/\//.test(c.image||"")?'<img class="sprite" src="'+h(c.image)+'" alt="'+h(c.name)+'">':'<span class="sprite">◉</span>';
-  return '<button aria-label="'+h(c.name)+' IV '+h(c.ivPercent)+'" class="spawn '+(active===i?"active":"")+'" onclick="Native.toggleDetail('+i+')">'+src+'<span class="ivbox">'+badge(c)+'</span></button>';
+  const label=[c.name,c.ivPercent?c.ivPercent+"%":"IV não disponível",c.iv,c.rank?"Rank "+c.rank:""].filter(Boolean).join(" · ");
+  const icon=/^https:\/\//.test(c.image||"")?'<img class="sprite" src="'+esc(c.image)+'" alt="">':'<span class="fallback">◉</span>';
+  return '<button title="'+esc(label)+'" aria-label="'+esc(label)+'" class="spawn '+(active===i?"active":"")+'" onclick="Native.toggleDetail('+i+')">'+icon+'</button>';
  }).join("");
- document.getElementById("empty").style.display=cards.length?"none":"block";
+ const empty=document.getElementById("empty");
+ empty.style.display=cards.length?"none":"block";
+ empty.textContent=status||"Sem resultados";
  requestAnimationFrame(()=>Native.resize(Math.ceil(document.getElementById("shell").getBoundingClientRect().height)+1));
 }
 window.onNativeData=(a,s,m,shi,r)=>{

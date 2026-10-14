@@ -28,7 +28,7 @@ import java.io.InputStream;
 import java.util.function.Consumer;
 
 public class OverlayService extends Service {
-    private static final int DOCK_DP=86, BUBBLE_DP=45, DETAIL_DP=226;
+    private static final int DOCK_DP=54, BUBBLE_DP=45, DETAIL_DP=226;
     private final Handler handler=new Handler(Looper.getMainLooper());
     private WindowManager wm;
     private WindowManager.LayoutParams params,detailParams;
@@ -62,8 +62,8 @@ public class OverlayService extends Service {
     }
     private int rowDp(){
         int n=Math.max(1,count());
-        int available=screenHeightDp()-125-156;
-        return Math.max(24,Math.min(39,available/n));
+        int available=screenHeightDp()-240;
+        return Math.max(25,Math.min(37,available/n));
     }
     private void update(){
         js(panel,panelLoaded,"window.onNativeData("+results+","+JSONObject.quote(status)+","+
