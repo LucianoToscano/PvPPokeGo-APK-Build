@@ -30,3 +30,10 @@ As buscas usam a página do PoGoCoordinates e a sessão do navegador integrado; 
 - Somente ao tocar em ✨ o aplicativo abre o PoGoCoordinates visível e seleciona o controle Shiny only na página. O próprio site poderá solicitar login por Discord ou Google; nenhuma autenticação automática foi adicionada.
 - Sem Shiny only a pesquisa IV100/GL#1/UL#1 não precisa ser bloqueada apenas pela existência de um botão de login na página.
 - Sessões do navegador externo (Chrome) não são copiadas. O login via Google pode ser recusado em WebView dependendo do provedor.
+
+## v0.33 · Controles mais claros
+- Engrenagem abre e fecha apenas o menu; não vira mais um X. **X vermelho** na última posição encerra o serviço e o overlay imediatamente.
+- A seta lateral, **‹** ou **›**, aponta na direção da engrenagem conforme o lado em que o menu está aberto; recolhe Pokémon, deixando apenas a engrenagem para restaurar.
+- **Sino** liga/desliga apenas as notificações gerais de novos Pokémon válidos no filtro selecionado. **Estrela** abre favoritos com busca por sprite/número/nome; alertas exclusivos de favoritos ficam configuráveis dentro dessa lista. A lista antiga é mantida.
+- Retirados histórico, diagnóstico, confirmação de encerramento e edição manual dos nomes. Preferências incluem apenas tamanho P/M/G, ordenação e relógio individual.
+- Coração continua representando Pix voluntário, AUTO 5m e ↻ preservados.
