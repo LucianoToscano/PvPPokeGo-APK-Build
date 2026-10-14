@@ -424,6 +424,10 @@ public class OverlayService extends Service {
         catch(Exception ignored){history=new JSONArray();}
         java.util.Set<String> current=new java.util.HashSet<>();
         String firstNew="";
+        String firstWatched="";
+        String watchDetails="";
+        int watchedCount=0;
+        java.util.Set<String> wanted=WatchAlerts.watched(this);
         long now=System.currentTimeMillis();
         for(int i=0;i<cards.length();i++){
             JSONObject c=cards.optJSONObject(i);
@@ -432,6 +436,15 @@ public class OverlayService extends Service {
             current.add(key);
             if(knownSpawns.contains(key))continue;
             if(firstNew.isEmpty())firstNew=c.optString("name","Pokémon");
+            if(WatchAlerts.enabled(this)&&WatchAlerts.matches(c.optString("name",""),wanted)){
+                watchedCount++;
+                if(firstWatched.isEmpty()){
+                    firstWatched=c.optString("name","Pokémon");
+                    watchDetails="Busca "+mode.toUpperCase(java.util.Locale.ROOT)+
+                        " · PC "+c.optString("cp","?")+
+                        (c.optString("location","").isEmpty()?"":" · "+c.optString("location",""));
+                }
+            }
             JSONObject entry=new JSONObject();
             try{
                 entry.put("name",c.optString("name","Pokémon"));
@@ -446,6 +459,13 @@ public class OverlayService extends Service {
         JSONArray limited=new JSONArray();
         for(int i=Math.max(0,history.length()-40);i<history.length();i++)limited.put(history.opt(i));
         preferences.edit().putString("history",limited.toString()).apply();
+        if(watchedCount>0&&!firstWatched.isEmpty()){
+            if(watchedCount>1)watchDetails+=" · +"+(watchedCount-1)+" Pokémon da lista";
+            boolean sent=WatchAlerts.match(this,firstWatched,watchDetails);
+            if(!sent&&!WatchAlerts.permissionGranted(this))
+                preferences.edit().putString("lastWatchAlertError",
+                    "Permissão de notificações não concedida").apply();
+        }
         if(alerts&&!firstNew.isEmpty()&&now-lastAlertAt>60000L){
             lastAlertAt=now;
             NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);
@@ -531,7 +551,7 @@ public class OverlayService extends Service {
             if(index<0||index>=a.length()){hideDetails();return;}
             selected=index;
             JSONObject obj=a.getJSONObject(index);
-            js(detailPanel,true,"window.showDetails("+obj.toString()+","+JSONObject.quote(mode)+")");
+            js(detailPanel,true,"window.showDetails("+obj.toString()+","+JSONObject.quote(mode)+","+WatchAlerts.isWatched(this,obj.optString("name",""))+")");
             detailRoot.setVisibility(View.VISIBLE);
             moveDetail();
             js(panel,panelLoaded,"window.highlight("+index+")");
@@ -598,6 +618,10 @@ public class OverlayService extends Service {
         status(message);
     }
     public class Bridge{
+        @JavascriptInterface public void toggleWatch(String pokemon){handler.post(()->{
+            boolean watched=WatchAlerts.toggle(OverlayService.this,pokemon);
+            js(detailPanel,detailLoaded,"window.watchFeedback("+watched+")");
+        });}
         @JavascriptInterface public void copyCoords(String coords){handler.post(()->{
             String valid=extractCoordinates(coords);
             if(valid.isEmpty()){js(detailPanel,detailLoaded,"window.copyFeedback("+JSONObject.quote("Coordenadas inválidas")+")");return;}
