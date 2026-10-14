@@ -1,3 +1,3 @@
-# Pokésearch Overlay v0.15 Alpha
+# Pokésearch Overlay 0.16 Alpha
 
-Abre Stats → Raw IV por padrão, tenta aguardar a hidratação da interface do site e preenche 15/15/15 automaticamente. Top ranking inicia com 1 quando a aba PvP aparece. Não altera posteriormente os campos após preenchimento inicial na mesma página. Shiny continua dependente de sessão autenticada.
+Menu recolhível com engrenagem acima dos sprites. Ao tocar na engrenagem, mostra controles antigos em duas colunas; ao fechar, somente engrenagem, alça e até dez sprites na coluna de 52dp. Tamanho da janela ajusta automaticamente. Mantidos toque longo para copiar, cronômetro, transparência 75% e atualização a cada cinco minutos.

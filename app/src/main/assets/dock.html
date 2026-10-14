@@ -6,7 +6,7 @@ html,body{margin:0;padding:0;background:transparent;color:#fff;font-family:Robot
 button{font:inherit;color:inherit;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 #shell{width:100%;background:rgba(11,16,23,.25);border:0;border-radius:7px;overflow:hidden;box-shadow:0 3px 12px #0003;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 #handle{height:12px;text-align:center;padding:0;color:#dce2ecae;font-size:9px;line-height:12px;letter-spacing:1px;user-select:none}
-#controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;padding:0 1px 1px}
+#controls{display:none;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;padding:0 1px 2px}#controls.open{display:grid}#gear{display:block;margin:0 auto 1px;width:37px;height:29px;border:0;border-radius:6px;background:#131a2270;color:#fff;font-size:23px;line-height:28px;text-align:center}
 #controls button{height:19px;min-height:19px;min-width:0;border-radius:2px;border:0;background:#131a2280;font-size:8px;font-weight:700;white-space:nowrap;padding:0 1px}
 #controls button.active{background:#e9294bb3;border-color:#fb718a7d}
 #controls button.shinyOn{color:#ffe4a0;background:#58452280;border-color:#d9b35b91}
@@ -23,6 +23,7 @@ button{font:inherit;color:inherit;border:0;cursor:pointer;-webkit-tap-highlight-
 </style></head><body>
 <div id="shell">
  <div id="handle">••••••</div>
+ <button id="gear" title="Configurações" aria-label="Abrir opções" onclick="toggleMenu()">⚙</button>
  <div id="controls">
    <button id="iv" title="Filtrar IV 100%" onclick="Native.select('iv')">IV100</button>
    <button id="gl" title="Filtrar Grande Liga rank 1" onclick="Native.select('gl')">GL#1</button>
@@ -38,7 +39,9 @@ button{font:inherit;color:inherit;border:0;cursor:pointer;-webkit-tap-highlight-
 </div>
 <div id="bubble"><b>◉</b><small id="count">0</small></div>
 <script>
-let cards=[],active=-1,mode="iv",shiny=true,status="",row=36;
+let cards=[],active=-1,mode="iv",shiny=true,status="",row=36,menuOpen=false;
+function toggleMenu(){menuOpen=!menuOpen;document.getElementById("controls").classList.toggle("open",menuOpen);document.getElementById("gear").setAttribute("aria-expanded",String(menuOpen));fit();}
+function fit(){requestAnimationFrame(()=>Native.resize(Math.ceil(document.getElementById("shell").getBoundingClientRect().height)+1));}
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let longTimer, longDone=false;
 function spriteClick(i){if(longDone){longDone=false;return;}Native.toggleDetail(i);}
@@ -76,6 +79,7 @@ window.onNativeData=(a,s,m,shi,r)=>{
 window.highlight=i=>{active=i;document.querySelectorAll(".spawn").forEach((e,index)=>e.classList.toggle("active",index===i));};
 window.setMinimized=value=>{
  document.getElementById("shell").style.display=value?"none":"block";
+ if(value){menuOpen=false;document.getElementById("controls").classList.remove("open");}
  document.getElementById("bubble").style.display=value?"flex":"none";
  if(!value)draw();
 };
