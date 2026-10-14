@@ -165,7 +165,7 @@ public class OverlayService extends Service {
             }
             return true;
         });
-        root.addView(grip,new FrameLayout.LayoutParams(dp(22),dp(23),Gravity.TOP|Gravity.LEFT));
+        root.addView(grip,new FrameLayout.LayoutParams(dp(DOCK_DP),dp(18),Gravity.TOP|Gravity.LEFT));
 
         params=new WindowManager.LayoutParams(dp(DOCK_DP),dp(height),
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
@@ -261,7 +261,7 @@ public class OverlayService extends Service {
         params.width=dp(yes?BUBBLE_DP:DOCK_DP);
         params.height=dp(yes?BUBBLE_DP:height);
         grip.setLayoutParams(new FrameLayout.LayoutParams(
-                dp(yes?BUBBLE_DP:22),dp(yes?BUBBLE_DP:23),Gravity.TOP|Gravity.LEFT));
+                dp(yes?BUBBLE_DP:DOCK_DP),dp(yes?BUBBLE_DP:18),Gravity.TOP|Gravity.LEFT));
         js(panel,panelLoaded,"window.setMinimized("+yes+")");
         updateWindow();
     }
