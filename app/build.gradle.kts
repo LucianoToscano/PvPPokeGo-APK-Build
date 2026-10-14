@@ -10,6 +10,8 @@ android {
         versionCode = 35
         versionName = "0.35-beta"
     }
+    // Sideloaded beta: keep tested overlay behavior on target 32. Play Store publishing needs a separate target SDK migration.
+    lint { disable += "ExpiredTargetSdkVersion" }
     buildTypes {
         getByName("release") {
             isMinifyEnabled = true
