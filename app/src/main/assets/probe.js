@@ -1,114 +1,170 @@
 (function(){
-'use strict';
-const action=__ACTION__,mode=__MODE__,shiny=__SHINY__;
-const clean=s=>String(s||'').replace(/\u00a0/g,' ').trim();
-const all=q=>Array.from(document.querySelectorAll(q));
-const txt=e=>clean(e&&(e.innerText||e.textContent));
-const visible=e=>!!(e&&e.getClientRects().length);
-const buttons=label=>all('button,[role=button]').filter(b=>visible(b)&&new RegExp('^'+label+'$','i').test(txt(b)));
-function press(label){const b=buttons(label);if(b.length){b[b.length-1].click();return true;}return false;}
-function setValue(el,value){
- if(!el)return false;
+"use strict";
+const action=__ACTION__,mode=__MODE__,shinyOnly=__SHINY__;
+const clean=s=>String(s??"").replace(/\u00a0/g," ").replace(/[ \t]+/g," ").trim();
+const text=e=>clean(e&&(e.innerText||e.textContent)||"");
+const elements=s=>Array.from(document.querySelectorAll(s));
+const vis=e=>!!(e&&e.getClientRects().length);
+const labels=(root,pattern)=>Array.from(root.querySelectorAll("span,label,strong,small,dt,div,p")).filter(e=>vis(e)&&pattern.test(text(e))&&text(e).length<50).sort((a,b)=>text(a).length-text(b).length);
+function oneButton(label){
+ const re=new RegExp("^\\s*"+label+"\\s*$","i");
+ return elements("button,[role=button]").find(b=>vis(b)&&re.test(text(b)))||null;
+}
+function click(label){let e=oneButton(label);if(e){e.click();return true;}return false;}
+function valueInput(input,value){
+ if(!input)return false;
  try{
-   const proto=el.tagName==='TEXTAREA'?window.HTMLTextAreaElement.prototype:window.HTMLInputElement.prototype;
-   const setter=Object.getOwnPropertyDescriptor(proto,'value').set;
-   setter.call(el,String(value));
-   el.dispatchEvent(new Event('input',{bubbles:true}));
-   el.dispatchEvent(new Event('change',{bubbles:true}));
-   return true;
- }catch(e){return false;}
+ const proto=input.tagName==="TEXTAREA"?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;
+ Object.getOwnPropertyDescriptor(proto,"value").set.call(input,String(value));
+ input.dispatchEvent(new Event("input",{bubbles:true}));
+ input.dispatchEvent(new Event("change",{bubbles:true}));
+ return true;
+ }catch(_){return false;}
 }
-function candidates(pattern){
- return all('label,span,strong,div').filter(e=>visible(e)&&pattern.test(txt(e))&&txt(e).length<65)
-   .sort((a,b)=>txt(a).length-txt(b).length);
+function inputNear(label){
+ const matches=labels(document,new RegExp("^"+label+"$","i"));
+ for(const e of matches){
+  let p=e;
+  for(let i=0;i<5&&p;i++,p=p.parentElement){
+   const ins=Array.from(p.querySelectorAll('input:not([type="checkbox"]):not([type="radio"])')).filter(vis);
+   if(ins.length===1)return ins[0];
+  }
+ }
+ return null;
 }
-function inputs(parent){return Array.from(parent.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio])')).filter(visible);}
-function nearInput(pattern){
- for(const c of candidates(pattern)){let p=c;for(let i=0;i<4&&p;i++,p=p.parentElement){
-   const v=inputs(p);if(v.length===1)return v[0];
- }}return null;
+function customSelect(label,want){
+ const found=labels(document,new RegExp("^"+label+"$","i"));
+ for(const e of found){
+  let p=e;
+  for(let i=0;i<5&&p;i++,p=p.parentElement){
+   const select=p.querySelector("select");
+   if(select){const o=Array.from(select.options).find(x=>text(x).toLowerCase()===want.toLowerCase());
+     if(o){select.value=o.value;select.dispatchEvent(new Event("change",{bubbles:true}));return true;}}
+   const b=p.querySelector('button[role="combobox"],[role="combobox"]');
+   if(b){
+    if(text(b).toLowerCase().includes(want.toLowerCase()))return true;
+    b.click();
+    const opt=elements('[role="option"]').find(x=>vis(x)&&text(x).toLowerCase()===want.toLowerCase());
+    if(opt){opt.click();return true;}return false;
+   }
+  }
+ }
+ return false;
 }
 function setShiny(want){
- for(const lab of candidates(/Shiny only/i)){
-   let node=lab;
-   for(let i=0;i<5&&node;i++,node=node.parentElement){
-     const sw=node.querySelector('input[type=checkbox],[role=switch]');
-     if(sw){
-       const checked=sw.matches('input')?sw.checked:sw.getAttribute('aria-checked')==='true';
-       if(checked!==want)sw.click();
-       return true;
-     }
+ for(const el of labels(document,/Shiny only/i)){
+  let p=el;
+  for(let i=0;i<5&&p;i++,p=p.parentElement){
+   const sw=p.querySelector('input[type=checkbox],[role=switch],button[aria-checked]');
+   if(sw){
+    const now=sw.matches("input")?sw.checked:sw.getAttribute("aria-checked")==="true"||sw.getAttribute("data-state")==="checked";
+    if(now!==want)sw.click();
+    return true;
    }
- }return false;
+  }
+ }
+ return false;
 }
 function applyIv(){
- press('Stats');press('Raw IV');
- for(const lab of candidates(/^IV$/i)){
-   let node=lab;for(let depth=0;depth<6&&node;depth++,node=node.parentElement){
-     const v=inputs(node);
-     if(v.length>=3&&v.length<=5){v.slice(0,3).forEach(el=>setValue(el,'15'));return true;}
-   }
- }return false;
+ click("Stats");click("Raw IV");
+ let done=false;
+ for(const el of labels(document,/^IV$/i)){
+  let p=el;
+  for(let depth=0;depth<6&&p;depth++,p=p.parentElement){
+   const ins=Array.from(p.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio])')).filter(vis);
+   if(ins.length>=3&&ins.length<=5){done=ins.slice(0,3).every(input=>valueInput(input,15));break;}
+  }
+  if(done)break;
+ }
+ return done;
 }
 function applyGl(){
- press('PvP');
- const top=nearInput(/^Top ranking$/i);
- if(top)setValue(top,'1');
- // Great League + previous evolutions Yes should be selected in site.
- // Complex dropdowns must be verified in a logged-in test.
- return !!top;
+ click("PvP");
+ let ok=!!valueInput(inputNear("Top ranking"),1);
+ const league=customSelect("League","Great League");
+ const prior=customSelect("Include previous evolutions","Yes");
+ return {ok,league,prior};
 }
-function getCards(){
- const btns=buttons('Get coords');
- return btns.slice(0,10).map((b,index)=>{
-   let box=b.parentElement;
-   for(let i=0;i<8&&box;i++,box=box.parentElement){
-     const t=txt(box);
-     if(t.length<2400&&/DESPAWN/i.test(t)&&/LOCATION/i.test(t)&&/(?:CP|LVL)/i.test(t))break;
-   }
-   if(!box)box=b.parentElement;
-   const body=txt(box);
-   const lines=body.split(/\n/).map(clean).filter(Boolean);
-   const take=re=>{const m=body.match(re);return m?clean(m[1]):''};
-   const images=Array.from(box.querySelectorAll('img[src]'));
-   const image=images.length?images[0].src:'';
-   const heading=box.querySelector('h2,h3,h4,h5');
-   let name=heading?txt(heading):'';
-   if(!name)name=lines.find(v=>/^[\p{L}\p{N}\- .♀♂]+\s*(?:✨)?$/u.test(v)&&!/^LOCATION|DESPAWN|Get coords|CP|LVL|IV$/i.test(v))||'Pokémon';
-   const number=take(/#(\d{1,4})/);
-   const detail=lines.find(l=>l.includes('#')&&/Male|Female|Genderless|♀|♂/i.test(l))||'';
-   const size=/(?:^|[ ·])((?:XXS|XS|XL|XXL|M|S|L))(?:$|[ ·])/i.exec(detail);
-   const moves=lines.find(v=>v.includes(' / ')&&!/LOCATION|DESPAWN/i.test(v))||'';
-   return {
-     name:name.replace(/✨/g,'').trim(),image,
-     cp:take(/(?:^|\n)\s*CP\s*\n\s*(\d+)/i),
-     level:take(/(?:^|\n)\s*(?:LVL|LEVEL)\s*\n\s*([\d.]+)/i),
-     iv:take(/(?:^|\n)\s*IV\s*\n\s*([^\n]+)/i),
-     rank:take(/Rank\s*(\d+)/i),
-     shiny:name.includes('✨'),
-     number:number?'#'+number:'',gender:/Female|♀/i.test(detail)?'♀':/Male|♂/i.test(detail)?'♂':'',
-     size:size?size[1]:'',moves,
-     location:take(/(?:^|\n)\s*LOCATION\s*\n\s*([^\n]+)/i),
-     despawn:take(/(?:^|\n)\s*DESPAWN\s*\n\s*([\d:]+)/i),
-     coords:''
-   };
+function cardRoots(){
+ const btns=elements("button,[role=button]").filter(e=>vis(e)&&/^Get coords$/i.test(text(e)));
+ return btns.slice(0,10).map((b,i)=>{
+  let node=b,chosen=b.parentElement;
+  for(let depth=0;depth<10&&node;depth++,node=node.parentElement){
+   const t=text(node);
+   if(/\bLOCATION\b/i.test(t)&&/\bDESPAWN\b/i.test(t)&&/\bCP\b/i.test(t)&&t.length<2500){chosen=node;break;}
+  }
+  return {node:chosen,sourceIndex:i};
  });
 }
-if(action==='collect')return JSON.stringify({ok:true,cards:getCards()});
-if(action.startsWith('coords:')){
- const index=parseInt(action.slice(7),10);
- const btn=buttons('Get coords')[index];
- if(!btn)return JSON.stringify({ok:false,status:'Botão Get coords não localizado'});
- btn.click();
- return JSON.stringify({ok:true,status:'Get coords acionado no site'});
+function nextLabelValue(root,label){
+ const re=new RegExp("^"+label+"$","i");
+ const c=Array.from(root.querySelectorAll("span,div,p,small,label,dt")).filter(e=>re.test(text(e))&&text(e).length<18).sort((a,b)=>text(a).length-text(b).length);
+ for(const x of c){
+  if(x.nextElementSibling){
+   const s=text(x.nextElementSibling);
+   if(s&&s.length<80&&!re.test(s))return s;
+  }
+  const p=x.parentElement;
+  if(p&&p.children.length<8){
+   const s=text(p).replace(new RegExp("^"+label+"\\s*:?\\s*","i"),"");
+   if(s&&s!==text(p)&&s.length<80)return s;
+  }
+ }
+ return "";
 }
-if(action==='search'){
- const sh=setShiny(shiny),modeFound=press(mode==='iv'?'Stats':'PvP');
+function parseCard(box,sourceIndex){
+ const body=text(box),lines=body.split(/\n+/).map(clean).filter(Boolean);
+ const ivMatch=body.match(/(\d{1,3})\s*%\s*[\(（]\s*(\d{1,2})\s*\/\s*(\d{1,2})\s*\/\s*(\d{1,2})\s*[\)）]/);
+ const raw=ivMatch?[ivMatch[2],ivMatch[3],ivMatch[4]].join("/"):
+    ((body.match(/(?:^|[^\d])(\d{1,2}\s*\/\s*\d{1,2}\s*\/\s*\d{1,2})(?:[^\d]|$)/)||[])[1]||"").replace(/\s/g,"");
+ const percent=ivMatch?ivMatch[1]:(raw?String(Math.round(raw.split("/").map(Number).reduce((a,b)=>a+b,0)/45*100)):"");
+ const val=(label,re)=>{let candidate=nextLabelValue(box,label);let m=candidate.match(re);if(m)return m[1];
+     m=body.match(new RegExp("(?:^|\\n)\\s*"+label+"\\s*:?\\s*([0-9.]+)","im"));return m?m[1]:"";};
+ const heading=box.querySelector("h2,h3,h4,h5,[class*=font-semibold],[class*=font-bold]");
+ let title=heading?text(heading):"";
+ if(!title||title.length>85||/^(?:CP|IV|LVL)$/i.test(title)){
+  title=lines.find(s=>/^[\p{L}\p{N} _'.\-♀♂()✨]+$/u.test(s)&&!/(?:^CP$|^IV$|^LVL$|LOCATION|DESPAWN|Get coords)/i.test(s)&&s.length<45)||"Pokémon";
+ }
+ const meta=lines.find(s=>/#\s*\d{1,4}\b/.test(s))||"";
+ const size=((meta.match(/(?:^|[\s·])(?:XXS|XS|XXL|XL|M)(?=$|[\s·])/i)||[])[0]||"").trim();
+ const move=lines.find(s=>/\s\/\s/.test(s)&&!/\d+\s*\/\s*\d+\s*\/\s*\d+/.test(s))||"";
+ const loc=nextLabelValue(box,"LOCATION")||(body.match(/\bLOCATION\s*\n?\s*([^\n]+?)(?=\n|DESPAWN|$)/i)||[])[1]||"";
+ const desp=nextLabelValue(box,"DESPAWN")||(body.match(/\bDESPAWN\s*(\d{1,2}:\d{2})/i)||[])[1]||"";
+ const image=Array.from(box.querySelectorAll("img[src]")).find(e=>/^https?:/.test(e.src)||e.src.startsWith("data:"));
+ const rankMatch=body.match(/\b(?:PvP\s*)?(?:Rank|Ranking|Rk)\s*#?\s*(\d+)\b/i);
+ const isShiny=/✨/.test(title);
+ return {
+  sourceIndex,name:title.replace(/✨/g,"").trim(),image:image?image.src:"",
+  number:(meta.match(/#\d{1,4}/)||[])[0]||"",
+  gender:/\bFemale\b|♀/i.test(meta)?"♀":/\bMale\b|♂/i.test(meta)?"♂":"",
+  size:size,moves:move,location:clean(loc),despawn:(desp.match(/\d{1,2}:\d{2}/)||[])[0]||"",
+  cp:val("CP",/(\d{1,5})/),level:val("(?:LVL|Level)",/([\d.]+)/),
+  iv:raw,ivPercent:percent,rank:rankMatch?rankMatch[1]:"",
+  shiny:isShiny,form:(title.match(/\(([^)]+)\)/)||[])[1]||""
+ };
+}
+function collect(){
+ const found=cardRoots().map(item=>parseCard(item.node,item.sourceIndex));
+ const valid=mode==="iv"?found.filter(x=>x.iv==="15/15/15"||x.ivPercent==="100"):found;
+ const uncertain=mode==="iv"&&found.some(x=>!(x.iv==="15/15/15"||x.ivPercent==="100"));
+ return JSON.stringify({ok:true,cards:valid,found:found.length,uncertain});
+}
+if(action==="collect")return collect();
+if(action.startsWith("coords:")){
+ const index=Number(action.slice(7));
+ const btn=elements("button,[role=button]").filter(e=>vis(e)&&/^Get coords$/i.test(text(e)))[index];
+ if(!btn)return JSON.stringify({ok:false,status:"Get coords não está disponível para este Pokémon"});
+ btn.click();
+ return JSON.stringify({ok:true,status:"Botão Get coords acionado no PoGoCoordinates"});
+}
+if(action==="search"){
+ const shin=setShiny(shinyOnly);
+ const tab=click(mode==="iv"?"Stats":"PvP");
  setTimeout(()=>{
-   const filters=mode==='iv'?applyIv():applyGl();
-   setTimeout(()=>press('Search'),500);
- },450);
- return JSON.stringify({ok:sh&&modeFound,shiny,mode});
+  const fields=mode==="iv"?applyIv():applyGl().ok;
+  setTimeout(()=>click("Search"),650);
+ },400);
+ return JSON.stringify({ok:tab,shinyConfirmed:shin,mode});
 }
 return JSON.stringify({ok:false});
 })()
