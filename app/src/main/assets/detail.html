@@ -16,7 +16,7 @@ button{font:inherit;color:inherit;border:0;cursor:pointer}
 #info{color:#d8e0ea;line-height:1.38;margin-top:5px;font-size:10px;overflow-wrap:anywhere}
 #info div{margin:2px 0}
 #info em{color:#afb9c8;font-style:normal}
-#coords{margin-top:7px;width:100%;border-radius:7px;padding:7px;background:#eb2850ce;font-weight:bold}
+#copy{margin-top:5px;width:100%;border:1px solid #ffffff35;background:#ffffff22;border-radius:7px;padding:7px;font-weight:bold}#coords{margin-top:7px;width:100%;border-radius:7px;padding:7px;background:#eb2850ce;font-weight:bold}
 </style></head><body><div id="panel">
  <div id="header">
   <img id="img" alt="" style="display:none">
@@ -24,17 +24,17 @@ button{font:inherit;color:inherit;border:0;cursor:pointer}
   <button id="x" onclick="Native.hideDetail()">×</button>
  </div>
  <div id="major"></div><div id="info"></div>
- <button id="coords" onclick="Native.coords(currentIndex)">⌖ Get coords</button>
+ <button id="coords" onclick="Native.coords(currentIndex)">⌖ Get coords</button><button id="copy" onclick="copyCoords()">⧉ Copiar coordenadas</button>
 </div>
 <script>
-let currentIndex=-1;let expiresAt=0;let ticking=null;
+let currentIndex=-1;let expiresAt=0;let ticking=null;let currentCoords="";function copyCoords(){if(currentCoords)Native.copyCoords(currentCoords);else document.getElementById("copy").textContent="Obtenha as coordenadas primeiro";}window.copyFeedback=msg=>{document.getElementById("copy").textContent=msg;};
 function fmt(sec){sec=Math.max(0,Math.floor(sec));return Math.floor(sec/60)+":"+String(sec%60).padStart(2,"0");}
 function updateCountdown(){const e=document.getElementById("timer");if(e&&expiresAt)e.textContent=fmt((expiresAt-Date.now())/1000);}
-window.coordsResult=function(coords,message){const el=document.getElementById("coordsValue");if(el)el.textContent=coords||message||"Coordenadas indisponíveis";};
+window.coordsResult=function(coords,message){if(coords)currentCoords=coords;document.getElementById("copy").textContent=currentCoords?"⧉ Copiar coordenadas":"Obtenha coordenadas";const el=document.getElementById("coordsValue");if(el)el.textContent=coords||message||"Coordenadas indisponíveis";};
 const h=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const item=(k,v)=>v?'<div><em>'+h(k)+':</em> '+h(v)+'</div>':"";
 window.showDetails=(c,mode)=>{
- currentIndex=Number(c.sourceIndex);
+ currentIndex=Number(c.sourceIndex);currentCoords=String(c.coords||"");document.getElementById("copy").textContent=currentCoords?"⧉ Copiar coordenadas":"Obtenha coordenadas";
  const parts=String(c.despawn||"").split(":").map(Number);
  const secs=parts.length===2&&parts.every(Number.isFinite)?parts[0]*60+parts[1]:0;
  expiresAt=secs?Date.now()+secs*1000:0;

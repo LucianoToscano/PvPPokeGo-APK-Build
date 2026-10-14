@@ -335,6 +335,13 @@ public class OverlayService extends Service {
         status(message);
     }
     public class Bridge{
+        @JavascriptInterface public void copyCoords(String coords){handler.post(()->{
+            String valid=extractCoordinates(coords);
+            if(valid.isEmpty()){js(detailPanel,detailLoaded,"window.copyFeedback("+JSONObject.quote("Coordenadas inválidas")+")");return;}
+            ClipboardManager clipboard=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+            if(clipboard!=null){clipboard.setPrimaryClip(ClipData.newPlainText("Coordenadas Pokémon",valid));js(detailPanel,detailLoaded,"window.copyFeedback("+JSONObject.quote("✓ Copiado!")+ ")");}
+        });}
+
         @JavascriptInterface public void select(String s){handler.post(()->{
             if(!s.equals("iv")&&!s.equals("gl"))return;
             mode=s;getSharedPreferences("prefs",0).edit().putString("mode",s).apply();
