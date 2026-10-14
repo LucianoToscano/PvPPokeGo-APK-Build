@@ -389,7 +389,7 @@ public class OverlayService extends Service {
         }catch(Exception e){return Long.MAX_VALUE;}
     }
     private String spawnKey(JSONObject c){
-        return c.optString("name","")+"|"+c.optString("cp","")+"|"+
+        return mode+"|"+c.optString("name","")+"|"+c.optString("cp","")+"|"+
             c.optString("level","")+"|"+c.optString("location","");
     }
     private JSONArray sortItems(JSONArray source){
@@ -446,7 +446,9 @@ public class OverlayService extends Service {
             String key=spawnKey(c);
             current.add(key);
             if(knownSpawns.contains(key))continue;
-            if(firstNew.isEmpty())firstNew=c.optString("name","Pokémon");
+            if(firstNew.isEmpty() &&
+                ("iv".equals(mode)||leagueConfirmed) && verifiedTargetCriteria(c))
+                firstNew=c.optString("name","Pokémon");
             if(WatchAlerts.enabled(this) &&
                 ("iv".equals(mode)||leagueConfirmed) &&
                 verifiedTargetCriteria(c) &&
@@ -516,7 +518,8 @@ public class OverlayService extends Service {
         if(selected>=0)hideDetails();
         getSharedPreferences("prefs",0).edit()
             .putLong("lastSearchAt",now).putString("lastError","Nenhum").apply();
-        if(r.optBoolean("uncertain"))status("Alguns IVs não puderam ser confirmados.");
+        if(r.optBoolean("uncertain"))
+            status("iv".equals(mode)?"Alguns IVs não confirmados.":"Alguns rankings PvP não confirmados.");
         else if(sorted.length()==0)status("Sem resultados confirmados");
         else status(sorted.length()+" Pokémon atualizados");
     }

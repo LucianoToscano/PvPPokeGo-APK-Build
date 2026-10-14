@@ -33,7 +33,7 @@ public final class PixSupport {
         Bitmap image=BitmapFactory.decodeByteArray(data,0,data.length);
         if(image!=null){
             ImageView qr=new ImageView(a);
-            qr.setImageBitmap(image);
+            qr.setImageBitmap(Bitmap.createScaledBitmap(image,dp(a,245),dp(a,245),false));
             qr.setScaleType(ImageView.ScaleType.FIT_CENTER);
             LinearLayout.LayoutParams qrLayout=new LinearLayout.LayoutParams(dp(a,245),dp(a,245));
             qrLayout.gravity=Gravity.CENTER_HORIZONTAL;qrLayout.topMargin=dp(a,8);
