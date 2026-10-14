@@ -291,6 +291,35 @@ public class OverlayService extends Service {
             detailParams.height=dp(detailHeight);moveDetail();
         }
     }
+    private void pollCoordinates(JSONObject target,int attempt){
+        JSONObject query=new JSONObject();
+        try{
+            query.put("name",target.optString("name",""));
+            query.put("cp",target.optString("cp",""));
+        }catch(Exception ignored){}
+        execute("readCoords:"+query.toString(),result->{
+            String coords=result.optString("coords","");
+            if(result.optBoolean("ok")&&!coords.isEmpty()){
+                try{
+                    JSONArray existing=new JSONArray(results);
+                    for(int i=0;i<existing.length();i++){
+                        JSONObject card=existing.getJSONObject(i);
+                        if(card.optInt("sourceIndex",-1)==target.optInt("sourceIndex",-2)){
+                            card.put("coords",coords);
+                            break;
+                        }
+                    }
+                    results=existing.toString();
+                }catch(Exception ignored){}
+                deliverCoords(coords,"Coordenadas obtidas");return;
+            }
+            if(attempt<8){
+                handler.postDelayed(()->pollCoordinates(target,attempt+1),450L);
+            }else{
+                deliverCoords("","O site não retornou coordenadas. Confira no navegador interno.");
+            }
+        });
+    }
     private String extractCoordinates(String input){
         java.util.regex.Matcher m=java.util.regex.Pattern.compile("(-?\\d{1,2}(?:\\.\\d+)?)\\s*[,;]\\s*(-?\\d{1,3}(?:\\.\\d+)?)").matcher(input);
         if(m.find()){
@@ -326,28 +355,25 @@ public class OverlayService extends Service {
         });}
         @JavascriptInterface public void hideDetail(){handler.post(OverlayService.this::hideDetails);}
         @JavascriptInterface public void coords(int sourceIndex){handler.post(()->{
-            final ClipboardManager clipboard=(ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
-            final String before=clipboard!=null&&clipboard.hasPrimaryClip()&&clipboard.getPrimaryClip()!=null
-                    &&clipboard.getPrimaryClip().getItemCount()>0?
-                    String.valueOf(clipboard.getPrimaryClip().getItemAt(0).coerceToText(OverlayService.this)):"";
-            execute("coords:"+sourceIndex,r->{
-                if(!r.optBoolean("ok")){deliverCoords("",r.optString("status","Get coords indisponível"));return;}
-                handler.postDelayed(()->{
-                    String coord="";
-                    try{
-                        ClipData clip=clipboard==null?null:clipboard.getPrimaryClip();
-                        if(clip!=null&&clip.getItemCount()>0){
-                            String after=String.valueOf(clip.getItemAt(0).coerceToText(OverlayService.this)).trim();
-                            if(!after.equals(before))coord=extractCoordinates(after);
-                        }
-                    }catch(Exception ignored){}
-                    if(!coord.isEmpty()){deliverCoords(coord,"Coordenadas copiadas");return;}
-                    execute("readCoords",found->deliverCoords(found.optString("coords",""),
-                            found.optBoolean("ok")?"Coordenadas encontradas":
-                            "O site não disponibilizou coordenadas. Abra o app para conferir."));
-                },850L);
+            JSONObject chosen;
+            try{
+                JSONArray list=new JSONArray(results);
+                chosen=null;
+                for(int i=0;i<list.length();i++){
+                    JSONObject item=list.getJSONObject(i);
+                    if(item.optInt("sourceIndex",-1)==sourceIndex){chosen=item;break;}
+                }
+            }catch(Exception e){chosen=null;}
+            if(chosen==null){deliverCoords("","Pokémon não encontrado nesta busca");return;}
+            final JSONObject target=chosen;
+            execute("coords:"+sourceIndex,response->{
+                if(!response.optBoolean("ok")){
+                    deliverCoords("",response.optString("status","Get coords indisponível"));return;
+                }
+                pollCoordinates(target,0);
             });
         });}
+
 
     }
     @Override public int onStartCommand(Intent i,int flags,int id){

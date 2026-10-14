@@ -197,18 +197,33 @@ if(action.startsWith("coords:")){
  btn.click();
  return JSON.stringify({ok:true,status:"Solicitando coordenadas no site"});
 }
-if(action==="readCoords"){
- const pattern=/(-?(?:90(?:\.0+)?|[0-8]?\d(?:\.\d+)?))\s*[,;\s]\s*(-?(?:180(?:\.0+)?|1[0-7]\d(?:\.\d+)?|[0-9]?\d(?:\.\d+)?))/;
- // First look for the modal or toast created by Get coords.
- const dialogs=elements('[role=dialog],[role=alertdialog],[role=alert],[data-state=open],input[readonly],textarea[readonly]');
- const scoped=dialogs.map(e=>e.matches('input,textarea')?e.value:text(e));
- // Also read newly exposed map links, but never guess from original search location.
- const urls=elements('a[href*="maps"],a[href*="coords"]').map(e=>e.href);
- for(const s of [...scoped,...urls]){
-  const match=String(s||"").match(pattern);
-  if(match)return JSON.stringify({ok:true,coords:match[1]+","+match[2],status:"Coordenadas encontradas"});
+if(action.startsWith("readCoords:")){
+ const query=JSON.parse(action.slice("readCoords:".length));
+ const latlong=/(-?\d{1,2}(?:\.\d{1,12})?)\s*[,;]\s*(-?\d{1,3}(?:\.\d{1,12})?)/g;
+ function coordinate(s){
+  for(const m of String(s||"").matchAll(latlong)){
+   const lat=Number(m[1]),lon=Number(m[2]);
+   if(Number.isFinite(lat)&&Number.isFinite(lon)&&Math.abs(lat)<=90&&Math.abs(lon)<=180)return m[1]+","+m[2];
+  }
+  return "";
  }
- return JSON.stringify({ok:false,status:"Aguardando coordenadas do site"});
+ // The website replaces Get coords with "Open in Maps" and puts coordinates beneath.
+ const buttons=elements('button,a,[role=button]').filter(x=>vis(x)&&/Open in Maps|Get coords/i.test(text(x)));
+ for(const b of buttons){
+  if(!/Open in Maps/i.test(text(b)))continue;
+  let card=b.parentElement;
+  for(let i=0;i<9&&card;i++,card=card.parentElement){
+   const t=text(card);
+   if(!/\bLOCATION\b/i.test(t)||!/\bDESPAWN\b/i.test(t)||t.length>3500)continue;
+   const name=String(query.name||"").toLowerCase();
+   if(name&&!t.toLowerCase().includes(name))continue;
+   const m=coordinate(t);
+   if(m)return JSON.stringify({ok:true,coords:m,status:"Coordenadas obtidas"});
+   // Matching card reached, avoid reading another Pokémon's coords.
+   break;
+  }
+ }
+ return JSON.stringify({ok:false,status:"O site ainda não exibiu coordenadas"});
 }
 if(action==="search"){
  const target=mode==="iv"?"Stats":"PvP";
