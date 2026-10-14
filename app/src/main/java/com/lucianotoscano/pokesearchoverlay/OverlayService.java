@@ -30,7 +30,7 @@ import java.io.InputStream;
 import java.util.function.Consumer;
 
 public class OverlayService extends Service {
-    private static final int DOCK_DP=52, BUBBLE_DP=45, DETAIL_DP=226, MENU_DP=168;
+    private static final int DOCK_DP=44, BUBBLE_DP=45, DETAIL_DP=226, MENU_DP=159;
     private final Handler handler=new Handler(Looper.getMainLooper());
     private WindowManager wm;
     private WindowManager.LayoutParams params,detailParams;
@@ -38,7 +38,7 @@ public class OverlayService extends Service {
     private View grip;
     private WebView panel,detailPanel,website;
     private boolean menuExpanded=false,menuLeft=false,minimized=false,shiny=true,loaded=false,panelLoaded=false,detailLoaded=false,stopped=false;
-    private int height=190,detailHeight=225,requestGeneration=0,selected=-1;
+    private int height=68,detailHeight=225,requestGeneration=0,selected=-1;
     private String mode="iv",results="[]",status="Conectando...";
     private float startRawX,startRawY;
     private int startX,startY;
@@ -65,7 +65,7 @@ public class OverlayService extends Service {
     private int rowDp(){
         int n=Math.max(1,count());
         int available=screenHeightDp()-160;
-        return Math.max(25,Math.min(37,available/n));
+        return Math.max(27,Math.min(30,available/n));
     }
     private void update(){
         js(panel,panelLoaded,"window.onNativeData("+results+","+JSONObject.quote(status)+","+
@@ -154,7 +154,7 @@ public class OverlayService extends Service {
                     if(Math.abs(dx)+Math.abs(dy)>dp(4))dragged=true;
                     if(dragged){
                         DisplayMetrics d=metrics();
-                        int winWidth=dp(minimized?BUBBLE_DP:DOCK_DP);
+                        int winWidth=dp(minimized?BUBBLE_DP:menuExpanded?MENU_DP:DOCK_DP);
                         int winHeight=dp(minimized?BUBBLE_DP:height);
                         params.x=Math.max(0,Math.min(d.widthPixels-winWidth,startX+dx));
                         params.y=Math.max(0,Math.min(d.heightPixels-winHeight,startY+dy));
@@ -168,7 +168,7 @@ public class OverlayService extends Service {
             }
             return true;
         });
-        root.addView(grip,new FrameLayout.LayoutParams(dp(DOCK_DP),dp(12),Gravity.TOP|Gravity.LEFT));
+        root.addView(grip,new FrameLayout.LayoutParams(dp(DOCK_DP),dp(9),Gravity.TOP|Gravity.LEFT));
 
         params=new WindowManager.LayoutParams(dp(DOCK_DP),dp(height),
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
@@ -253,7 +253,7 @@ public class OverlayService extends Service {
     }
     private void resize(int h){
         if(minimized||params==null)return;
-        int target=Math.max(78,Math.min(screenHeightDp()-95,h));
+        int target=Math.max(46,Math.min(screenHeightDp()-95,h));
         if(Math.abs(target-height)<2)return;
         height=target;params.height=dp(height);updateWindow();moveDetail();
     }
@@ -267,11 +267,11 @@ public class OverlayService extends Service {
             if(menuLeft)params.x=Math.max(0,params.x-extra);
             params.width=dp(MENU_DP);
         }else{
-            if(menuLeft)params.x+=dp(MENU_DP-DOCK_DP);
+            if(menuLeft)params.x=Math.min(metrics().widthPixels-dp(DOCK_DP),params.x+dp(MENU_DP-DOCK_DP));
             params.width=dp(DOCK_DP);
         }
         menuExpanded=show;
-        FrameLayout.LayoutParams g=new FrameLayout.LayoutParams(dp(DOCK_DP),dp(12),Gravity.TOP|Gravity.LEFT);
+        FrameLayout.LayoutParams g=new FrameLayout.LayoutParams(dp(DOCK_DP),dp(9),Gravity.TOP|Gravity.LEFT);
         g.leftMargin=show&&menuLeft?dp(MENU_DP-DOCK_DP):0;
         grip.setLayoutParams(g);
         js(panel,panelLoaded,"window.menuSide("+JSONObject.quote(menuLeft?"left":"right")+")");
@@ -285,7 +285,7 @@ public class OverlayService extends Service {
         params.width=dp(yes?BUBBLE_DP:DOCK_DP);
         params.height=dp(yes?BUBBLE_DP:height);
         grip.setLayoutParams(new FrameLayout.LayoutParams(
-                dp(yes?BUBBLE_DP:DOCK_DP),dp(yes?BUBBLE_DP:12),Gravity.TOP|Gravity.LEFT));
+                dp(yes?BUBBLE_DP:DOCK_DP),dp(yes?BUBBLE_DP:9),Gravity.TOP|Gravity.LEFT));
         js(panel,panelLoaded,"window.setMinimized("+yes+")");
         updateWindow();
     }

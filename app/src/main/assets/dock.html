@@ -1,25 +1,33 @@
 <!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <style>
-:root{--row:36px}
+:root{--row:30px}
 *{box-sizing:border-box}
-html,body{margin:0;padding:0;background:transparent;color:#fff;font-family:Roboto,Arial,sans-serif;font-size:10px;overflow:hidden}
+html,body{margin:0;padding:0;background:transparent!important;color:#fff;font:10px Roboto,Arial,sans-serif;overflow:hidden}
 button{font:inherit;color:inherit;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-#shell{width:52px;background:rgba(11,16,23,.25);border:0;border-radius:7px;overflow:visible;box-shadow:0 3px 12px #0003;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
-#handle{height:12px;text-align:center;padding:0;color:#dce2ecae;font-size:9px;line-height:12px;letter-spacing:1px;user-select:none}
-#controls{display:none;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;padding:0 1px 2px}#controls.open{display:grid}#gear{display:flex;align-items:center;justify-content:center;margin:0 auto 1px;width:32px;height:27px;border:0;border-radius:7px;background:#131a2255;color:#d8e0e9;line-height:1}#gear svg{width:17px;height:17px;stroke-width:1.65}#menu{display:none;position:absolute;top:13px;left:55px;width:111px;z-index:3;padding:3px;border-radius:8px;background:rgba(18,23,31,.89);border:1px solid #ffffff2b;box-shadow:0 3px 13px #0006}#menu.open{display:block}body.menu-left #shell{margin-left:116px}body.menu-left #menu{left:0}#controls{display:grid!important}#controls button{height:27px!important;min-height:27px!important;font-size:10px!important}#controls button:first-child{grid-column:1 / -1}#spawns{width:52px}#handle{width:52px}
-#controls button{height:19px;min-height:19px;min-width:0;border-radius:2px;border:0;background:#131a2280;font-size:8px;font-weight:700;white-space:nowrap;padding:0 1px}
-#controls button.active{background:#e9294bb3;border-color:#fb718a7d}
-#controls button.shinyOn{color:#ffe4a0;background:#58452280;border-color:#d9b35b91}
+#shell{width:44px;background:transparent!important;border:0;border-radius:0;overflow:visible;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+#handle{width:44px;height:9px;text-align:center;line-height:9px;color:#e1e6eab0;letter-spacing:0;font-size:8px;user-select:none}
+#gear{display:flex;align-items:center;justify-content:center;margin:0 auto;width:27px;height:23px;padding:0;border:0;border-radius:5px;background:transparent!important;color:#e7ecf2;line-height:1}
+#gear svg{width:18px;height:18px;stroke-width:1.5;filter:drop-shadow(0 1px 1px #0009)}
+#menu{display:none;position:absolute;top:9px;left:47px;width:112px;z-index:3;padding:3px;border-radius:7px;background:rgba(18,23,31,.88);border:1px solid #ffffff24;box-shadow:0 3px 11px #0007}
+#menu.open{display:block}
+body.menu-left #shell{margin-left:115px}
+body.menu-left #menu{left:0}
+#controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px;padding:0}
+#controls button{height:26px;min-height:26px;min-width:0;padding:0 2px;background:#ffffff15;border-radius:4px;font-size:11px;font-weight:650;white-space:nowrap}
+#controls button:first-child{grid-column:1/-1}
+#controls button.active{background:#e9294ba6}
+#controls button.shinyOn{color:#ffe8a7;background:#54401caa}
 #actions{display:contents}
-#actions button{height:19px;min-height:19px;font-size:12px}
-#spawns{display:flex;flex-direction:column;align-items:center;gap:0;padding:1px 0 2px}
-.spawn{width:100%;height:var(--row);display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid transparent;border-radius:6px;padding:1px}
-.spawn.active{border-color:#ff6b86a9;background:#53303955}
-.sprite{display:block;width:min(calc(var(--row) - 2px),39px);height:min(calc(var(--row) - 2px),39px);object-fit:contain;filter:drop-shadow(0 1px 2px #0005)}
-.fallback{font-size:22px;line-height:1}
-#empty{color:#dce4eda9;text-align:center;padding:4px 2px 7px;font-size:9px;line-height:1.4;overflow-wrap:anywhere}
+#actions button{font-size:14px}
+#spawns{width:44px;display:flex;flex-direction:column;align-items:center;gap:0;padding:0;margin:0}
+.spawn{width:44px;height:var(--row);min-height:var(--row);display:flex;align-items:center;justify-content:center;margin:0;background:transparent!important;border:1px solid transparent;border-radius:5px;padding:0;overflow:visible}
+.spawn.active{border-color:#ff7384a0;background:transparent!important}
+.sprite{display:block;width:34px;height:34px;min-width:34px;min-height:34px;object-fit:contain;filter:drop-shadow(0 1px 1px #0008);pointer-events:none}
+.fallback{font-size:19px;line-height:1}
+#empty{display:block;width:44px;height:18px;line-height:18px;color:#e4eaf1c0;text-align:center;padding:0;font-size:13px;white-space:nowrap;overflow:hidden}
 #bubble{display:none;width:45px;height:45px;border:1px solid #ffffff70;background:#1b1c28bf;box-shadow:0 3px 12px #0006;border-radius:50%;align-items:center;justify-content:center;flex-direction:column;gap:1px}
-#bubble b{font-size:18px;line-height:18px}#bubble small{font-size:10px;font-weight:bold;color:#ff839a}
+#bubble b{font-size:18px;line-height:18px}
+#bubble small{font-size:10px;font-weight:bold;color:#ff839a}
 </style></head><body>
 <div id="shell">
  <div id="handle">••••••</div>
@@ -38,7 +46,7 @@ button{font:inherit;color:inherit;border:0;cursor:pointer;-webkit-tap-highlight-
 </div>
 <div id="bubble"><b>◉</b><small id="count">0</small></div>
 <script>
-let cards=[],active=-1,mode="iv",shiny=true,status="",row=36,menuOpen=false;
+let cards=[],active=-1,mode="iv",shiny=true,status="",row=30,menuOpen=false;
 function toggleMenu(){menuOpen=!menuOpen;document.getElementById("menu").classList.toggle("open",menuOpen);document.getElementById("gear").setAttribute("aria-expanded",String(menuOpen));Native.menu(menuOpen);}
 function fit(){requestAnimationFrame(()=>Native.resize(Math.ceil(document.getElementById("shell").getBoundingClientRect().height)+1));}
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -65,12 +73,14 @@ function draw(){
  attachLongPress();
  const empty=document.getElementById("empty");
  empty.style.display=cards.length?"none":"block";
- empty.textContent=status||"Sem resultados";
+ empty.textContent=/sem resultados/i.test(status)?"0":/falha|erro|não|login/i.test(status)?"!":"…";
+ empty.title=status||"Aguardando busca";
+ document.getElementById("gear").title=status?("Configurações · "+status):"Configurações";
  requestAnimationFrame(()=>Native.resize(Math.ceil(document.getElementById("shell").getBoundingClientRect().height)+1));
 }
 window.onNativeData=(a,s,m,shi,r)=>{
  cards=Array.isArray(a)?a.slice(0,10):[];
- mode=m;status=String(s||"");shiny=!!shi;row=Number(r)||36;
+ mode=m;status=String(s||"");shiny=!!shi;row=Number(r)||30;
  if(active>=cards.length)active=-1;
  draw();
 };

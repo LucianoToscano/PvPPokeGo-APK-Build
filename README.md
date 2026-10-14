@@ -1,3 +1,3 @@
-# Pokésearch Overlay 0.18
+# Pokésearch Overlay v0.19 Alpha
 
-Ícone de engrenagem vetorial discreta; menu lateral flutuante independente da coluna vertical de Pokémon. Ao abrir, a janela aumenta horizontalmente sem aumentar a altura, e o menu aparece à esquerda ou direita segundo espaço disponível. Botão de modo gira IV100/GL#1/UL#1. Mantido painel transparente, 5 min de atualização e contador de despawn.
+Visual ultracompacto: faixa principal sem fundo, sombra ou efeito blur; engrenagem vetorial fina centralizada; sprites alinhados e mais próximos, intervalos de ~30 dp, sprites 34 dp; coluna com apenas 44 dp, alça de 9 dp. Menu lateral continua abrindo à esquerda/direita e fica com fundo próprio para legibilidade. Indicação compacta de status quando vazio. Atualização 5 min, copiar coordenadas e despawn conservados. Necessária validação em aparelho real.
