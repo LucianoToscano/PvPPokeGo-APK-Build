@@ -3,7 +3,7 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <application android:icon="@drawable/pokesearch_icon" android:roundIcon="@drawable/pokesearch_icon" android:label="PokeSearch" android:usesCleartextTraffic="false" android:theme="@android:style/Theme.Material.NoActionBar" android:allowBackup="false">
+    <application android:icon="@drawable/ic_launcher" android:roundIcon="@drawable/ic_launcher" android:label="PokeSearch" android:usesCleartextTraffic="false" android:theme="@android:style/Theme.Material.NoActionBar" android:allowBackup="false">
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
