@@ -29,10 +29,10 @@ jobs:
           test -s app/build/outputs/apk/debug/app-debug.apk
           unzip -t app/build/outputs/apk/debug/app-debug.apk >/dev/null
           mkdir -p delivery
-          cp app/build/outputs/apk/debug/app-debug.apk delivery/PokeSearch-Overlay-0.14-alpha.apk
+          cp app/build/outputs/apk/debug/app-debug.apk delivery/PokeSearch-Overlay-0.15-alpha.apk
           sha256sum delivery/*.apk > delivery/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: PokeSearch-Overlay-0.14-alpha-APK
+          name: PokeSearch-Overlay-0.15-alpha-APK
           path: delivery/
           retention-days: 30
