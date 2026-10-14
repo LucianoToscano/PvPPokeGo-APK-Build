@@ -197,22 +197,28 @@ if(action.startsWith("coords:")){
  btn.click();
  return JSON.stringify({ok:true,status:"Botão Get coords acionado no PoGoCoordinates"});
 }
-if(action==="prepare"){
- return JSON.stringify({ok:tab(mode==="iv"?"Stats":"PvP")});
-}
-if(action==="setShiny"){
- return JSON.stringify(setShiny(shinyOnly));
-}
-if(action==="setFilters"){
- return JSON.stringify({ok:mode==="iv"?applyIv():applyGl()});
-}
-if(action==="validate"){
- return JSON.stringify(check());
-}
-if(action==="submit"){
- const valid=check();
- if(!valid.ok)return JSON.stringify(valid);
- return JSON.stringify({ok:click("Search")});
+if(action==="search"){
+ const target=mode==="iv"?"Stats":"PvP";
+ const ok=tab(target);
+ setTimeout(()=>{
+  if(mode==="iv"){
+   tab("Raw IV");
+   const fields=rawIVInputs();
+   fields.slice(0,3).forEach(e=>valueInput(e,"15"));
+  }else{
+   const rank=inputNear("Top ranking");
+   if(rank)valueInput(rank,"1");
+   choice("League","Great League");
+   choice("Include previous evolutions","Yes");
+  }
+  const s=shinyControl();
+  if(s){
+   const current=readShiny();
+   if(current!==null&&current!==shinyOnly)s.click();
+  }
+  setTimeout(()=>click("Search"),750);
+ },600);
+ return JSON.stringify({ok,mode,attempted:true});
 }
 return JSON.stringify({ok:false});
 })()

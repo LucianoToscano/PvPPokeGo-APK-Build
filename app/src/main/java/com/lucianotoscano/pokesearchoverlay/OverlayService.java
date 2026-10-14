@@ -227,28 +227,13 @@ public class OverlayService extends Service {
     private void refresh(){
         if(!loaded){status("Aguardando login...");return;}
         final int generation=++requestGeneration;
-        results="[]";hideDetails();status("Configurando...");
-        execute("prepare",prepared->{
+        status("Atualizando...");
+        execute("search",response->{
             if(generation!=requestGeneration)return;
-            if(!prepared.optBoolean("ok")){status("Aba Stats/PvP não encontrada");return;}
-            handler.postDelayed(()->execute("setShiny",sh->{
-                if(generation!=requestGeneration)return;
-                if(!sh.optBoolean("ok")){status(sh.optString("reason","Shiny não confirmado"));return;}
-                handler.postDelayed(()->execute("setFilters",filters->{
-                    if(generation!=requestGeneration)return;
-                    if(!filters.optBoolean("ok")){status("Não foi possível ajustar IV/PvP");return;}
-                    handler.postDelayed(()->execute("validate",validated->{
-                        if(generation!=requestGeneration)return;
-                        if(!validated.optBoolean("ok")){status(validated.optString("reason","Filtro não confirmado"));return;}
-                        execute("submit",submitted->{
-                            if(generation!=requestGeneration)return;
-                            if(!submitted.optBoolean("ok")){status(submitted.optString("reason","Busca não iniciou"));return;}
-                            status("Buscando...");
-                            handler.postDelayed(()->{if(!stopped&&generation==requestGeneration)collect(generation);},4500L);
-                        });
-                    }),600L);
-                }),650L);
-            }),550L);
+            if(!response.optBoolean("ok"))status("Tentando consultar os filtros do site...");
+            handler.postDelayed(()->{
+                if(!stopped&&generation==requestGeneration)collect(generation);
+            },4600L);
         });
     }
     private void collect(int generation){

@@ -1,3 +1,3 @@
-# Pokésearch Overlay v0.8 Alpha
+# Pokésearch Overlay 0.9 Alpha
 
-Sequência assíncrona explícita para configurar Stats/PvP, Shiny e filtros. Nova validação dos controles antes de iniciar Search. Mostra status se os controles não puderem ser confirmados. Requer teste autenticado no dispositivo; não garante automação sob futuras alterações do site.
+Rollback funcional: busca tolerante, sem bloqueio por validação estrita; segue o fluxo da primeira versão que conseguia apresentar resultados. Preserva interface compacta, leitor de IV da versão 0.8 e botão Get coords. Procura selecionar shiny e Grande Liga, mas a implementação segue experimental. Os resultados IV100 são filtrados em cliente por 15/15/15. Não assume que GL#1 está confirmado quando não há rank explícito.
