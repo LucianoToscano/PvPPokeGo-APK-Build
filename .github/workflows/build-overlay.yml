@@ -41,17 +41,19 @@ jobs:
           assert len(d)>1000 and d[0]==[1,"Bulbasaur"]
           print(f'Catálogo validado: {len(d)} espécies')
           PY
-      - name: Assemble installable debug APK
-        run: gradle --no-daemon --stacktrace :app:assembleDebug
-      - name: Validate APK
+      - name: Assemble optimized unsigned release APK
+        run: gradle --no-daemon --stacktrace :app:assembleRelease
+      - name: Validate optimized release APK and export signing tools
         run: |
-          test -s app/build/outputs/apk/debug/app-debug.apk
-          unzip -t app/build/outputs/apk/debug/app-debug.apk >/dev/null
-          mkdir -p delivery
-          cp app/build/outputs/apk/debug/app-debug.apk delivery/PokeSearch-0.34-alpha.apk
-          sha256sum delivery/*.apk > delivery/SHA256SUMS.txt
+          test -s app/build/outputs/apk/release/app-release-unsigned.apk
+          unzip -t app/build/outputs/apk/release/app-release-unsigned.apk >/dev/null
+          mkdir -p delivery/tools
+          cp app/build/outputs/apk/release/app-release-unsigned.apk delivery/PokeSearch-0.35-beta-unsigned.apk
+          cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" delivery/tools/apksigner.jar
+          cp "$ANDROID_HOME/build-tools/36.0.0/zipalign" delivery/tools/zipalign
+          sha256sum delivery/PokeSearch-0.35-beta-unsigned.apk > delivery/UNSIGNED_SHA256.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: PokeSearch-0.34-alpha-APK
+          name: PokeSearch-0.35-beta-unsigned-build
           path: delivery/
           retention-days: 30
