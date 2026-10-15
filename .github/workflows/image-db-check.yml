@@ -53,6 +53,14 @@ jobs:
           test -s "$APK"
           unzip -t "$APK" >/dev/null
           python3 -c 'import zipfile; z=zipfile.ZipFile("app/build/outputs/apk/standard/debug/app-standard-debug.apk"); req=("assets/gamemaster.json", "assets/pokemon_icon_atlas.png", "assets/pokemon_icon_atlas.json", "assets/pokemon_visual_fingerprints.json"); assert all(x in z.namelist() for x in req)'
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
+          test -x "$APKSIGNER"
+          "$APKSIGNER" verify --verbose --print-certs "$APK" | tee image-db-apk-signature.txt
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)"
+          test -x "$AAPT"
+          "$AAPT" dump badging "$APK" | tee image-db-apk-metadata.txt
+          grep -q "name='com.lucianotoscano.pvppokego'" image-db-apk-metadata.txt
+          grep -q "versionName='0.5.37'" image-db-apk-metadata.txt
           sha256sum "$APK" | tee image-db-apk-sha256.txt
       - uses: actions/upload-artifact@v4
         if: success()
@@ -61,5 +69,7 @@ jobs:
           path: |
             app/build/outputs/apk/standard/debug/*.apk
             image-db-apk-sha256.txt
+            image-db-apk-signature.txt
+            image-db-apk-metadata.txt
           retention-days: 30
           if-no-files-found: error
