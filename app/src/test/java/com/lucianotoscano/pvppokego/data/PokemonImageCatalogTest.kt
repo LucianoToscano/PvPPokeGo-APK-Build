@@ -34,6 +34,22 @@ class PokemonImageCatalogTest {
         assertNull(PokemonImageCatalog.lookup(1026, "new_pokemon"))
     }
 
+    @Test fun alternateFormsKeepTheirExistingExactAtlasArt() {
+        assertNull(PokemonImageCatalog.lookup(386, "deoxys_attack"))
+        assertNull(PokemonImageCatalog.lookup(386, "deoxys_defense"))
+        assertNull(PokemonImageCatalog.lookup(487, "giratina_origin"))
+        assertNull(PokemonImageCatalog.lookup(351, "castform_rainy"))
+        assertNull(PokemonImageCatalog.lookup(585, "deerling_summer"))
+        assertTrue(PokemonImageCatalog.isDistinctForm("deoxys_attack"))
+        assertTrue(PokemonImageCatalog.isDistinctForm("charizard_mega_x"))
+    }
+
+    @Test fun meganiumIsNotAMegaEvolution() {
+        assertFalse(PokemonImageCatalog.isDistinctForm("meganium"))
+        assertEquals("0154_base", PokemonImageCatalog.lookup(154, "meganium")?.key)
+        assertFalse(PokemonImageCatalog.isDistinctForm("gengar"))
+    }
+
     @Test fun sourceUrlsAreDeterministicAndSecure() {
         val mega = PokemonImageCatalog.lookup(6, "charizard-mega-y")!!
         assertEquals("https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/10035.png", mega.url)
