@@ -41,6 +41,27 @@ class HybridSnapshotStoreTest {
         } finally { root.deleteRecursively() }
     }
 
+
+    @Test fun rejectsCorruptedOrDeletedStagedDataAndRecovers() {
+        val root = Files.createTempDirectory("hybrid-checksums").toFile()
+        try {
+            val store = HybridSnapshotStore(root)
+            val good = "trusted-data".toByteArray()
+            val name = "gamemaster.json"
+            val expected = listOf(HybridSnapshotStore.Entry(name, sha(good)))
+            assertTrue(store.stage("v3", mapOf(name to good), expected))
+            val staged = store.snapshot("v3")!!
+            staged.resolve(name).writeText("tampered")
+            assertNull("Tampered bytes must reject whole snapshot", store.snapshot("v3"))
+            assertNull(store.activateBetweenBattles("v3", false))
+            assertTrue("Re-stage must replace corrupt partial state",
+                store.stage("v3", mapOf(name to good), expected))
+            assertNotNull(store.activateBetweenBattles("v3", false))
+            staged.resolve("CHECKSUMS").delete()
+            assertNull("Missing ledger must invalidate active pointer", store.activeVersion())
+        } finally { root.deleteRecursively() }
+    }
+
     @Test fun rejectsPathTraversalAndIncompleteSets() {
         val root = Files.createTempDirectory("hybrid-snapshot").toFile()
         try {

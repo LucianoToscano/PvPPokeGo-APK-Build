@@ -55,6 +55,26 @@ class GameDataRepository(private val context: Context) {
 
     suspend fun load(leagueCp: Int = 1500) = withContext(Dispatchers.IO) {
         selectedSnapshot = hybridStore.activeVersion()?.let { hybridStore.snapshot(it) }
+        if (selectedSnapshot != null) {
+            // Validate all live data needed by this league BEFORE mutating engine state.
+            val compatible = runCatching {
+                val master = json.decodeFromString<GameMaster>(
+                    readSnapshotAsset("gamemaster.json")
+                )
+                require(master.pokemon.size > 100 && master.moves.size > 100)
+                val ranks = json.decodeFromString<List<RankingEntry>>(
+                    readSnapshotAsset("rankings-" + leagueCp + ".json")
+                )
+                require(ranks.size > 100)
+                val cpms = json.parseToJsonElement(readSnapshotAsset("pvpoke_cpms.json"))
+                    .jsonObject.getValue("cpms").jsonArray
+                require(cpms.size >= 100)
+            }.isSuccess
+            if (!compatible) {
+                hybridStore.disableActiveSnapshot()
+                selectedSnapshot = null // Atomic fallback to the original APK asset set.
+            }
+        }
         currentLeagueCp = leagueCp
         legalFastCache.clear()
         legalChargedCache.clear()
@@ -295,7 +315,7 @@ class GameDataRepository(private val context: Context) {
     }
 
     fun offlineSnapshotMetadata(): String? = runCatching {
-        context.assets.open("pvpoke_snapshot.json").bufferedReader().use { it.readText() }
+        readSnapshotAsset("pvpoke_snapshot.json")
     }.getOrNull()
 
     fun offlineSnapshotVersion(): String? = offlineSnapshotMetadata()?.let { raw ->

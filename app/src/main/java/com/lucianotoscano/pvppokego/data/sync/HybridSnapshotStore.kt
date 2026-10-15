@@ -2,37 +2,54 @@ package com.lucianotoscano.pvppokego.data.sync
 
 import java.io.File
 import java.security.MessageDigest
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 /**
- * Stages verified snapshots without changing the currently active battle dataset.
- * The caller must supply a private app directory and download files outside battles.
- * Activation is deliberately explicit and must happen only between sessions.
+ * Versioned files are staged and verified, then activated outside a running battle.
+ * The previous snapshot remains on disk for rollback.
  */
 class HybridSnapshotStore(private val root: File) {
     data class Entry(val name: String, val sha256: String)
     private val safeName = Regex("[a-zA-Z0-9][a-zA-Z0-9_.-]{0,100}")
+    private val validSha = Regex("[0-9a-fA-F]{64}")
+
+    private fun isSafe(name: String) =
+        name.matches(safeName) && name != "." && name != ".."
 
     fun stage(version: String, files: Map<String, ByteArray>, expected: List<Entry>): Boolean {
-        require(version.matches(safeName) && version != "." && version != "..")
+        require(isSafe(version))
         require(expected.isNotEmpty() && expected.map { it.name }.toSet().size == expected.size)
-        require(expected.all { it.name.matches(safeName) && it.name != "." && it.name != ".." })
+        require(expected.all { isSafe(it.name) && it.sha256.matches(validSha) })
         require(files.keys == expected.map { it.name }.toSet())
-        if (!expected.all { entry ->
-                entry.sha256.matches(Regex("[0-9a-fA-F]{64}")) &&
-                    digest(files.getValue(entry.name)).equals(entry.sha256, ignoreCase = true)
+        if (!expected.all {
+                digest(files.getValue(it.name)).equals(it.sha256, ignoreCase = true)
             }) return false
-        val staged = File(root, "staged-$version")
-        if (staged.exists()) return false
+
+        val staged = File(root, "staged-" + version)
+        if (staged.exists()) {
+            if (snapshot(version) != null &&
+                expected.all {
+                    digest(File(staged, it.name).readBytes()).equals(it.sha256, true)
+                }) return true
+            // An interrupted prior stage must never block subsequent safe attempts.
+            require(staged.deleteRecursively())
+        }
         if (!staged.mkdirs()) return false
         try {
             for ((name, bytes) in files) File(staged, name).writeBytes(bytes)
             for (entry in expected) {
-                if (digest(File(staged, entry.name).readBytes()) != entry.sha256.lowercase()) {
+                if (!digest(File(staged, entry.name).readBytes())
+                        .equals(entry.sha256, ignoreCase = true)) {
                     staged.deleteRecursively()
                     return false
                 }
             }
-            File(staged, "READY").writeText(version)
+            val checksums = expected.sortedBy { it.name }.joinToString("\n") {
+                it.name + "\t" + it.sha256.lowercase()
+            } + "\n"
+            File(staged, "CHECKSUMS").writeText(checksums)
+            File(staged, "READY").writeText(version) // READY is the final operation.
             return true
         } catch (error: Exception) {
             staged.deleteRecursively()
@@ -40,28 +57,18 @@ class HybridSnapshotStore(private val root: File) {
         }
     }
 
-    /** Returns the validated directory to be loaded for the NEXT battle only. */
     fun activateBetweenBattles(version: String, battleActive: Boolean): File? {
-        if (battleActive || !version.matches(safeName) || version == "." || version == "..") return null
-        val staged = File(root, "staged-$version")
-        if (!staged.isDirectory || File(staged, "READY").readTextOrNull() != version) return null
-        // The previous active snapshot is kept for rollback. Never overwrite it in-place.
-        File(root, "active-version").apply {
-            parentFile?.mkdirs()
-            val temp = File(root, "active-version.tmp")
-            temp.writeText(version)
-            try {
-                java.nio.file.Files.move(
-                    temp.toPath(), toPath(),
-                    java.nio.file.StandardCopyOption.REPLACE_EXISTING,
-                    java.nio.file.StandardCopyOption.ATOMIC_MOVE
-                )
-            } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
-                java.nio.file.Files.move(
-                    temp.toPath(), toPath(),
-                    java.nio.file.StandardCopyOption.REPLACE_EXISTING
-                )
-            }
+        if (battleActive || !isSafe(version)) return null
+        val staged = snapshot(version) ?: return null
+        root.mkdirs()
+        val temp = File(root, "active-version.tmp")
+        temp.writeText(version)
+        try {
+            Files.move(temp.toPath(), File(root, "active-version").toPath(),
+                StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+            Files.move(temp.toPath(), File(root, "active-version").toPath(),
+                StandardCopyOption.REPLACE_EXISTING)
         }
         return staged
     }
@@ -69,18 +76,32 @@ class HybridSnapshotStore(private val root: File) {
     fun activeVersion(): String? = File(root, "active-version").readTextOrNull()
         ?.takeIf { snapshot(it) != null }
 
-    /** Roll back to the bundled assets if a snapshot cannot be loaded. */
     fun disableActiveSnapshot() {
         File(root, "active-version").delete()
     }
+
+    /** Re-check all persisted SHA-256 hashes before trusting an active snapshot. */
     fun snapshot(version: String): File? {
-        if (!version.matches(safeName) || version == "." || version == "..") return null
-        return File(root, "staged-$version").takeIf {
-            it.isDirectory && File(it, "READY").readTextOrNull() == version
+        if (!isSafe(version)) return null
+        val folder = File(root, "staged-" + version)
+        if (!folder.isDirectory ||
+            File(folder, "READY").readTextOrNull() != version) return null
+        val lines = File(folder, "CHECKSUMS").readTextOrNull()
+            ?.lineSequence()?.filter { it.isNotBlank() }?.toList() ?: return null
+        if (lines.isEmpty()) return null
+        val names = mutableSetOf<String>()
+        for (line in lines) {
+            val pair = line.split('\t')
+            if (pair.size != 2 || !isSafe(pair[0]) ||
+                !names.add(pair[0]) || !pair[1].matches(Regex("[0-9a-f]{64}"))) return null
+            val file = File(folder, pair[0])
+            if (!file.isFile ||
+                !runCatching { digest(file.readBytes()) == pair[1] }.getOrDefault(false)) return null
         }
+        return folder
     }
 
-    private fun File.readTextOrNull(): String? = if (isFile) readText() else null
+    private fun File.readTextOrNull(): String? = if (isFile) runCatching { readText() }.getOrNull() else null
 
     private fun digest(bytes: ByteArray): String =
         MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
