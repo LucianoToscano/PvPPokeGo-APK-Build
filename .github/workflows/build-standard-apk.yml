@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: pvppokego-0526-public-build-${{ github.ref }}
@@ -94,3 +94,36 @@ jobs:
           path: delivery/
           retention-days: 30
           if-no-files-found: error
+
+      - name: Validate and package hybrid dataset feed
+        run: |
+          set -euo pipefail
+          python3 tools/generate_hybrid_feed.py --source app/src/main/assets --output hybrid-feed
+          test -s hybrid-feed/manifest.json
+          test -s hybrid-feed/pvpoke_LICENSE.txt
+
+      - name: Publish verified feed to dedicated hybrid-feed branch
+        if: github.ref == 'refs/heads/preview/hybrid-data-sync-20261015'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/hybrid-feed-staging"
+          cp -a hybrid-feed/. "$RUNNER_TEMP/hybrid-feed-staging/"
+          git config user.name "PvPPokeGo data publisher"
+          git config user.email "103388355+LucianoToscano@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin hybrid-feed >/dev/null 2>&1; then
+            git fetch origin hybrid-feed:refs/remotes/origin/hybrid-feed
+            git checkout -B hybrid-feed origin/hybrid-feed
+          else
+            git checkout --orphan hybrid-feed
+          fi
+          git rm -rf . || true
+          git clean -fdx
+          cp -a "$RUNNER_TEMP/hybrid-feed-staging/." .
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Identical validated data: no feed update needed."
+          else
+            git commit -m "data: publish validated PvPoke hybrid snapshot"
+            git push origin HEAD:hybrid-feed
+          fi
