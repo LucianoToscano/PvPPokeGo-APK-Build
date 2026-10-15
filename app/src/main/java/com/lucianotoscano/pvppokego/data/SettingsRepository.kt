@@ -8,6 +8,14 @@ import org.json.JSONObject
 class SettingsRepository(context: Context) {
     private val prefs = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
 
+    var pokemonImagesAutoUpdate: Boolean
+        get() = prefs.getBoolean("pokemon_images_auto_update", true)
+        set(v) = prefs.edit().putBoolean("pokemon_images_auto_update", v).apply()
+
+    var pokemonImagesWifiOnly: Boolean
+        get() = prefs.getBoolean("pokemon_images_wifi_only", true)
+        set(v) = prefs.edit().putBoolean("pokemon_images_wifi_only", v).apply()
+
     var overlayEnabled: Boolean
         get() = prefs.getBoolean("overlay_enabled", true)
         set(v) = prefs.edit().putBoolean("overlay_enabled", v).apply()
@@ -384,6 +392,7 @@ class SettingsRepository(context: Context) {
     companion object {
         private const val FILE = "pvppokego_prefs"
         private val BACKUP_KEYS = setOf(
+            "pokemon_images_auto_update", "pokemon_images_wifi_only",
             "overlay_enabled", "auto_recognition", "battle_assist_enabled",
             "league_mode", "last_detected_league_cp", "show_strong_types",
             "show_current_indicator", "analyze_reserves", "show_reserve_types",
