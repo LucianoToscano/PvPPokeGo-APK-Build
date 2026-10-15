@@ -130,3 +130,45 @@ jobs:
             git commit -m "data: publish validated PvPoke hybrid snapshot"
             git push origin HEAD:hybrid-feed
           fi
+
+  smoke:
+    name: Android 35 install and launcher smoke
+    needs: build
+    if: github.ref == 'refs/heads/preview/hybrid-data-sync-20261015'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+      - name: Download verified QA APK
+        uses: actions/download-artifact@v4
+        with:
+          name: PvPPokeGo-0.5.29-Hybrid-QA-debug
+          path: qa
+      - name: Enable Android emulator hardware virtualization
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Boot emulator and test installation/launcher
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          script: |
+            set -e
+            adb install -r qa/PvPPokeGo-0.5.29-Hybrid-QA-debug.apk
+            adb shell am start -W -n com.lucianotoscano.pvppokego/.MainActivity
+            sleep 10
+            adb shell pidof com.lucianotoscano.pvppokego
+            adb exec-out screencap -p > qa/launcher-smoke.png
+            test -s qa/launcher-smoke.png
+      - name: Upload startup screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PvPPokeGo-Hybrid-Emulator-Startup
+          path: qa/launcher-smoke.png
+          if-no-files-found: warn
