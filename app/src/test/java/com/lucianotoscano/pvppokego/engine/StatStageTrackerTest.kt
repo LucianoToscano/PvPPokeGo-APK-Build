@@ -103,4 +103,21 @@ class StatStageTrackerTest {
         assertEquals(1, result.self.defense.min)
         assertEquals(-1, result.opponent.defense.min)
     }
+    @Test
+    fun dualTargetOnlyExplicitBuffsStillAffectBothSides() {
+        val move = MoveDef(
+            moveId = "DUAL_STATUS",
+            buffsSelf = listOf(1, 0),
+            buffsOpponent = listOf(0, -1),
+            buffTarget = "both",
+            buffApplyChance = "1"
+        )
+        val result = StatStageTracker.applyMove(
+            move, StatStageTracker.Stages(), StatStageTracker.Stages()
+        )
+        assertEquals(1, result.self.attack.min)
+        assertEquals(-1, result.opponent.defense.min)
+        assertTrue(result.deterministic)
+    }
+
 }
