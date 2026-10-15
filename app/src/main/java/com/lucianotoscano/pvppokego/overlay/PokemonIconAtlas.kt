@@ -83,8 +83,8 @@ internal class PokemonIconAtlas(context: Context, onImageReady: () -> Unit = {})
         destination: RectF,
         paint: Paint
     ): Boolean {
-        val resolvedDex = dex ?: speciesId?.let { bySpecies[normalize(it)]?.dex }?.takeIf { it > 0 }
         val exact = speciesId?.let { bySpecies[normalize(it)] }
+        val resolvedDex = PokemonImageCatalog.preferExactDex(exact?.dex, dex)
         val isKnownAlternate = exact != null &&
             baseSpeciesByDex[exact.dex] != normalize(exact.speciesId)
         val requestedMega = PokemonImageCatalog.lookup(resolvedDex, speciesId)
