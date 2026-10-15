@@ -133,6 +133,8 @@ fun TeamBuilderPanel(
     var feedback by remember { mutableStateOf("") }
     var leagueMenu by remember { mutableStateOf(false) }
     var atlas by remember { mutableStateOf<PokemonIconAtlas?>(null) }
+    var imageRevision by remember { mutableStateOf(0) }
+    @Suppress("UNUSED_VARIABLE") val imageRedrawToken = imageRevision
     val spritePaint = remember { Paint(Paint.ANTI_ALIAS_FLAG).apply { isFilterBitmap = true } }
     val hasSelectedPokemon = saved.slots.any { it.speciesId.isNotBlank() }
     val scanPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
@@ -185,7 +187,7 @@ fun TeamBuilderPanel(
 
     LaunchedEffect(hasSelectedPokemon) {
         if (hasSelectedPokemon && atlas == null) {
-            atlas = withContext(Dispatchers.IO) { runCatching { PokemonIconAtlas(context) }.getOrNull() }
+            atlas = withContext(Dispatchers.IO) { runCatching { PokemonIconAtlas(context) { imageRevision++ } }.getOrNull() }
         }
     }
 
