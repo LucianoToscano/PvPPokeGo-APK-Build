@@ -34,6 +34,9 @@ android {
         targetSdk = 36
         versionCode = 34
         versionName = "0.5.29"
+        val hybridManifestUrl = providers.gradleProperty("pvppokego.hybridManifestUrl").orElse("").get()
+        require(hybridManifestUrl.isBlank() || (hybridManifestUrl.startsWith("https://") && !hybridManifestUrl.contains('"')))
+        buildConfigField("String", "HYBRID_MANIFEST_URL", "\""+hybridManifestUrl+"\"")
     }
 
     buildFeatures {
@@ -102,6 +105,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     debugImplementation("androidx.compose.ui:ui-tooling")
 
+    implementation("androidx.work:work-runtime-ktx:2.10.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
