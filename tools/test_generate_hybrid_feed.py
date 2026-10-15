@@ -35,6 +35,9 @@ class HybridFeedGeneratorTest(unittest.TestCase):
         self.assertEqual(len(first["files"]), 7)
         for entry in first["files"]:
             self.assertEqual((self.dst / entry["name"]).stat().st_size, entry["size"])
+        (self.src / "pvpoke_snapshot.json").write_text(
+            json.dumps({"pvpokeRef": "test-ref", "generatedAtUtc": "new timestamp"}))
+        self.assertEqual(first["version"], build(self.src, self.dst)["version"])
         (self.src / "pvpoke_LICENSE.txt").write_text("Edited licensed test data " * 8)
         self.assertNotEqual(first["version"], build(self.src, self.dst)["version"])
 

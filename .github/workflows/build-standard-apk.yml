@@ -116,6 +116,12 @@ jobs:
           git config user.email "103388355+LucianoToscano@users.noreply.github.com"
           if git ls-remote --exit-code --heads origin hybrid-feed >/dev/null 2>&1; then
             git fetch origin hybrid-feed:refs/remotes/origin/hybrid-feed
+            OLD_VERSION="$(git show origin/hybrid-feed:manifest.json | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])')"
+            NEW_VERSION="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$RUNNER_TEMP/hybrid-feed-staging/manifest.json")"
+            if [ "$OLD_VERSION" = "$NEW_VERSION" ]; then
+              echo "No core data or license change; keeping published snapshot immutable."
+              exit 0
+            fi
             git checkout -B hybrid-feed origin/hybrid-feed
           else
             git checkout --orphan hybrid-feed

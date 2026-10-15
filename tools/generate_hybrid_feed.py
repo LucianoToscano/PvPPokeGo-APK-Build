@@ -43,7 +43,8 @@ def build(source: Path, dest: Path) -> dict:
         for name in (*REQUIRED, *EXTRAS)
     ]
     version_digest = sha256(
-        json.dumps(entries, sort_keys=True, separators=(",", ":")).encode()
+        json.dumps([entry for entry in entries if entry["name"] != "pvpoke_snapshot.json"],
+                   sort_keys=True, separators=(",", ":")).encode()
     )[:24]
     manifest = {
         "schema": "pvppokego-hybrid-v1",
