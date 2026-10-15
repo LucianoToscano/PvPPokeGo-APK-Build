@@ -211,14 +211,15 @@ private fun DashboardHome(
     val avg = pcs.takeIf { it.isNotEmpty() }?.average()?.toInt()
     val running = settings.overlayServiceRunning
     var atlas by remember { mutableStateOf<PokemonIconAtlas?>(null) }
+    var imageRevision by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
         atlas = withContext(Dispatchers.IO) {
-            runCatching { PokemonIconAtlas(context) }.getOrNull()
+            runCatching { PokemonIconAtlas(context) { imageRevision++ } }.getOrNull()
         }
     }
 
     // Recomposition after resume checks the real service flag rather than a demo toggle.
-    @Suppress("UNUSED_VARIABLE") val revisionToken = historyRevision
+    @Suppress("UNUSED_VARIABLE") val revisionToken = historyRevision + imageRevision
 
     Box(Modifier.fillMaxSize().background(
         Brush.verticalGradient(listOf(
