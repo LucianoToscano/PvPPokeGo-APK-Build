@@ -29,6 +29,33 @@ internal object PokemonImageCatalog {
         }
     }
 
+    /**
+     * Only use the downloaded BASE render when the identity is genuinely the
+     * default form. Existing atlas forms have priority for all other variants.
+     * Token matching prevents confusing a species such as Meganium with Mega.
+     */
+    private val nonBaseFormTokens = setOf(
+        "alola", "alolan", "galar", "galarian", "hisui", "hisuian",
+        "paldea", "paldean", "primal", "origin", "therian", "incarnate",
+        "gigantamax", "gmax", "attack", "defense", "speed", "altered",
+        "sky", "zen", "dusk", "dawn", "crowned", "resolute", "ultra",
+        "black", "white", "sunny", "rainy", "snowy", "baile", "pom",
+        "sensu", "pau", "sandy", "trash", "east", "west",
+        "winter", "summer", "autumn", "spring", "male", "female",
+        "plant", "midday", "midnight", "dusk", "hero", "blade",
+        "land", "flying", "complete", "ten", "fifty", "rapid",
+        "single", "striking", "school", "solo", "ice", "shadowrider",
+        "ice_rider"
+    )
+
+    private fun tokens(speciesId: String?): List<String> =
+        speciesId.orEmpty().lowercase(Locale.ROOT)
+            .replace(Regex("[^a-z0-9]+"), "_")
+            .trim('_').split('_').filter(String::isNotBlank)
+
+    private fun hasMegaToken(parts: List<String>): Boolean =
+        parts.any { it == "mega" || it == "megax" || it == "megay" }
+
     fun allImages(): Sequence<Image> = sequence {
         megaIds.entries.sortedWith(compareBy({ it.key.first }, { it.key.second }))
             .forEach { (key, id) -> yield(Image(key.first, key.second, id)) }
@@ -37,10 +64,8 @@ internal object PokemonImageCatalog {
 
     fun lookup(dex: Int?, speciesId: String?): Image? {
         if (dex == null || dex !in 1..1025 || speciesId.isNullOrBlank()) return null
-        val normalized = speciesId.orEmpty().lowercase(Locale.ROOT)
-            .replace(Regex("[^a-z0-9]+"), "_").trim('_')
-        val tokens = normalized.split('_').filter(String::isNotBlank)
-        val isMega = "mega" in tokens || "megax" in tokens || "megay" in tokens
+        val tokens = tokens(speciesId)
+        val isMega = hasMegaToken(tokens)
         if (isMega) {
             val form = when {
                 "megax" in tokens || ("mega" in tokens && "x" in tokens) -> "mega_x"
@@ -50,14 +75,12 @@ internal object PokemonImageCatalog {
             return megaIds[dex to form]?.let { Image(dex, form, it) }
         }
         // Do not silently substitute an incorrect base image for a known variant.
-        if (tokens.any { it in setOf("alola", "alolan", "galar", "galarian", "hisui", "hisuian",
-                    "paldea", "paldean", "primal", "origin", "therian", "gigantamax", "gmax") }) return null
+        if (tokens.any { it in nonBaseFormTokens }) return null
         return Image(dex, "base", dex)
     }
 
     fun isDistinctForm(speciesId: String?): Boolean {
-        val n = speciesId.orEmpty().lowercase(Locale.ROOT)
-        return listOf("mega", "alola", "galar", "hisui", "paldea", "primal",
-            "origin", "therian", "gigantamax", "gmax").any { it in n }
+        val parts = tokens(speciesId)
+        return hasMegaToken(parts) || parts.any { it in nonBaseFormTokens }
     }
 }
