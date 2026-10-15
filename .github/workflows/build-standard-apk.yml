@@ -211,14 +211,8 @@ jobs:
             # Require real app content, not a notification dialog or unrelated launcher ANR.
             grep -Fq 'PvPPokeGo' qa/launcher-window.xml
             grep -Fq 'Assistente visual' qa/launcher-window.xml
-            if grep -Eiq 'isn.t responding|not responding|Pixel Launcher|não está respondendo' qa/launcher-window.xml; then
-              echo "System dialog obscures the app: smoke test inconclusive" >&2
-              exit 1
-            fi
-            if adb logcat -d -v brief | grep -E 'ANR in com.lucianotoscano.pvppokego|FATAL EXCEPTION.*com.lucianotoscano.pvppokego'; then
-              echo "App ANR or fatal exception detected" >&2
-              exit 1
-            fi
+            if grep -Eiq 'isn.t responding|not responding|Pixel Launcher|não está respondendo' qa/launcher-window.xml; then echo "System dialog obscures app" >&2; exit 1; fi
+            if adb logcat -d -v brief | grep -E 'ANR in com.lucianotoscano.pvppokego|FATAL EXCEPTION.*com.lucianotoscano.pvppokego'; then echo "App ANR or fatal exception" >&2; exit 1; fi
             adb exec-out screencap -p > qa/launcher-smoke.png
             test -s qa/launcher-smoke.png
       - name: Upload startup screenshot
