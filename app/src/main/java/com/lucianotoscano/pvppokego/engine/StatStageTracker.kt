@@ -23,7 +23,13 @@ internal object StatStageTracker {
     fun applyMove(move: MoveDef, self: Stages, opponent: Stages): Result {
         val buffs = move.buffs
         val chance = move.buffChance
-        if (buffs.size < 2 || chance <= 0f) {
+        // Dual-target moves can describe their effects exclusively in buffsSelf /
+        // buffsOpponent, without a generic 'buffs' entry in the Game Master.
+        val hasBuffs = buffs.size >= 2 || (
+            move.buffTarget.equals("both", ignoreCase = true) &&
+                (move.buffsSelf.size >= 2 || move.buffsOpponent.size >= 2)
+            )
+        if (!hasBuffs || chance <= 0f) {
             return Result(self, opponent, deterministic = true, chance = 0f)
         }
 
