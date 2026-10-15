@@ -1,0 +1,32 @@
+{
+  "format": "PvPPokeGo-pvpoke-snapshot",
+  "generatedAtUtc": "2026-10-15T20:19:28.014642+00:00",
+  "pvpokeRef": "f627e89e53c0c7b903fff097df7a0ad0ac95decc",
+  "turnDurationMs": 500,
+  "settings": {
+    "maxBuffStages": 4,
+    "buffDivisor": 4.0
+  },
+  "gamemasterSources": {
+    "moves": "https://raw.githubusercontent.com/pvpoke/pvpoke/f627e89e53c0c7b903fff097df7a0ad0ac95decc/src/data/gamemaster/moves.json",
+    "pokemon": "https://raw.githubusercontent.com/pvpoke/pvpoke/f627e89e53c0c7b903fff097df7a0ad0ac95decc/src/data/gamemaster/pokemon.json",
+    "base": "https://raw.githubusercontent.com/pvpoke/pvpoke/f627e89e53c0c7b903fff097df7a0ad0ac95decc/src/data/gamemaster/base.json",
+    "cpms": "https://raw.githubusercontent.com/pvpoke/pvpoke/f627e89e53c0c7b903fff097df7a0ad0ac95decc/src/js/pokemon/Pokemon.js",
+    "license": "https://raw.githubusercontent.com/pvpoke/pvpoke/f627e89e53c0c7b903fff097df7a0ad0ac95decc/LICENSE"
+  },
+  "rankingSources": {
+    "1500": "https://pvpoke.com/data/rankings/all/overall/rankings-1500.json",
+    "2500": "https://pvpoke.com/data/rankings/all/overall/rankings-2500.json",
+    "10000": "https://pvpoke.com/data/rankings/all/overall/rankings-10000.json"
+  },
+  "sha256": {
+    "gamemaster.json": "83e98c3228ea5dac48480a73bf41f6ef011dd9d6968e4d90022458d3e0cb9aeb",
+    "pvpoke_cpms.json": "225cd4740ef7b65e2ba2f566f9b8aa79cefd35c965668ee7592187ce134ffc60",
+    "pvpoke_LICENSE.txt": "3c8500ea8ad3bc42dbaccaf2e0ebfb2950b7db69b3ed56b80d5805dd02078924",
+    "rankings": {
+      "1500": "3f0d0f868f5f89ab182baf029efcc3a1335fa1a65fcfee84a8bc9e4b77cc8dcb",
+      "2500": "20ab71b4e6d8e13495a915410a638f3657ae6673fba33e843855ede413dd5a84",
+      "10000": "a833c11245224edc38bb21a7919998e08d955dfd12752b2891a03baf573219a1"
+    }
+  }
+}

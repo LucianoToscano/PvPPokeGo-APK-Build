@@ -1,0 +1,41 @@
+{
+  "schema": "pvppokego-hybrid-v1",
+  "version": "pvpoke-c6a8aa396f84df1914503921",
+  "files": [
+    {
+      "name": "gamemaster.json",
+      "sha256": "83e98c3228ea5dac48480a73bf41f6ef011dd9d6968e4d90022458d3e0cb9aeb",
+      "size": 909651
+    },
+    {
+      "name": "rankings-1500.json",
+      "sha256": "3f0d0f868f5f89ab182baf029efcc3a1335fa1a65fcfee84a8bc9e4b77cc8dcb",
+      "size": 1203875
+    },
+    {
+      "name": "rankings-2500.json",
+      "sha256": "20ab71b4e6d8e13495a915410a638f3657ae6673fba33e843855ede413dd5a84",
+      "size": 894304
+    },
+    {
+      "name": "rankings-10000.json",
+      "sha256": "a833c11245224edc38bb21a7919998e08d955dfd12752b2891a03baf573219a1",
+      "size": 445944
+    },
+    {
+      "name": "pvpoke_cpms.json",
+      "sha256": "225cd4740ef7b65e2ba2f566f9b8aa79cefd35c965668ee7592187ce134ffc60",
+      "size": 2005
+    },
+    {
+      "name": "pvpoke_snapshot.json",
+      "sha256": "dcf3eac4c638c34e0eb0653de00a0dd881f3bf780827c91bc1260e25abaf33d0",
+      "size": 1766
+    },
+    {
+      "name": "pvpoke_LICENSE.txt",
+      "sha256": "3c8500ea8ad3bc42dbaccaf2e0ebfb2950b7db69b3ed56b80d5805dd02078924",
+      "size": 1063
+    }
+  ]
+}
