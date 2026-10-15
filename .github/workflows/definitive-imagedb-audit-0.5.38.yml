@@ -118,22 +118,8 @@ jobs:
             build.gradle.kts settings.gradle.kts gradle.properties
           test -s "$SOURCE"
           unzip -t "$SOURCE" >/dev/null
-          unzip -Z1 "$SOURCE" | grep -q '^app/src/main/java/com/lucianotoscano/pvppokego/engine/BattleEngine.kt
-        uses: actions/upload-artifact@v4
-        with:
-          name: PvPPokeGo-0.5.38-QA-debug
-          path: delivery/
-          retention-days: 30
-          if-no-files-found: error
-
-          unzip -Z1 "$SOURCE" | grep -q '^app/src/main/assets/pokemon_icon_atlas.png
-        uses: actions/upload-artifact@v4
-        with:
-          name: PvPPokeGo-0.5.38-QA-debug
-          path: delivery/
-          retention-days: 30
-          if-no-files-found: error
-
+          unzip -Z1 "$SOURCE" | grep -q '^app/src/main/java/com/lucianotoscano/pvppokego/engine/BattleEngine.kt$'
+          unzip -Z1 "$SOURCE" | grep -q '^app/src/main/assets/pokemon_icon_atlas.png$'
           sha256sum "$SOURCE" >> delivery/SHA256SUMS.txt
 
       - name: Upload installable QA APK
