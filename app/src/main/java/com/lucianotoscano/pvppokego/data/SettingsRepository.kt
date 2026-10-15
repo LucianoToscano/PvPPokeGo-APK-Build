@@ -27,6 +27,8 @@ class SettingsRepository(context: Context) {
             HybridSyncScheduler.configure(appContext, automaticDataUpdates, enabled)
         }
 
+    fun checkHybridUpdatesNow() = HybridSyncScheduler.checkNow(appContext)
+
     fun hybridDataStatus(): String {
         val lastSuccess = hybridPrefs.getLong("last_success_ms", 0)
         val activeVersion = com.lucianotoscano.pvppokego.data.sync.HybridSnapshotStore(

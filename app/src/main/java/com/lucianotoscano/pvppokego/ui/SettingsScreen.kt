@@ -425,6 +425,16 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 OutlinedButton(
+                    onClick = {
+                        repository.checkHybridUpdatesNow()
+                        hybridStatus = "Verificação agendada. O download respeita as condições da rede.\n" +
+                            repository.hybridDataStatus()
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Verificar atualizações agora")
+                }
+                OutlinedButton(
                     onClick = { hybridStatus = repository.hybridDataStatus() },
                     modifier = Modifier.fillMaxWidth()
                 ) {

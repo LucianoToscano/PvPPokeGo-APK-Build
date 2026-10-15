@@ -6,6 +6,9 @@ import android.net.NetworkCapabilities
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.workDataOf
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkerParameters
@@ -47,6 +50,23 @@ object HybridSyncScheduler {
         )
     }
 
+    /** Schedules a user-requested one-off refresh, even if automatic checks are disabled. */
+    fun checkNow(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val wifiOnly = prefs.getBoolean("wifi_only", true)
+        val request = OneTimeWorkRequestBuilder<HybridSyncWorker>()
+            .setInputData(workDataOf("manual_check" to true))
+            .setConstraints(
+                Constraints.Builder()
+                    .setRequiredNetworkType(
+                        if (wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED
+                    ).build()
+            ).build()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            "pvppokego-manual-hybrid-check", ExistingWorkPolicy.REPLACE, request
+        )
+    }
+
     fun configure(context: Context, automatic: Boolean, wifiOnly: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean("auto", automatic).putBoolean("wifi_only", wifiOnly).apply()
@@ -70,7 +90,7 @@ class HybridSyncWorker(context: Context, params: WorkerParameters) :
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val prefs = applicationContext.getSharedPreferences("hybrid_data_sync", Context.MODE_PRIVATE)
-        if (!prefs.getBoolean("auto", true)) return@withContext Result.success()
+        if (!prefs.getBoolean("auto", true) && !inputData.getBoolean("manual_check", false)) return@withContext Result.success()
         val endpoint = BuildConfig.HYBRID_MANIFEST_URL
         if (endpoint.isBlank()) return@withContext Result.success()
         if (prefs.getBoolean("wifi_only", true)) {

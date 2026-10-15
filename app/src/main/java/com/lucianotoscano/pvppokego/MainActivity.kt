@@ -67,6 +67,7 @@ class MainActivity : ComponentActivity() {
                         }
                         entry("settings.json", settingsRepo.exportBackupJson())
                         entry("battle_history.json", historyRepo.exportJson())
+                        entry("hybrid_sync.txt", settingsRepo.hybridDataStatus())
                         entry(
                             "device.txt",
                             buildString {

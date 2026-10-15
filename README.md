@@ -33,3 +33,10 @@ Isolated preview branch `preview/hybrid-data-sync-20261015` mirrors hybrid snaps
 - Published hybrid-feed data comes from pinned PvPoke source assets plus currently fetched official rankings; the license and snapshot provenance are included.
 - Public HTTPS plus SHA-256 is integrity verification, not a separately signed manifest. A dedicated signing key is still recommended for production.
 - A green CI run is required before using a new APK. Actual device overlay/OCR regression QA remains essential.
+
+## QA preview 0.5.30 — experimental features
+- Three distinct observed opponent slots with stable CP/HP, reappearance after switches, and unknown-slot placeholders. Optional compact HUD toggle under settings.
+- Daily hybrid sync preferences now configurable inside the Android app, with current/pending dataset status, one-off network check, and portable backup/restore of update settings.
+- Diagnostic export includes the local hybrid data status.
+- A complete, editable BUILD-MIRROR source ZIP is uploaded by the public CI alongside the debug APK. The private canonical GitHub repository holds additional internal documentation/history; the ZIP is the full buildable Android snapshot, not private repo Git history.
+- Physical-device capture, OCR and PvP regressions remain to be validated. No independent detached signature for remote manifest, and no permanent production release signing key is bundled.
