@@ -61,7 +61,10 @@ class BattleOverlayView(
     private var nativeTopCardYpx: Int? = null
     private var blockAlphaMultiplier = 1f
     private val reserveUsableCache = booleanArrayOf(true, true)
-    private val pokemonIconAtlas = PokemonIconAtlas(context.applicationContext)
+    private val pokemonIconAtlas = PokemonIconAtlas(context.applicationContext) {
+        // Async atlas completion should repaint even if the battle is not producing new frames.
+        postInvalidateOnAnimation()
+    }
     /** Current native reserve-card crops, indexed by top/bottom card. */
     private val reservePortraits = arrayOfNulls<Bitmap>(2)
     /** Stable team-selection/card portraits, indexed by original team slot 0..2. */
@@ -107,6 +110,7 @@ class BattleOverlayView(
 
     fun release() {
         clearPokemonPortraits()
+        pokemonIconAtlas.release()
     }
 
     private fun replaceReservePortrait(index: Int, next: Bitmap?) {
