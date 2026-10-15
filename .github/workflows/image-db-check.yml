@@ -31,9 +31,53 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
+      - name: Package offline game data (existing production pipeline)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/package_offline_pvpoke_assets.py
+          test -s app/src/main/assets/gamemaster.json
+          test -s app/src/main/assets/pvpoke_snapshot.json
+      - name: Build existing form-aware atlas and fingerprints
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check pillow
+          python3 tools/package_visual_fingerprints.py
+          test -s app/src/main/assets/pokemon_icon_atlas.png
+          test -s app/src/main/assets/pokemon_icon_atlas.json
+          test -s app/src/main/assets/pokemon_visual_fingerprints.json
       - name: Unit tests and Standard debug APK
         run: |
           gradle :app:testStandardDebugUnitTest :app:assembleStandardDebug --stacktrace
+      - name: Verify offline APK packaging
+        if: success()
+        run: |
+          unzip -t app/build/outputs/apk/standard/debug/app-standard-debug.apk >/dev/null
+          unzip -Z1 app/build/outputs/apk/standard/debug/app-standard-debug.apk | grep -q '^assets/gamemaster.json
+        if: success()
+        run: sha256sum app/build/outputs/apk/standard/debug/*.apk | tee image-db-apk-sha256.txt
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: PvPPokeGo-0.5.37-image-db-standard-debug
+          path: |
+            app/build/outputs/apk/standard/debug/*.apk
+            image-db-apk-sha256.txt
+          if-no-files-found: error
+
+          unzip -Z1 app/build/outputs/apk/standard/debug/app-standard-debug.apk | grep -q '^assets/pokemon_icon_atlas.png
+        if: success()
+        run: sha256sum app/build/outputs/apk/standard/debug/*.apk | tee image-db-apk-sha256.txt
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: PvPPokeGo-0.5.37-image-db-standard-debug
+          path: |
+            app/build/outputs/apk/standard/debug/*.apk
+            image-db-apk-sha256.txt
+          if-no-files-found: error
+
       - name: Record APK digest
         if: success()
         run: sha256sum app/build/outputs/apk/standard/debug/*.apk | tee image-db-apk-sha256.txt
