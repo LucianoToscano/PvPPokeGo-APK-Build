@@ -22,3 +22,6 @@ The first build is triggered by commits to `main`. If no run appears, use the **
 0.5.29 visual patch: old 0.5.17 reserve/switch-matchup icons and normal move HUD restored; predictive diagnostics kept in debug mode. Official transparent launcher retained.
 
 0.5.29: ally team recognition regains 0.5.17 text+CP fallback and wider screen scan with confidence checks. Original 0.5.17 HUD visual remains intact.
+
+## Hybrid data sync preview (2026-10-15)
+Isolated preview branch `preview/hybrid-data-sync-20261015` mirrors hybrid snapshot storage, WorkManager scheduling, loader and tests from private PR #37. The main branch remains the known 0.5.29 baseline. This preview has NOT passed CI and MUST NOT be described as a tested APK. The remote manifest endpoint defaults to empty, so no automatic data downloads occur until a trusted feed is configured.
