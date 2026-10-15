@@ -10,6 +10,10 @@ import android.graphics.RectF
 import com.lucianotoscano.pvppokego.data.PokemonImageCatalog
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Offline display-only Pokémon sprite atlas generated from the same form-aware source
@@ -37,44 +41,66 @@ internal class PokemonIconAtlas(context: Context, onImageReady: () -> Unit = {})
         val entries: List<Entry> = emptyList()
     )
 
-    private val bitmap: Bitmap? = runCatching {
-        context.assets.open(ATLAS_ASSET).use(BitmapFactory::decodeStream)
-    }.getOrNull()
+    private data class AtlasData(
+        val bitmap: Bitmap,
+        val bySpecies: Map<String, Entry>,
+        val baseSpeciesByDex: Map<Int, String>,
+        val uniqueByDex: Map<Int, Entry>
+    )
 
-    private val entries: List<Entry> = runCatching {
-        context.assets.open(INDEX_ASSET).bufferedReader().use { reader ->
-            Json { ignoreUnknownKeys = true }
-                .decodeFromString<AtlasIndex>(reader.readText())
-                .entries
+    @Volatile private var atlasData: AtlasData? = null
+    @Volatile private var released: Boolean = false
+
+    init {
+        // Decoding the form-aware fallback atlas on View construction blocked
+        // the battle/UI thread. Keep personal image cache and exact-form rules.
+        val assets = context.applicationContext.assets
+        CoroutineScope(Dispatchers.IO).launch {
+            val bitmap = runCatching {
+                assets.open(ATLAS_ASSET).use(BitmapFactory::decodeStream)
+            }.getOrNull()
+            val entries = runCatching {
+                assets.open(INDEX_ASSET).bufferedReader().use { reader ->
+                    Json { ignoreUnknownKeys = true }
+                        .decodeFromString<AtlasIndex>(reader.readText()).entries
+                }
+            }.getOrDefault(emptyList())
+            val data = if (bitmap != null && entries.isNotEmpty()) {
+                val bySpecies = entries.associateBy { normalize(it.speciesId) }
+                val baseSpeciesByDex = entries
+                    .filter { it.dex > 0 }.groupBy { it.dex }
+                    .mapNotNull { (dex, matches) ->
+                        PokemonImageCatalog.inferBaseSpeciesKey(
+                            matches.map { normalize(it.speciesId) }
+                        )?.let { dex to it }
+                    }.toMap()
+                val uniqueByDex = entries
+                    .filter { it.dex > 0 }.groupBy { it.dex }
+                    .mapNotNull { (dex, matches) ->
+                        matches.singleOrNull()?.let { dex to it }
+                    }.toMap()
+                AtlasData(bitmap, bySpecies, baseSpeciesByDex, uniqueByDex)
+            } else {
+                bitmap?.recycle()
+                null
+            }
+            withContext(Dispatchers.Main) {
+                if (released) data?.bitmap?.recycle()
+                else {
+                    atlasData = data
+                    if (data != null) onImageReady()
+                }
+            }
         }
-    }.getOrDefault(emptyList())
-
-    private val bySpecies: Map<String, Entry> = entries.associateBy {
-        normalize(it.speciesId)
     }
 
-    /**
-     * Only a true base-form entry may be replaced by the generic HOME portrait.
-     * Alternate Pokémon GO art (Armored Mewtwo, Rotom forms, Pikachu Libre, etc.)
-     * is retained even when an alternate name is not in the catalog token list.
-     */
-    private val baseSpeciesByDex: Map<Int, String> = entries
-        .filter { it.dex > 0 }
-        .groupBy { it.dex }
-        .mapNotNull { (dex, matches) ->
-            val keys = matches.map { normalize(it.speciesId) }
-            val base = PokemonImageCatalog.inferBaseSpeciesKey(keys)
-            base?.let { dex to it }
-        }.toMap()
+    fun release() {
+        released = true
+        atlasData?.bitmap?.takeUnless { it.isRecycled }?.recycle()
+        atlasData = null
+    }
 
-    private val uniqueByDex: Map<Int, Entry> = entries
-        .filter { it.dex > 0 }
-        .groupBy { it.dex }
-        .mapNotNull { (dex, matches) -> matches.singleOrNull()?.let { dex to it } }
-        .toMap()
-
-    val isAvailable: Boolean
-        get() = bitmap != null && entries.isNotEmpty()
+    val isAvailable: Boolean get() = atlasData != null
 
     fun draw(
         canvas: Canvas,
@@ -83,10 +109,11 @@ internal class PokemonIconAtlas(context: Context, onImageReady: () -> Unit = {})
         destination: RectF,
         paint: Paint
     ): Boolean {
-        val exact = speciesId?.let { bySpecies[normalize(it)] }
+        val snapshot = atlasData
+        val exact = speciesId?.let { snapshot?.bySpecies?.get(normalize(it)) }
         val resolvedDex = PokemonImageCatalog.preferExactDex(exact?.dex, dex)
         val isKnownAlternate = exact != null &&
-            baseSpeciesByDex[exact.dex] != normalize(exact.speciesId)
+            snapshot?.baseSpeciesByDex?.get(exact.dex) != normalize(exact.speciesId)
         val requestedMega = PokemonImageCatalog.lookup(resolvedDex, speciesId)
             ?.form?.startsWith("mega") == true
         // Preserve the exact offline GO form whenever HOME only has its base.
@@ -96,11 +123,12 @@ internal class PokemonIconAtlas(context: Context, onImageReady: () -> Unit = {})
                 return true
             }
         }
-        val atlas = bitmap?.takeUnless { it.isRecycled } ?: return false
+        val data = snapshot ?: return false
+        val atlas = data.bitmap.takeUnless { it.isRecycled } ?: return false
         val entry = speciesId
             ?.takeIf { it.isNotBlank() }
-            ?.let { bySpecies[normalize(it)] }
-            ?: dex?.takeUnless { PokemonImageCatalog.isDistinctForm(speciesId) }?.let(uniqueByDex::get)
+            ?.let { data.bySpecies[normalize(it)] }
+            ?: dex?.takeUnless { PokemonImageCatalog.isDistinctForm(speciesId) }?.let(data.uniqueByDex::get)
             ?: return false
 
         val source = Rect(entry.x, entry.y, entry.x + entry.w, entry.y + entry.h)
