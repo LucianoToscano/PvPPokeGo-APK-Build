@@ -56,6 +56,17 @@ internal object PokemonImageCatalog {
     private fun hasMegaToken(parts: List<String>): Boolean =
         parts.any { it == "mega" || it == "megax" || it == "megay" }
 
+    /** Base-form detection using the actual packaged atlas, not a fixed suffix list. */
+    fun inferBaseSpeciesKey(keys: List<String>): String? {
+        if (keys.isEmpty()) return null
+        if (keys.size == 1) return keys.single()
+        return keys
+            .filter { candidate -> keys.any { other ->
+                other != candidate && other.startsWith(candidate + "_")
+            } }
+            .minByOrNull(String::length)
+    }
+
     fun allImages(): Sequence<Image> = sequence {
         megaIds.entries.sortedWith(compareBy({ it.key.first }, { it.key.second }))
             .forEach { (key, id) -> yield(Image(key.first, key.second, id)) }
