@@ -4,6 +4,9 @@ on:
   push:
     branches: [preview/pokemon-image-db-20261015]
     paths: ['scripts/download_pokemon_images.py', '.github/workflows/pokemon-image-assets.yml']
+  pull_request:
+    branches: [preview/home-mobile-0.5.37-20261013]
+    paths: ['scripts/download_pokemon_images.py', '.github/workflows/pokemon-image-assets.yml']
   workflow_dispatch:
 
 permissions:
