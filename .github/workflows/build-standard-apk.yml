@@ -98,6 +98,195 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
+      - name: Package complete editable Android source
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Include source, Gradle files, tests, icons, and generated offline assets.
+          # Exclude secrets, runner caches, compiled intermediates and VCS objects.
+          test -s app/src/main/assets/gamemaster.json
+          test -s app/src/main/assets/pokemon_icon_atlas.png
+          SOURCE_ZIP="PvPPokeGo-0.5.29-Hybrid-FONTE-EDITAVEL.zip"
+          zip -q -r "$SOURCE_ZIP" . \
+            -x '.git/*' '.gradle/*' 'app/build/*' 'build/*' \
+               '.venv/*' '.venv-visual/*' 'delivery/*' 'hybrid-feed/*' \
+               '*.apk' '*.jks' '*.keystore' 'keystore.properties' \
+               "$SOURCE_ZIP"
+          unzip -t "$SOURCE_ZIP" >/dev/null
+          unzip -Z1 "$SOURCE_ZIP" | grep -q '^app/src/main/java/com/lucianotoscano/pvppokego/MainActivity.kt
+        run: |
+          set -euo pipefail
+          python3 tools/generate_hybrid_feed.py --source app/src/main/assets --output hybrid-feed
+          test -s hybrid-feed/manifest.json
+          test -s hybrid-feed/pvpoke_LICENSE.txt
+
+      - name: Publish verified feed to dedicated hybrid-feed branch
+        if: github.ref == 'refs/heads/preview/hybrid-data-sync-20261015'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/hybrid-feed-staging"
+          cp -a hybrid-feed/. "$RUNNER_TEMP/hybrid-feed-staging/"
+          git config user.name "PvPPokeGo data publisher"
+          git config user.email "103388355+LucianoToscano@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin hybrid-feed >/dev/null 2>&1; then
+            git fetch origin hybrid-feed:refs/remotes/origin/hybrid-feed
+            OLD_VERSION="$(git show origin/hybrid-feed:manifest.json | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])')"
+            NEW_VERSION="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$RUNNER_TEMP/hybrid-feed-staging/manifest.json")"
+            if [ "$OLD_VERSION" = "$NEW_VERSION" ]; then
+              echo "No core data or license change; keeping published snapshot immutable."
+              exit 0
+            fi
+            git checkout -B hybrid-feed origin/hybrid-feed
+          else
+            git checkout --orphan hybrid-feed
+          fi
+          git rm -rf . || true
+          git clean -fdx
+          cp -a "$RUNNER_TEMP/hybrid-feed-staging/." .
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Identical validated data: no feed update needed."
+          else
+            git commit -m "data: publish validated PvPoke hybrid snapshot"
+            git push origin HEAD:hybrid-feed
+          fi
+
+  smoke:
+    name: Android 35 install and launcher smoke
+    needs: build
+    if: github.ref == 'refs/heads/preview/hybrid-data-sync-20261015'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+      - name: Download verified QA APK
+        uses: actions/download-artifact@v4
+        with:
+          name: PvPPokeGo-0.5.29-Hybrid-QA-debug
+          path: qa
+      - name: Enable Android emulator hardware virtualization
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Boot emulator and test installation/launcher
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          script: |
+            set -e
+            adb install -r qa/PvPPokeGo-0.5.29-Hybrid-QA-debug.apk
+            adb shell am start -W -n com.lucianotoscano.pvppokego/.MainActivity
+            sleep 10
+            adb shell pidof com.lucianotoscano.pvppokego
+            adb exec-out screencap -p > qa/launcher-smoke.png
+            test -s qa/launcher-smoke.png
+      - name: Upload startup screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PvPPokeGo-Hybrid-Emulator-Startup
+          path: qa/launcher-smoke.png
+          if-no-files-found: warn
+
+          unzip -Z1 "$SOURCE_ZIP" | grep -q '^app/src/main/assets/pokemon_icon_atlas.png
+        run: |
+          set -euo pipefail
+          python3 tools/generate_hybrid_feed.py --source app/src/main/assets --output hybrid-feed
+          test -s hybrid-feed/manifest.json
+          test -s hybrid-feed/pvpoke_LICENSE.txt
+
+      - name: Publish verified feed to dedicated hybrid-feed branch
+        if: github.ref == 'refs/heads/preview/hybrid-data-sync-20261015'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/hybrid-feed-staging"
+          cp -a hybrid-feed/. "$RUNNER_TEMP/hybrid-feed-staging/"
+          git config user.name "PvPPokeGo data publisher"
+          git config user.email "103388355+LucianoToscano@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin hybrid-feed >/dev/null 2>&1; then
+            git fetch origin hybrid-feed:refs/remotes/origin/hybrid-feed
+            OLD_VERSION="$(git show origin/hybrid-feed:manifest.json | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])')"
+            NEW_VERSION="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$RUNNER_TEMP/hybrid-feed-staging/manifest.json")"
+            if [ "$OLD_VERSION" = "$NEW_VERSION" ]; then
+              echo "No core data or license change; keeping published snapshot immutable."
+              exit 0
+            fi
+            git checkout -B hybrid-feed origin/hybrid-feed
+          else
+            git checkout --orphan hybrid-feed
+          fi
+          git rm -rf . || true
+          git clean -fdx
+          cp -a "$RUNNER_TEMP/hybrid-feed-staging/." .
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Identical validated data: no feed update needed."
+          else
+            git commit -m "data: publish validated PvPoke hybrid snapshot"
+            git push origin HEAD:hybrid-feed
+          fi
+
+  smoke:
+    name: Android 35 install and launcher smoke
+    needs: build
+    if: github.ref == 'refs/heads/preview/hybrid-data-sync-20261015'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+      - name: Download verified QA APK
+        uses: actions/download-artifact@v4
+        with:
+          name: PvPPokeGo-0.5.29-Hybrid-QA-debug
+          path: qa
+      - name: Enable Android emulator hardware virtualization
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Boot emulator and test installation/launcher
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          script: |
+            set -e
+            adb install -r qa/PvPPokeGo-0.5.29-Hybrid-QA-debug.apk
+            adb shell am start -W -n com.lucianotoscano.pvppokego/.MainActivity
+            sleep 10
+            adb shell pidof com.lucianotoscano.pvppokego
+            adb exec-out screencap -p > qa/launcher-smoke.png
+            test -s qa/launcher-smoke.png
+      - name: Upload startup screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PvPPokeGo-Hybrid-Emulator-Startup
+          path: qa/launcher-smoke.png
+          if-no-files-found: warn
+
+          sha256sum "$SOURCE_ZIP" > "$SOURCE_ZIP.sha256"
+
+      - name: Upload editable Android source
+        uses: actions/upload-artifact@v4
+        with:
+          name: PvPPokeGo-0.5.29-Hybrid-FONTE-EDITAVEL
+          path: |
+            PvPPokeGo-0.5.29-Hybrid-FONTE-EDITAVEL.zip
+            PvPPokeGo-0.5.29-Hybrid-FONTE-EDITAVEL.zip.sha256
+          retention-days: 30
+          if-no-files-found: error
+
       - name: Validate and package hybrid dataset feed
         run: |
           set -euo pipefail

@@ -1,12 +1,46 @@
 package com.lucianotoscano.pvppokego.data
 
 import com.lucianotoscano.pvppokego.BuildConfig
+import com.lucianotoscano.pvppokego.data.sync.HybridSyncScheduler
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 import android.content.Context
 import org.json.JSONObject
 
 class SettingsRepository(context: Context) {
     private val prefs = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+    private val appContext = context.applicationContext
+    private val hybridPrefs = appContext.getSharedPreferences("hybrid_data_sync", Context.MODE_PRIVATE)
+
+    /** One canonical source of truth shared by daily worker and the settings UI. */
+    var automaticDataUpdates: Boolean
+        get() = hybridPrefs.getBoolean("auto", true)
+        set(enabled) {
+            HybridSyncScheduler.configure(appContext, enabled, wifiOnlyDataUpdates)
+        }
+
+    var wifiOnlyDataUpdates: Boolean
+        get() = hybridPrefs.getBoolean("wifi_only", true)
+        set(enabled) {
+            HybridSyncScheduler.configure(appContext, automaticDataUpdates, enabled)
+        }
+
+    fun hybridDataStatus(): String {
+        val lastSuccess = hybridPrefs.getLong("last_success_ms", 0)
+        val activeVersion = com.lucianotoscano.pvppokego.data.sync.HybridSnapshotStore(
+            java.io.File(appContext.filesDir, "hybrid-data")
+        ).activeVersion()
+        val pending = hybridPrefs.getString("pending_version", null)
+        val date = if (lastSuccess > 0) {
+            SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date(lastSuccess))
+        } else "Nenhuma atualização baixada"
+        return "Base ativa: " + (activeVersion ?: "interna do APK") + "\n" +
+            "Último download: " + date +
+            (if (pending != null) "\nNova base preparada: " + pending + " (na próxima abertura)" else "")
+    }
+
 
     var overlayEnabled: Boolean
         get() = prefs.getBoolean("overlay_enabled", true)
@@ -332,6 +366,10 @@ class SettingsRepository(context: Context) {
             values.put(key, item)
         }
         root.put("settings", values)
+        root.put("hybridSync", JSONObject().apply {
+            put("automatic", automaticDataUpdates)
+            put("wifiOnly", wifiOnlyDataUpdates)
+        })
         return root.toString(2)
     }
 
@@ -365,6 +403,12 @@ class SettingsRepository(context: Context) {
         editor.putInt("top_hud_position_version", 6)
         editor.remove("overlay_service_running")
         editor.apply()
+        root.optJSONObject("hybridSync")?.let { hybrid ->
+            val automatic = hybrid.optBoolean("automatic", automaticDataUpdates)
+            val wifiOnly = hybrid.optBoolean("wifiOnly", wifiOnlyDataUpdates)
+            HybridSyncScheduler.configure(appContext, automatic, wifiOnly)
+            restored += 2
+        }
         return restored
     }
 

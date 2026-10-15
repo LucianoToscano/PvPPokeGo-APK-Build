@@ -77,6 +77,9 @@ fun SettingsScreen(
     var hpAssist by remember { mutableStateOf(repository.showHpAssist) }
     var timer by remember { mutableStateOf(repository.showSwitchTimer) }
     var debug by remember { mutableStateOf(repository.debugMode) }
+    var hybridAutomatic by remember { mutableStateOf(repository.automaticDataUpdates) }
+    var hybridWifiOnly by remember { mutableStateOf(repository.wifiOnlyDataUpdates) }
+    var hybridStatus by remember { mutableStateOf(repository.hybridDataStatus()) }
     var edit by remember { mutableStateOf(repository.editMode) }
     var scale by remember { mutableFloatStateOf(repository.scale) }
     var opacity by remember { mutableFloatStateOf(repository.opacity) }
@@ -387,6 +390,35 @@ fun SettingsScreen(
                     valueRange = .3f..1f,
                     steps = 6
                 )
+
+                SectionTitle("Banco de dados híbrido — offline e online")
+                Text(
+                    "O aplicativo usa a base interna sem internet. Atualizações verificadas são " +
+                        "baixadas fora da batalha e entram em uso somente após reabrir o PvPPokeGo.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Toggle("Atualização automática diária", hybridAutomatic) {
+                    hybridAutomatic = it
+                    repository.automaticDataUpdates = it
+                    hybridStatus = repository.hybridDataStatus()
+                }
+                Toggle("Atualizar apenas por Wi-Fi", hybridWifiOnly) {
+                    hybridWifiOnly = it
+                    repository.wifiOnlyDataUpdates = it
+                    hybridStatus = repository.hybridDataStatus()
+                }
+                Text(
+                    hybridStatus,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedButton(
+                    onClick = { hybridStatus = repository.hybridDataStatus() },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Atualizar status da base")
+                }
 
                 SectionTitle("Backup e diagnóstico")
                 Text("Backup de configurações e posições", style = MaterialTheme.typography.titleMedium)
