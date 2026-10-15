@@ -21,7 +21,14 @@ internal class StableCpTracker {
             streak = 0
         }
 
-        if (cp == null || cp !in 10..10000) return accepted
+        // Missing/invalid OCR breaks the candidate streak, but not the trusted value.
+        // Otherwise two zoom artifacts separated by unreadable frames can be mistaken
+        // for consecutive evidence of a new CP.
+        if (cp == null || cp !in 10..10000) {
+            candidate = null
+            streak = 0
+            return accepted
+        }
         if (cp == accepted) {
             candidate = null
             streak = 0
