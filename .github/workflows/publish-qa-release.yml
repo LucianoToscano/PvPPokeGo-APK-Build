@@ -42,7 +42,7 @@ jobs:
             --name PvPPokeGo-0.5.30-Hybrid-FONTE-EDITAVEL -D qa/source
           (
             cd qa/apk
-            sha256sum --check SHA256SUMS.txt
+            sed 's#  delivery/#  #' SHA256SUMS.txt | sha256sum --check -
             unzip -t PvPPokeGo-0.5.30-Hybrid-QA-debug.apk >/dev/null
             grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true' signature-verification.txt
           )
