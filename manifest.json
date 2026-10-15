@@ -1,6 +1,6 @@
 {
   "schema": "pvppokego-hybrid-v1",
-  "version": "pvpoke-952faf5f4067926b766371f9",
+  "version": "pvpoke-6f188deab6e057566a6e0fca",
   "files": [
     {
       "name": "gamemaster.json",
@@ -29,7 +29,7 @@
     },
     {
       "name": "pvpoke_snapshot.json",
-      "sha256": "b359bf9966899f1f2c15c5ccb67c19854ae3e6937064f98671c84bc9eb61de8c",
+      "sha256": "c839379bb3578fb138c7d5bdd69c1aa8b4af58f88cb3c1ceb5c87fd56f0d4618",
       "size": 1766
     },
     {
