@@ -28,12 +28,16 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.lucianotoscano.pvppokego.data.PokemonImageImporter
+import com.lucianotoscano.pvppokego.data.PokemonImageSyncWorker
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.lucianotoscano.pvppokego.BuildConfig
 import com.lucianotoscano.pvppokego.data.BattleHistoryEntry
@@ -43,6 +47,8 @@ import com.lucianotoscano.pvppokego.data.BattleLeagueMode
 import com.lucianotoscano.pvppokego.data.SettingsRepository
 import com.lucianotoscano.pvppokego.data.TeamSetupRepository
 import com.lucianotoscano.pvppokego.data.TrainerPreferencesRepository
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -71,6 +77,26 @@ fun SettingsScreen(
     val context = LocalContext.current
     val teamStore = remember(context) { TeamSetupRepository(context) }
     val trainerStore = remember(context) { TrainerPreferencesRepository(context) }
+    var imageAuto by remember { mutableStateOf(repository.pokemonImagesAutoUpdate) }
+    var imageWifi by remember { mutableStateOf(repository.pokemonImagesWifiOnly) }
+    var imageImportStatus by remember { mutableStateOf("") }
+    val imageImportScope = rememberCoroutineScope()
+    val imageZipPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            imageImportStatus = "Importando imagens..."
+            imageImportScope.launch {
+                runCatching { PokemonImageImporter.importZip(context, uri) }
+                    .onSuccess { result ->
+                        imageImportStatus = "${result.imported} retratos importados; ${result.skipped} ignorados. Reabra o overlay para atualizar imagens."
+                    }.onFailure { error ->
+                        imageImportStatus = "Falha na importação: ${error.message}"
+                    }
+            }
+        }
+    }
+
     var overlay by remember { mutableStateOf(repository.overlayEnabled) }
     var auto by remember { mutableStateOf(repository.autoRecognition) }
     var assist by remember { mutableStateOf(repository.battleAssistEnabled) }
@@ -131,6 +157,42 @@ fun SettingsScreen(
                 )
                 ArenaDashboard(history = history)
                 TrainerSettingsPanel(trainerStore = trainerStore, teamStore = teamStore)
+
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Banco de imagens Pokémon", style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold)
+                        Text("Retratos salvos no celular. O atlas original funciona mesmo sem internet.",
+                            style = MaterialTheme.typography.bodySmall)
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text("Atualizações automáticas diárias", modifier = Modifier.weight(1f))
+                            Switch(checked = imageAuto, onCheckedChange = {
+                                imageAuto = it
+                                repository.pokemonImagesAutoUpdate = it
+                                PokemonImageSyncWorker.schedule(context)
+                            })
+                        }
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text("Baixar somente por Wi-Fi", modifier = Modifier.weight(1f))
+                            Switch(checked = imageWifi, onCheckedChange = {
+                                imageWifi = it
+                                repository.pokemonImagesWifiOnly = it
+                                PokemonImageSyncWorker.schedule(context)
+                            })
+                        }
+                        OutlinedButton(onClick = {
+                            imageZipPicker.launch(arrayOf("application/zip", "application/octet-stream"))
+                        }, modifier = Modifier.fillMaxWidth()) {
+                            Text("Importar banco completo (ZIP)")
+                        }
+                        if (imageImportStatus.isNotBlank()) {
+                            Text(imageImportStatus, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
 
                 Card(
                     modifier = Modifier

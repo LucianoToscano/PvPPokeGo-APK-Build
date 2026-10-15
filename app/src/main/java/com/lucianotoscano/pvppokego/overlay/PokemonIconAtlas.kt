@@ -7,6 +7,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
+import com.lucianotoscano.pvppokego.data.PokemonImageCatalog
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -17,7 +18,8 @@ import kotlinx.serialization.json.Json
  * Recognition and display remain independent: failure to load an icon never changes
  * species identity, typing, matchup or battle state.
  */
-internal class PokemonIconAtlas(context: Context) {
+internal class PokemonIconAtlas(context: Context, onImageReady: () -> Unit = {}) {
+    private val currentImages = PokemonImageStore(context, onImageReady)
     @Serializable
     private data class Entry(
         val speciesId: String,
@@ -51,6 +53,20 @@ internal class PokemonIconAtlas(context: Context) {
         normalize(it.speciesId)
     }
 
+    /**
+     * Only a true base-form entry may be replaced by the generic HOME portrait.
+     * Alternate Pokémon GO art (Armored Mewtwo, Rotom forms, Pikachu Libre, etc.)
+     * is retained even when an alternate name is not in the catalog token list.
+     */
+    private val baseSpeciesByDex: Map<Int, String> = entries
+        .filter { it.dex > 0 }
+        .groupBy { it.dex }
+        .mapNotNull { (dex, matches) ->
+            val keys = matches.map { normalize(it.speciesId) }
+            val base = PokemonImageCatalog.inferBaseSpeciesKey(keys)
+            base?.let { dex to it }
+        }.toMap()
+
     private val uniqueByDex: Map<Int, Entry> = entries
         .filter { it.dex > 0 }
         .groupBy { it.dex }
@@ -67,11 +83,24 @@ internal class PokemonIconAtlas(context: Context) {
         destination: RectF,
         paint: Paint
     ): Boolean {
+        val exact = speciesId?.let { bySpecies[normalize(it)] }
+        val resolvedDex = PokemonImageCatalog.preferExactDex(exact?.dex, dex)
+        val isKnownAlternate = exact != null &&
+            baseSpeciesByDex[exact.dex] != normalize(exact.speciesId)
+        val requestedMega = PokemonImageCatalog.lookup(resolvedDex, speciesId)
+            ?.form?.startsWith("mega") == true
+        // Preserve the exact offline GO form whenever HOME only has its base.
+        if (!isKnownAlternate || requestedMega) {
+            currentImages.find(resolvedDex, speciesId)?.let {
+                canvas.drawBitmap(it, null, destination, paint)
+                return true
+            }
+        }
         val atlas = bitmap?.takeUnless { it.isRecycled } ?: return false
         val entry = speciesId
             ?.takeIf { it.isNotBlank() }
             ?.let { bySpecies[normalize(it)] }
-            ?: dex?.let(uniqueByDex::get)
+            ?: dex?.takeUnless { PokemonImageCatalog.isDistinctForm(speciesId) }?.let(uniqueByDex::get)
             ?: return false
 
         val source = Rect(entry.x, entry.y, entry.x + entry.w, entry.y + entry.h)

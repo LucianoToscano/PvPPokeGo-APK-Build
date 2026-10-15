@@ -1,0 +1,75 @@
+name: Check PvPPokeGo image database (isolated)
+
+on:
+  push:
+    branches: [preview/pokemon-image-db-20261015]
+  pull_request:
+    branches: [preview/home-mobile-0.5.37-20261013]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-image-db:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android SDK 36
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKM="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit)"
+          test -n "$SDKM"
+          "$SDKM" --install 'platforms;android-36' 'build-tools;36.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+      - name: Generate pinned offline game data
+        run: |
+          set -euo pipefail
+          python3 tools/package_offline_pvpoke_assets.py
+          test -s app/src/main/assets/gamemaster.json
+          test -s app/src/main/assets/pvpoke_snapshot.json
+      - name: Generate form-aware atlas and fingerprints
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check pillow
+          python3 tools/package_visual_fingerprints.py
+          test -s app/src/main/assets/pokemon_icon_atlas.png
+          test -s app/src/main/assets/pokemon_icon_atlas.json
+          test -s app/src/main/assets/pokemon_visual_fingerprints.json
+      - name: Run unit tests and compile Standard APK
+        run: gradle --no-daemon :app:testStandardDebugUnitTest :app:assembleStandardDebug --stacktrace
+      - name: Verify packaged assets and capture SHA-256
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/standard/debug/app-standard-debug.apk
+          test -s "$APK"
+          unzip -t "$APK" >/dev/null
+          python3 -c 'import zipfile; z=zipfile.ZipFile("app/build/outputs/apk/standard/debug/app-standard-debug.apk"); req=("assets/gamemaster.json", "assets/pokemon_icon_atlas.png", "assets/pokemon_icon_atlas.json", "assets/pokemon_visual_fingerprints.json"); assert all(x in z.namelist() for x in req)'
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
+          test -x "$APKSIGNER"
+          "$APKSIGNER" verify --verbose --print-certs "$APK" | tee image-db-apk-signature.txt
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)"
+          test -x "$AAPT"
+          "$AAPT" dump badging "$APK" | tee image-db-apk-metadata.txt
+          grep -q "name='com.lucianotoscano.pvppokego'" image-db-apk-metadata.txt
+          grep -q "versionName='0.5.37'" image-db-apk-metadata.txt
+          sha256sum "$APK" | tee image-db-apk-sha256.txt
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: PvPPokeGo-0.5.37-image-db-standard-debug
+          path: |
+            app/build/outputs/apk/standard/debug/*.apk
+            image-db-apk-sha256.txt
+            image-db-apk-signature.txt
+            image-db-apk-metadata.txt
+          retention-days: 30
+          if-no-files-found: error
