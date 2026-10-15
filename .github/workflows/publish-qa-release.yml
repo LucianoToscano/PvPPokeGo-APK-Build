@@ -1,10 +1,5 @@
 name: Publish verified PvPPokeGo 0.5.30 QA APK and editable source
 on:
-  push:
-    branches:
-      - preview/hybrid-data-sync-20261015
-    paths:
-      - .github/workflows/publish-qa-release.yml
   workflow_dispatch:
 
 permissions:
@@ -16,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      GH_TOKEN: ${{ github.token }}
+      GH_TOKEN: ${{ secrets.PVPPOKEGO_RELEASE_TOKEN }}
       GH_REPO: LucianoToscano/PvPPokeGo-APK-Build
       QA_RUN: "38815466466"
       QA_COMMIT: d838a44a3bf6ded5110e82589f2961cc205f14af
@@ -26,6 +21,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::error::Add a repository secret named PVPPOKEGO_RELEASE_TOKEN with GitHub Releases write permission; no token or key may be committed."
+            exit 1
+          fi
           RUN_STATUS="$(gh api "repos/$GH_REPO/actions/runs/$QA_RUN" --jq '.conclusion')"
           RUN_SHA="$(gh api "repos/$GH_REPO/actions/runs/$QA_RUN" --jq '.head_sha')"
           test "$RUN_STATUS" = success
