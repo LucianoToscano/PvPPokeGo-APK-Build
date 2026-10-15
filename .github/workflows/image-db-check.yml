@@ -29,10 +29,11 @@ jobs:
           "$SDKM" --install 'platforms;android-36' 'build-tools;36.0.0'
           yes | "$SDKM" --licenses >/dev/null || true
       - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
       - name: Unit tests and Standard debug APK
         run: |
-          chmod +x ./gradlew
-          ./gradlew :app:testStandardDebugUnitTest :app:assembleStandardDebug --stacktrace
+          gradle :app:testStandardDebugUnitTest :app:assembleStandardDebug --stacktrace
       - name: Record APK digest
         if: success()
         run: sha256sum app/build/outputs/apk/standard/debug/*.apk | tee image-db-apk-sha256.txt
