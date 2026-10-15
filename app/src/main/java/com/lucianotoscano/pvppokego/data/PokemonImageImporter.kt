@@ -21,7 +21,7 @@ internal object PokemonImageImporter {
     private val allowedNames = PokemonImageCatalog.allImages()
         .map { it.fileName }.toSet()
 
-    suspend fun import(context: Context, uri: Uri): Result = withContext(Dispatchers.IO) {
+    suspend fun importZip(context: Context, uri: Uri): Result = withContext(Dispatchers.IO) {
         val root = File(context.applicationContext.filesDir, "pokemon_images")
         check(root.isDirectory || root.mkdirs()) { "Não foi possível criar pasta de imagens" }
 
