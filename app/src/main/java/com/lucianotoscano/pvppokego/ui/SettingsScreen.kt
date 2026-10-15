@@ -72,6 +72,7 @@ fun SettingsScreen(
     var reserves by remember { mutableStateOf(repository.analyzeReserves) }
     var reserveTypes by remember { mutableStateOf(repository.showReserveTypes) }
     var moves by remember { mutableStateOf(repository.showEnemyMoves) }
+    var enemyTeamSlots by remember { mutableStateOf(repository.showEnemyHistory) }
     var counter by remember { mutableStateOf(repository.showChargedCounter) }
     var progress by remember { mutableStateOf(repository.showEnergyProgress) }
     var hpAssist by remember { mutableStateOf(repository.showHpAssist) }
@@ -320,6 +321,16 @@ fun SettingsScreen(
                     moves = it
                     repository.showEnemyMoves = it
                 }
+                Toggle("Três slots do time adversário", enemyTeamSlots) {
+                    enemyTeamSlots = it
+                    repository.showEnemyHistory = it
+                }
+                Text(
+                    "Mostra apenas Pokémon realmente reconhecidos. Slots desconhecidos ficam " +
+                        "com interrogação; PC, HP e energia são preservados por identificação e trocas.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Toggle("Pontos de carregamento", counter) {
                     counter = it
                     repository.showChargedCounter = it

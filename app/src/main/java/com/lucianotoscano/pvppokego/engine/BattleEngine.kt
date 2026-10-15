@@ -45,6 +45,7 @@ class BattleEngine(private val repo: GameDataRepository) {
     )
 
     private val enemyStates = BattleStateStore()
+    private val opponentTeamTracker = OpponentTeamTracker()
     private val ownStates = BattleStateStore()
 
     private var playerName: String? = null
@@ -212,6 +213,7 @@ class BattleEngine(private val repo: GameDataRepository) {
         pendingOutgoingChargedHpBefore = null
         pendingIncomingChargedDamage = null
         pendingOutgoingChargedDamage = null
+        opponentTeamTracker.clear()
         enemyStates.clearBattle()
         ownStates.clearBattle()
     }
@@ -327,8 +329,12 @@ class BattleEngine(private val repo: GameDataRepository) {
                 normalize(speciesId ?: canonical),
                 detected.cp
             )
-            if (!samePokemonIdentity(enemyName, enemySpeciesId, canonical, speciesId)) {
-                onEnemyChanged(canonical, speciesId)
+            val previousSlot = opponentTeamTracker.slots()
+                .firstOrNull { it.active }?.index
+            val slot = opponentTeamTracker.observe(canonical, speciesId, stableCp)
+            val changedSlot = previousSlot != null && slot != null && previousSlot != slot
+            if (!samePokemonIdentity(enemyName, enemySpeciesId, canonical, speciesId) || changedSlot) {
+                onEnemyChanged(canonical, speciesId, slot)
                 enemyCp = stableCp
             } else {
                 enemyName = canonical
@@ -941,7 +947,7 @@ class BattleEngine(private val repo: GameDataRepository) {
         saveOwnActiveState()
     }
 
-    private fun onEnemyChanged(name: String, speciesId: String? = null) {
+    private fun onEnemyChanged(name: String, speciesId: String? = null, slot: Int? = null) {
         saveActiveState()
         resetStages(activeState)
         pendingIncomingChargedDamage = null
@@ -953,9 +959,10 @@ class BattleEngine(private val repo: GameDataRepository) {
         enemySpeciesId = speciesId ?: repo.pokemon(name)?.speciesId
         chargedPendingSinceMs = null
         enemyChargedCycle.reset()
+        lastOpponentHpRatio = null // Do not reuse another opponent\u0027s HP across a switch.
         ignoreFastUntilMs = 0L
         val lookup = enemySpeciesId ?: name
-        val key = normalize(lookup)
+        val key = normalize(lookup) + "#" + (slot?.toString() ?: "unknown")
         activeState = enemyStates.getOrCreate(key, name, enemySpeciesId)
         val saved = activeState!!
         val likely = repo.likelyMoveset(lookup)
@@ -1162,7 +1169,10 @@ class BattleEngine(private val repo: GameDataRepository) {
                 if (value <= .01f) state.fainted = true
             }
         }
-        opponentHpRatio?.let { lastOpponentHpRatio = it.coerceIn(0f, 1f) }
+        opponentHpRatio?.let {
+            lastOpponentHpRatio = it.coerceIn(0f, 1f)
+            opponentTeamTracker.updateHp(it)
+        }
 
         val outcomes = mutableListOf<DamageObservation>()
         processChargedOutcome(
@@ -1880,18 +1890,28 @@ class BattleEngine(private val repo: GameDataRepository) {
             switchSeconds = switchSeconds(ownSwitchReadyAtMs)
         )
 
-        val enemyHistory = enemyStates.all()
-            .sortedByDescending { it.lastSeenAtMs }
-            .take(3)
-            .map { s ->
-                val e = if (s.energyUncertain || s.minEnergy != s.maxEnergy) "${s.minEnergy}-${s.maxEnergy}E" else "${s.estimatedEnergy}E"
-                val seen = s.lastChargedMoveId?.let(repo::move)?.name
-                buildString {
-                    append(s.speciesName)
-                    append(": ${s.fastMoveCount}F • $e")
-                    if (!seen.isNullOrBlank()) append(" • $seen")
+        val enemyHistory = opponentTeamTracker.slots().map { slot ->
+            if (slot.name == null) {
+                "#"+(slot.index+1)+" ? • aguardando"
+            } else {
+                val key = normalize(slot.speciesId ?: slot.name) + "#" + slot.index
+                val saved = enemyStates.find(key)
+                val energy = saved?.let {
+                    if (it.energyUncertain || it.minEnergy != it.maxEnergy)
+                        it.minEnergy.toString() + "-" + it.maxEnergy + "E"
+                    else it.estimatedEnergy.toString() + "E"
+                } ?: "?E"
+                val hp = slot.hpRatio?.let { (it * 100).toInt().toString() + "%" } ?: "?HP"
+                val cp = slot.cp?.let { " PC"+it } ?: ""
+                val stateText = when {
+                    slot.fainted -> " ✕"
+                    slot.active -> " ▶"
+                    else -> ""
                 }
+                "#"+(slot.index+1)+" "+slot.name.take(11)+cp+
+                    " • "+hp+" "+energy+stateText
             }
+        }
 
         return BattleUiState(
             playerName = playerName,
