@@ -53,6 +53,24 @@ internal class PokemonIconAtlas(context: Context, onImageReady: () -> Unit = {})
         normalize(it.speciesId)
     }
 
+    /**
+     * Only a true base-form entry may be replaced by the generic HOME portrait.
+     * Alternate Pokémon GO art (Armored Mewtwo, Rotom forms, Pikachu Libre, etc.)
+     * is retained even when an alternate name is not in the catalog token list.
+     */
+    private val baseSpeciesByDex: Map<Int, String> = entries
+        .filter { it.dex > 0 }
+        .groupBy { it.dex }
+        .mapNotNull { (dex, matches) ->
+            val keys = matches.map { normalize(it.speciesId) }
+            val base = if (keys.size == 1) keys.single() else keys
+                .filter { candidate -> keys.any { other ->
+                    other != candidate && other.startsWith(candidate + "_")
+                } }
+                .minByOrNull(String::length)
+            base?.let { dex to it }
+        }.toMap()
+
     private val uniqueByDex: Map<Int, Entry> = entries
         .filter { it.dex > 0 }
         .groupBy { it.dex }
@@ -70,9 +88,17 @@ internal class PokemonIconAtlas(context: Context, onImageReady: () -> Unit = {})
         paint: Paint
     ): Boolean {
         val resolvedDex = dex ?: speciesId?.let { bySpecies[normalize(it)]?.dex }?.takeIf { it > 0 }
-        currentImages.find(resolvedDex, speciesId)?.let {
-            canvas.drawBitmap(it, null, destination, paint)
-            return true
+        val exact = speciesId?.let { bySpecies[normalize(it)] }
+        val isKnownAlternate = exact != null &&
+            baseSpeciesByDex[exact.dex] != normalize(exact.speciesId)
+        val requestedMega = PokemonImageCatalog.lookup(resolvedDex, speciesId)
+            ?.form?.startsWith("mega") == true
+        // Preserve the exact offline GO form whenever HOME only has its base.
+        if (!isKnownAlternate || requestedMega) {
+            currentImages.find(resolvedDex, speciesId)?.let {
+                canvas.drawBitmap(it, null, destination, paint)
+                return true
+            }
         }
         val atlas = bitmap?.takeUnless { it.isRecycled } ?: return false
         val entry = speciesId
