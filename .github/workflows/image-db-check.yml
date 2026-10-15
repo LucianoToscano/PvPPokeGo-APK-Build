@@ -19,7 +19,13 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
+      - name: Ensure Android SDK 36
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "ANDROID_HOME=${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0'
+          yes | sdkmanager --licenses >/dev/null || true
       - uses: gradle/actions/setup-gradle@v4
       - name: Unit tests and Standard debug APK
         run: |
@@ -31,7 +37,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: PvPPokeGo-0.5.26-image-db-standard-debug
+          name: PvPPokeGo-0.5.37-image-db-standard-debug
           path: |
             app/build/outputs/apk/standard/debug/*.apk
             image-db-apk-sha256.txt
