@@ -32,4 +32,32 @@ class StableCpTrackerTest {
         assertNull(tracker.observe("rillaboom", 1500))
         assertEquals(1500, tracker.observe("rillaboom", 1500))
     }
+    @Test
+    fun missingOrInvalidFramesCannotCompleteInterruptedCpCandidate() {
+        val tracker = StableCpTracker()
+        tracker.observe("altaria", 1486)
+        assertEquals(1486, tracker.observe("altaria", 1486))
+
+        assertEquals(1486, tracker.observe("altaria", 143))
+        assertEquals(1486, tracker.observe("altaria", null))
+        assertEquals(1486, tracker.observe("altaria", 143))
+        assertEquals(1486, tracker.observe("altaria", -1))
+        assertEquals(1486, tracker.observe("altaria", 143))
+        assertEquals(1486, tracker.observe("altaria", null))
+
+        // Only three consecutive valid readings may replace an established CP.
+        assertEquals(1486, tracker.observe("altaria", 1482))
+        assertEquals(1486, tracker.observe("altaria", 1482))
+        assertEquals(1482, tracker.observe("altaria", 1482))
+    }
+
+    @Test
+    fun missingFrameInterruptsFirstCpConfirmation() {
+        val tracker = StableCpTracker()
+        assertNull(tracker.observe("altaria", 1486))
+        assertNull(tracker.observe("altaria", null))
+        assertNull(tracker.observe("altaria", 1486))
+        assertEquals(1486, tracker.observe("altaria", 1486))
+    }
+
 }
