@@ -32,6 +32,22 @@ class OpponentTeamTrackerTest {
         assertEquals(1499, tracker.slots()[2].cp)
     }
 
+    @Test fun ambiguousDuplicateSpeciesWithoutCpDoesNotCreatePhantomSlot() {
+        val tracker = OpponentTeamTracker()
+        assertEquals(0, tracker.observe("Swampert", "swampert", 1497))
+        assertEquals(1, tracker.observe("Swampert", "swampert", 1499))
+        assertNull(tracker.observe("Swampert", "swampert", null))
+        assertNull(tracker.slots()[2].name)
+    }
+
+    @Test fun laterExactFormIdentityUpgradesSameObservedCard() {
+        val tracker = OpponentTeamTracker()
+        assertEquals(0, tracker.observe("Ninetales", null, 1498))
+        assertEquals(0, tracker.observe("Ninetales", "ninetales_alolan", 1498))
+        assertEquals("ninetales_alolan", tracker.slots()[0].speciesId)
+        assertNull(tracker.slots()[1].name)
+    }
+
     @Test fun neverAssignsSecondIdentityFromMissingCpOrWeakEvidence() {
         val tracker = OpponentTeamTracker()
         assertNull(tracker.observe("", null, null))

@@ -16,7 +16,7 @@ class OpponentTeamTracker {
     )
 
     private data class Observed(
-        val identity: String,
+        var identity: String,
         var name: String,
         var speciesId: String?,
         var cp: Int?,
@@ -45,9 +45,20 @@ class OpponentTeamTracker {
             val candidates = observed.withIndex().filter { it.value.identity == identity }
             // A prior incomplete identity can be upgraded without inventing a new slot.
             index = candidates.firstOrNull { it.value.cp == null }?.index ?: -1
-            if (index < 0 && (reliableCp == null || candidates.size == 1 && candidates[0].value.cp == null)) {
-                index = candidates.singleOrNull()?.index ?: -1
+            if (index < 0 && candidates.size == 1 && reliableCp == null) {
+                index = candidates.single().index
             }
+            // Two observed copies of one species + unreadable CP are ambiguous.
+            // Do not invent a third slot or switch identities.
+            if (index < 0 && candidates.size > 1 && reliableCp == null) return null
+        }
+        if (index < 0 && reliableCp != null) {
+            // Upgrade a formerly OCR-only species identity to an exact form ID
+            // only when both its name and confirmed CP identify one slot.
+            val sameCard = observed.withIndex().filter {
+                it.value.name.equals(name, ignoreCase = true) && it.value.cp == reliableCp
+            }
+            if (sameCard.size == 1) index = sameCard.single().index
         }
         if (index < 0) {
             if (observed.size == 3) {
@@ -58,6 +69,7 @@ class OpponentTeamTracker {
             index = observed.lastIndex
         }
         val entry = observed[index]
+        entry.identity = identity
         entry.name = name
         if (!speciesId.isNullOrBlank()) entry.speciesId = speciesId
         if (reliableCp != null) entry.cp = reliableCp
