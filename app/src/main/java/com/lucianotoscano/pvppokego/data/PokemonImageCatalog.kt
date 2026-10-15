@@ -56,6 +56,10 @@ internal object PokemonImageCatalog {
     private fun hasMegaToken(parts: List<String>): Boolean =
         parts.any { it == "mega" || it == "megax" || it == "megay" }
 
+    /** Maintain the original atlas rule: a known exact species beats a CP/OCR Dex hint. */
+    fun preferExactDex(exactDex: Int?, hintDex: Int?): Int? =
+        exactDex?.takeIf { it > 0 } ?: hintDex?.takeIf { it > 0 }
+
     /** Base-form detection using the actual packaged atlas, not a fixed suffix list. */
     fun inferBaseSpeciesKey(keys: List<String>): String? {
         if (keys.isEmpty()) return null
