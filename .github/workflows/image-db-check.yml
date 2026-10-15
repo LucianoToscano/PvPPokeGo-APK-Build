@@ -24,8 +24,10 @@ jobs:
         run: |
           set -euo pipefail
           echo "ANDROID_HOME=${ANDROID_HOME:-/usr/local/lib/android/sdk}"
-          sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0'
-          yes | sdkmanager --licenses >/dev/null || true
+          SDKM="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit)"
+          test -n "$SDKM"
+          "$SDKM" --install 'platforms;android-36' 'build-tools;36.0.0'
+          yes | "$SDKM" --licenses >/dev/null || true
       - uses: gradle/actions/setup-gradle@v4
       - name: Unit tests and Standard debug APK
         run: |
