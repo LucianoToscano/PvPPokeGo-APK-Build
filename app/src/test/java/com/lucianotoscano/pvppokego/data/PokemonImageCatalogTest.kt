@@ -73,6 +73,14 @@ class PokemonImageCatalogTest {
         ))
     }
 
+    @Test fun exactVisualSpeciesIdentityBeatsStaleDexHint() {
+        assertEquals(150, PokemonImageCatalog.preferExactDex(150, 386))
+        assertEquals(386, PokemonImageCatalog.preferExactDex(null, 386))
+        assertEquals(150, PokemonImageCatalog.preferExactDex(150, null))
+        assertEquals(150, PokemonImageCatalog.preferExactDex(0, 150))
+        assertNull(PokemonImageCatalog.preferExactDex(null, null))
+    }
+
     @Test fun sourceUrlsAreDeterministicAndSecure() {
         val mega = PokemonImageCatalog.lookup(6, "charizard-mega-y")!!
         assertEquals("https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/10035.png", mega.url)
