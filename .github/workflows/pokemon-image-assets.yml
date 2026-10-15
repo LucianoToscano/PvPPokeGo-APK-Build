@@ -1,6 +1,9 @@
 name: Build personal Pokémon image cache (manual)
 
 on:
+  push:
+    branches: [preview/pokemon-image-db-20261015]
+    paths: ['scripts/download_pokemon_images.py', '.github/workflows/pokemon-image-assets.yml']
   workflow_dispatch:
 
 permissions:
