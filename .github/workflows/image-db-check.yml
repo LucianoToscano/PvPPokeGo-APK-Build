@@ -1,0 +1,38 @@
+name: Check PvPPokeGo image database (isolated)
+
+on:
+  push:
+    branches: [preview/pokemon-image-db-20261015]
+  pull_request:
+    branches: [preview/home-mobile-0.5.37-20261013]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-image-db:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Unit tests and Standard debug APK
+        run: |
+          chmod +x ./gradlew
+          ./gradlew :app:testStandardDebugUnitTest :app:assembleStandardDebug --stacktrace
+      - name: Record APK digest
+        if: success()
+        run: sha256sum app/build/outputs/apk/standard/debug/*.apk | tee image-db-apk-sha256.txt
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: PvPPokeGo-0.5.26-image-db-standard-debug
+          path: |
+            app/build/outputs/apk/standard/debug/*.apk
+            image-db-apk-sha256.txt
+          if-no-files-found: error
