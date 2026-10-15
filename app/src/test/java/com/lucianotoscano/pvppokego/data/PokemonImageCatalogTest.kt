@@ -50,6 +50,29 @@ class PokemonImageCatalogTest {
         assertFalse(PokemonImageCatalog.isDistinctForm("gengar"))
     }
 
+    @Test fun offlineAtlasBaseSelectionPreservesSpecialForms() {
+        assertEquals(
+            "mewtwo",
+            PokemonImageCatalog.inferBaseSpeciesKey(
+                listOf("mewtwo", "mewtwo_armored", "mewtwo_mega_x", "mewtwo_mega_y")
+            )
+        )
+        assertEquals(
+            "mr_mime",
+            PokemonImageCatalog.inferBaseSpeciesKey(listOf("mr_mime", "mr_mime_galarian"))
+        )
+        assertEquals(
+            "pikachu",
+            PokemonImageCatalog.inferBaseSpeciesKey(listOf("pikachu", "pikachu_libre", "pikachu_flying"))
+        )
+        assertNull(PokemonImageCatalog.inferBaseSpeciesKey(
+            listOf("giratina_altered", "giratina_origin")
+        ))
+        assertNull(PokemonImageCatalog.inferBaseSpeciesKey(
+            listOf("darmanitan_standard", "darmanitan_zen")
+        ))
+    }
+
     @Test fun sourceUrlsAreDeterministicAndSecure() {
         val mega = PokemonImageCatalog.lookup(6, "charizard-mega-y")!!
         assertEquals("https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/10035.png", mega.url)
