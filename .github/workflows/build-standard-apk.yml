@@ -104,6 +104,11 @@ jobs:
           set -euo pipefail
           test -s app/src/main/assets/gamemaster.json
           test -s app/src/main/assets/pokemon_icon_atlas.png
+          # Include the official Gradle wrapper so the ZIP is directly buildable.
+          gradle wrapper --gradle-version 8.11.1
+          test -s gradlew
+          test -s gradle/wrapper/gradle-wrapper.jar
+          chmod +x gradlew
           ZIP="PvPPokeGo-0.5.30-Hybrid-FONTE-EDITAVEL.zip"
           zip -q -r "$ZIP" . \
             -x './.git/*' './.gradle/*' './app/build/*' './build/*' \
@@ -111,6 +116,8 @@ jobs:
                '*.apk' '*.jks' '*.keystore' 'keystore.properties' \
                "./$ZIP"
           unzip -t "$ZIP" >/dev/null
+          unzip -Z1 "$ZIP" | grep -q "gradle/wrapper/gradle-wrapper.jar"
+          unzip -Z1 "$ZIP" | grep -q "gradlew"
           unzip -Z1 "$ZIP" | grep -q 'app/src/main/java/com/lucianotoscano/pvppokego/MainActivity.kt'
           unzip -Z1 "$ZIP" | grep -q 'app/src/main/assets/pokemon_icon_atlas.png'
           sha256sum "$ZIP" > "$ZIP.sha256"
