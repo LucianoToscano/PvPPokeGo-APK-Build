@@ -1,0 +1,33 @@
+name: Build personal Pokémon image cache (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare-images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install "Pillow>=10.3,<12"
+      - name: Download 3D HOME portraits, validate and optimize to WebP
+        run: python scripts/download_pokemon_images.py --output pokemon_images --workers 6
+      - name: Report image collection
+        if: always()
+        run: |
+          if [ -f pokemon_images/image-sync-report.json ]; then
+            python -c "import json; d=json.load(open('pokemon_images/image-sync-report.json')); print({k:d[k] for k in ('requested','downloaded','cached','failed')})"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: PvPPokeGo-PokemonImageDB-3D-WebP
+          path: pokemon_images/
+          if-no-files-found: error
+          retention-days: 7
