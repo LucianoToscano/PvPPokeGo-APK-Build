@@ -28,6 +28,8 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import com.lucianotoscano.pvppokego.data.PokemonImageSyncWorker
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
@@ -71,6 +73,9 @@ fun SettingsScreen(
     val context = LocalContext.current
     val teamStore = remember(context) { TeamSetupRepository(context) }
     val trainerStore = remember(context) { TrainerPreferencesRepository(context) }
+    val context = LocalContext.current
+    var imageAuto by remember { mutableStateOf(repository.pokemonImagesAutoUpdate) }
+    var imageWifi by remember { mutableStateOf(repository.pokemonImagesWifiOnly) }
     var overlay by remember { mutableStateOf(repository.overlayEnabled) }
     var auto by remember { mutableStateOf(repository.autoRecognition) }
     var assist by remember { mutableStateOf(repository.battleAssistEnabled) }
@@ -131,6 +136,34 @@ fun SettingsScreen(
                 )
                 ArenaDashboard(history = history)
                 TrainerSettingsPanel(trainerStore = trainerStore, teamStore = teamStore)
+
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Banco de imagens Pokémon", style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold)
+                        Text("Retratos salvos no celular. O atlas original funciona mesmo sem internet.",
+                            style = MaterialTheme.typography.bodySmall)
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text("Atualizações automáticas diárias", modifier = Modifier.weight(1f))
+                            Switch(checked = imageAuto, onCheckedChange = {
+                                imageAuto = it
+                                repository.pokemonImagesAutoUpdate = it
+                                PokemonImageSyncWorker.schedule(context)
+                            })
+                        }
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text("Baixar somente por Wi-Fi", modifier = Modifier.weight(1f))
+                            Switch(checked = imageWifi, onCheckedChange = {
+                                imageWifi = it
+                                repository.pokemonImagesWifiOnly = it
+                                PokemonImageSyncWorker.schedule(context)
+                            })
+                        }
+                    }
+                }
 
                 Card(
                     modifier = Modifier
