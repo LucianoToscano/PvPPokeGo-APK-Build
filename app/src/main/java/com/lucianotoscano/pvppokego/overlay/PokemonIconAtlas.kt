@@ -63,11 +63,7 @@ internal class PokemonIconAtlas(context: Context, onImageReady: () -> Unit = {})
         .groupBy { it.dex }
         .mapNotNull { (dex, matches) ->
             val keys = matches.map { normalize(it.speciesId) }
-            val base = if (keys.size == 1) keys.single() else keys
-                .filter { candidate -> keys.any { other ->
-                    other != candidate && other.startsWith(candidate + "_")
-                } }
-                .minByOrNull(String::length)
+            val base = PokemonImageCatalog.inferBaseSpeciesKey(keys)
             base?.let { dex to it }
         }.toMap()
 
