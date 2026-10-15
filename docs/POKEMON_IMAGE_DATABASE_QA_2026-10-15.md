@@ -1,3 +1,5 @@
+**APK final QA standalone (Drive):** https://drive.google.com/file/d/1eGO1ALwCkcUWIeysE4oG5_gl_1-XlaE2/view?usp=drivesdk — arquivo de 80.990.041 bytes verificado no Drive. O ZIP com comprovantes continua disponível.
+
 # PvPPokeGo 0.5.37 ImageDB — QA técnico final (15/10/2026)
 
 Status: **BUILD QA CONFIRMADO; QA EM APARELHO PENDENTE**. Branch isolada e PR draft, não mesclados à versão estável ou reconstrução 1.0.0.
