@@ -73,7 +73,6 @@ fun SettingsScreen(
     val context = LocalContext.current
     val teamStore = remember(context) { TeamSetupRepository(context) }
     val trainerStore = remember(context) { TrainerPreferencesRepository(context) }
-    val context = LocalContext.current
     var imageAuto by remember { mutableStateOf(repository.pokemonImagesAutoUpdate) }
     var imageWifi by remember { mutableStateOf(repository.pokemonImagesWifiOnly) }
     var overlay by remember { mutableStateOf(repository.overlayEnabled) }
