@@ -24,4 +24,12 @@ The first build is triggered by commits to `main`. If no run appears, use the **
 0.5.29: ally team recognition regains 0.5.17 text+CP fallback and wider screen scan with confidence checks. Original 0.5.17 HUD visual remains intact.
 
 ## Hybrid data sync preview (2026-10-15)
-Isolated preview branch `preview/hybrid-data-sync-20261015` mirrors hybrid snapshot storage, WorkManager scheduling, loader and tests from private PR #37. The main branch remains the known 0.5.29 baseline. This preview has NOT passed CI and MUST NOT be described as a tested APK. The remote manifest endpoint defaults to empty, so no automatic data downloads occur until a trusted feed is configured.
+Isolated preview branch `preview/hybrid-data-sync-20261015` mirrors hybrid snapshot storage, WorkManager scheduling, loader and tests from private PR #37. The main branch remains the known 0.5.29 baseline. This preview has NOT passed CI and MUST NOT be described as a tested APK. The built-in update feed is pinned to this repository's hybrid-feed branch. Updates require a successful validated feed publication.
+
+## Hybrid sync preview validation (2026-10-15)
+- Full UI and OCR stay on the original 0.5.29 baseline. No production merge.
+- Connected preview defaults to daily updates on unmetered Wi-Fi, using a fixed GitHub HTTPS feed URL and SHA-256 verified seven-file snapshots.
+- The public CI now unit-tests the feed manifest generator, compiles and tests the APK, verifies its debug signature and publishes validated data to the separate hybrid-feed branch.
+- Published hybrid-feed data comes from pinned PvPoke source assets plus currently fetched official rankings; the license and snapshot provenance are included.
+- Public HTTPS plus SHA-256 is integrity verification, not a separately signed manifest. A dedicated signing key is still recommended for production.
+- A green CI run is required before using a new APK. Actual device overlay/OCR regression QA remains essential.

@@ -51,6 +51,9 @@ jobs:
           test -s app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
           test -s app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
 
+      - name: Unit test deterministic feed generation
+        run: python3 tools/test_generate_hybrid_feed.py
+
       - name: Package pinned offline PvPoke data
         run: |
           set -euo pipefail
