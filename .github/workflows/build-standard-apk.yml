@@ -85,7 +85,7 @@ jobs:
           cp "$APK" delivery/PvPPokeGo-0.5.29-Hybrid-QA-debug.apk
           sha256sum delivery/*.apk | tee delivery/SHA256SUMS.txt
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
-          "$APKSIGNER" verify --verbose delivery/PvPPokeGo-0.5.29-QA-debug.apk | tee delivery/signature-verification.txt
+          "$APKSIGNER" verify --verbose delivery/PvPPokeGo-0.5.29-Hybrid-QA-debug.apk | tee delivery/signature-verification.txt
 
       - name: Upload installable QA APK
         uses: actions/upload-artifact@v4
