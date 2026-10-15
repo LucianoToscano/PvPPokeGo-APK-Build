@@ -1,8 +1,8 @@
-name: Build PvPPokeGo 0.5.29 Standard APK
+name: Build PvPPokeGo 0.5.29 Standard and Hybrid Preview
 
 on:
   push:
-    branches: [main]
+    branches: [main, preview/hybrid-data-sync-20261015]
   workflow_dispatch:
 
 permissions:
@@ -82,7 +82,7 @@ jobs:
           unzip -Z1 "$APK" | grep -q '^assets/pokemon_icon_atlas.png$'
           unzip -Z1 "$APK" | grep -q '^assets/pokemon_icon_atlas.json$'
           unzip -Z1 "$APK" | grep -q 'pvppokego_launcher.png'
-          cp "$APK" delivery/PvPPokeGo-0.5.29-QA-debug.apk
+          cp "$APK" delivery/PvPPokeGo-0.5.29-Hybrid-QA-debug.apk
           sha256sum delivery/*.apk | tee delivery/SHA256SUMS.txt
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
           "$APKSIGNER" verify --verbose delivery/PvPPokeGo-0.5.29-QA-debug.apk | tee delivery/signature-verification.txt
@@ -90,7 +90,7 @@ jobs:
       - name: Upload installable QA APK
         uses: actions/upload-artifact@v4
         with:
-          name: PvPPokeGo-0.5.29-QA-debug
+          name: PvPPokeGo-0.5.29-Hybrid-QA-debug
           path: delivery/
           retention-days: 30
           if-no-files-found: error
