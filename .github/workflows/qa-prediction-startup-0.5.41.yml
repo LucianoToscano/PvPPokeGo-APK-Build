@@ -2,7 +2,7 @@ name: QA PvPPokeGo 0.5.41 ImageDB + Hybrid Regression QA
 
 on:
   push:
-    branches: ['preview/prediction-startup-0.5.41-20261015']
+    branches: ['preview/prediction-startup-0.5.41-20261015', 'preview/iv4u-references-iv-database-0.5.41-20261015']
   workflow_dispatch:
 
 permissions:

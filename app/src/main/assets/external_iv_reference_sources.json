@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "lastChecked": "2026-10-15",
+  "policy": "references_only_no_scraping",
+  "primaryOfflineProvider": {
+    "id": "pvpoke",
+    "role": "game_master_and_cpm_calculation",
+    "runtime": "offline",
+    "license": "MIT; review non-software assets separately",
+    "url": "https://github.com/pvpoke/pvpoke"
+  },
+  "references": [
+    {
+      "id": "iv4u",
+      "title": "IV4U PvP IV / CP / stat product reference",
+      "home": "https://iv4u.lima-city.de/",
+      "example": "https://iv4u.lima-city.de/?l=en&m=3&p=Clefable",
+      "detailPattern": "https://iv4u.lima-city.de/?l=en&m=3&m2={league}&p={species}",
+      "leagueParams": {
+        "500": 4,
+        "1500": 1,
+        "2500": 2,
+        "10000": 3
+      },
+      "dataImported": false,
+      "apiConfirmed": false,
+      "notes": "Read-only external reference. No IV4U tables or imagery copied or cached; verify conditions (XL, buddy, minimum IV) before comparing results."
+    }
+  ]
+}
