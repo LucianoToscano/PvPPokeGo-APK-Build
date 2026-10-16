@@ -1,6 +1,7 @@
 package com.lucianotoscano.pvppokego.ui
 
 import android.net.Uri
+import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
@@ -44,6 +45,10 @@ import com.lucianotoscano.pvppokego.data.PokemonDef
 import com.lucianotoscano.pvppokego.data.TeamScanHistoryRepository
 import com.lucianotoscano.pvppokego.data.TeamPvpTools
 import com.lucianotoscano.pvppokego.data.IvLeagueResult
+import com.lucianotoscano.pvppokego.data.PvpIvDatabase
+import com.lucianotoscano.pvppokego.data.PvpIvReferences
+import com.lucianotoscano.pvppokego.data.PvPIvRankEntry
+import com.lucianotoscano.pvppokego.data.PvPIvCmp
 import com.lucianotoscano.pvppokego.detect.TeamScanKind
 import com.lucianotoscano.pvppokego.detect.TeamScreenshotResult
 import com.lucianotoscano.pvppokego.detect.TeamScreenshotScanner
@@ -122,6 +127,10 @@ fun TeamBuilderPanel(
     var scanBusy by remember { mutableStateOf(false) }
     var scanApplied by remember { mutableStateOf(false) }
     var ivRanking by remember { mutableStateOf<IvLeagueResult?>(null) }
+    var topIvOpen by remember { mutableStateOf(false) }
+    var topIvCount by remember { mutableStateOf(20) }
+    var topIvOffset by remember { mutableStateOf(0) }
+    var topIvRows by remember { mutableStateOf<List<PvPIvRankEntry>>(emptyList()) }
     var saved by remember { mutableStateOf(store.load()) }
     var recognitionMode by remember { mutableStateOf(store.recognitionMode) }
     var opened by remember { mutableStateOf(false) }
@@ -181,6 +190,26 @@ fun TeamBuilderPanel(
             ivRanking = withContext(Dispatchers.Default) {
                 TeamPvpTools.rank(found.baseStats, catalog?.cpms.orEmpty(), cap,
                     draft.atkIv, draft.defIv, draft.hpIv)
+            }
+        }
+    }
+
+    // IV spreads are calculated off the UI thread, only when the user asks to see them.
+    // Changes to league/species invalidate the displayed list rather than leaving stale rows.
+    LaunchedEffect(topIvOpen, topIvCount, draft.speciesId,
+        league, autoLeagueCp, catalog) {
+        topIvRows = emptyList()
+        topIvOffset = 0
+        if (topIvOpen) {
+            val selected = catalog?.species?.firstOrNull {
+                it.speciesId == draft.speciesId
+            }
+            val cap = if (league == BattleLeagueMode.AUTO) autoLeagueCp else league.cpCap
+            if (selected != null && cap != null) {
+                topIvRows = withContext(Dispatchers.Default) {
+                    PvpIvDatabase.topSpreads(
+                        selected.baseStats, catalog?.cpms.orEmpty(), cap, topIvCount)
+                }
             }
         }
     }
@@ -511,6 +540,110 @@ fun TeamBuilderPanel(
                     Text("PC estimado no nível 50: ${rank.maximumCpAtLevel50}. " +
                         "Custo exato de poeira/doces requer dados de fortalecimento adicionais.",
                         style = MaterialTheme.typography.bodySmall)
+                }
+                if (draft.speciesId.isNotBlank()) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        OutlinedButton(modifier = Modifier.weight(1f), onClick = {
+                            val cap = if (league == BattleLeagueMode.AUTO) {
+                                autoLeagueCp
+                            } else league.cpCap ?: 0
+                            val url = PvpIvReferences.iv4uUrl(draft.speciesName, cap)
+                            runCatching {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                            }.onFailure {
+                                feedback = "Não foi possível abrir o IV4U no navegador."
+                            }
+                        }) { Text("Consultar IV4U ↗") }
+                        OutlinedButton(modifier = Modifier.weight(1f), onClick = {
+                            topIvOpen = !topIvOpen
+                        }) { Text(if (topIvOpen) "Fechar ranks" else "Ver melhores IVs") }
+                    }
+
+                    if (topIvOpen) {
+                        Text("Ranking estatístico offline (PvPoke), não ranking de vitórias. " +
+                            "Compare com IV4U conferindo XL, Best Buddy e IVs mínimos.",
+                            style = MaterialTheme.typography.bodySmall)
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf(20, 50, 200).forEach { count ->
+                                FilterChip(
+                                    modifier = Modifier.weight(1f),
+                                    selected = topIvCount == count,
+                                    onClick = { topIvCount = count },
+                                    label = { Text("Top " + count) }
+                                )
+                            }
+                        }
+                        if (topIvRows.isEmpty()) {
+                            Text("Lista indisponível ou calculando. Verifique a liga e " +
+                                "o banco local de atributos/CPM.",
+                                style = MaterialTheme.typography.bodySmall)
+                        } else {
+                            val ownSpecies = catalog?.species?.firstOrNull {
+                                it.speciesId == draft.speciesId
+                            }
+                            val ownAttack = ownSpecies?.let {
+                                PvpIvDatabase.effectiveAttack(
+                                    it.baseStats, draft.atkIv, ivRanking?.level,
+                                    catalog?.cpms.orEmpty())
+                            }
+                            Text("Rank • Ataque/Defesa/PS • PC • nível • Attack efetivo",
+                                style = MaterialTheme.typography.labelSmall)
+                            topIvRows.drop(topIvOffset).take(10).forEach { entry ->
+                                val cmp = PvpIvDatabase.cmpIfSimultaneous(
+                                    ownAttack, entry.attack)
+                                val cmpText = when (cmp) {
+                                    PvPIvCmp.FAVORS_OURS -> "CMP ↑"
+                                    PvPIvCmp.FAVORS_THEIRS -> "CMP ↓"
+                                    PvPIvCmp.TIE -> "CMP ="
+                                    PvPIvCmp.UNKNOWN -> "CMP ?"
+                                }
+                                Text(
+                                    "#" + entry.rank + "  " + entry.attackIv + "/" +
+                                        entry.defenseIv + "/" + entry.hpIv + "  PC " +
+                                        entry.cp + "  Lv " + entry.level + "  Atq " +
+                                        "%.2f".format(entry.attack) + "  " + cmpText +
+                                        "  " + "%.2f".format(entry.percentOfBest) + "%",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                OutlinedButton(
+                                    modifier = Modifier.weight(1f),
+                                    enabled = topIvOffset > 0,
+                                    onClick = { topIvOffset = (topIvOffset - 10).coerceAtLeast(0) }
+                                ) { Text("Anterior") }
+                                Text(
+                                    (topIvOffset + 1).toString() + "–" +
+                                        minOf(topIvOffset + 10, topIvRows.size) +
+                                        "/" + topIvRows.size,
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                                OutlinedButton(
+                                    modifier = Modifier.weight(1f),
+                                    enabled = topIvOffset + 10 < topIvRows.size,
+                                    onClick = {
+                                        topIvOffset = (topIvOffset + 10)
+                                            .coerceAtMost(topIvRows.size - 1)
+                                    }
+                                ) { Text("Próximos") }
+                            }
+                            Text("CMP ↑/↓/= é uma comparação matemática com os IVs da " +
+                                "vaga atual; só decide prioridade se ambos os carregados " +
+                                "forem iniciados no mesmo turno. Não prevê o vencedor " +
+                                "do confronto.",
+                                style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
                 }
                 Text("Sexo e forma (marcação informativa)", style = MaterialTheme.typography.bodySmall)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
