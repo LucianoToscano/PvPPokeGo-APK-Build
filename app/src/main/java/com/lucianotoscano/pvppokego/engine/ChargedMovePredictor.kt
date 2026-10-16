@@ -35,7 +35,8 @@ internal object ChargedMovePredictor {
      */
     internal fun energyWindow(
         hypotheses: List<EnemyEnergyTracker.Hypothesis>,
-        energyCost: Int
+        energyCost: Int,
+        phase: FastMovePhaseSnapshot? = null
     ): EnergyWindow? {
         if (hypotheses.isEmpty() || energyCost <= 0) return null
         val perHypothesis = hypotheses.map { h ->
@@ -44,7 +45,14 @@ internal object ChargedMovePredictor {
             val fastNeeded = if (missing == 0) 0 else {
                 ceil(missing.toDouble() / gain.toDouble()).toInt()
             }
-            val turns = fastNeeded * h.fastMove.turns.coerceAtLeast(1)
+            val moveTurns = h.fastMove.turns.coerceAtLeast(1)
+            val trustworthyPhase = phase?.takeIf {
+                it.confidence >= .75f && it.moveId == h.fastMove.moveId &&
+                    it.turnsUntilRegistration in 1..moveTurns
+            }
+            val turns = if (fastNeeded > 0 && trustworthyPhase != null) {
+                (fastNeeded - 1) * moveTurns + trustworthyPhase.turnsUntilRegistration
+            } else fastNeeded * moveTurns
             Triple(h, fastNeeded, turns)
         }
         val fastValues = perHypothesis.map { it.second to it.first.weight }
@@ -78,7 +86,9 @@ internal object ChargedMovePredictor {
         defenderDefenseStages: StatStageRange = StatStageRange(),
         /** Time since the player HP bar was last readable. Projection is non-mutating. */
         unobservedFastWindowMs: Long = 0L,
-        fastPhase: FastMovePhaseSnapshot? = null
+        fastPhase: FastMovePhaseSnapshot? = null,
+        observedChargedMoveIds: List<String> = emptyList(),
+        enemyHpRatio: Float? = null
     ): EnemyEnergyForecast? {
         val hypotheses = energyTracker.projectedHypotheses(unobservedFastWindowMs)
         if (hypotheses.isEmpty() || chargedMoves.isEmpty()) return null
@@ -106,7 +116,7 @@ internal object ChargedMovePredictor {
         val candidates = chargedMoves.mapNotNull candidate@ { weightedMove ->
             val move = weightedMove.move
             val cost = move.chargedCost.takeIf { it > 0 } ?: return@candidate null
-            val window = energyWindow(hypotheses, cost) ?: return@candidate null
+            val window = energyWindow(hypotheses, cost, fastPhase) ?: return@candidate null
             val fastMin = window.fastMovesMin
             val fastMax = window.fastMovesMax
             val fastLikely = window.fastMovesLikely
@@ -178,9 +188,18 @@ internal object ChargedMovePredictor {
                 .sumOf { it.weight.toDouble() }
                 .toFloat()
                 .takeIf { it > 0f } ?: 1f
-            val baitProbability = if (baitPotential) {
-                (weightedMove.weight / affordableWeight).coerceIn(0f, .95f)
-            } else 0f
+            // Prior is NOT a calibrated probability of player behaviour.
+            // Repeated observed cheap throws only increases bait *heuristic* when a
+            // stronger move is affordable and the opponent's exact move pool is uncertain.
+            val usedCheap = observedChargedMoveIds.count { it == move.moveId }
+            val baitProbability = EnemyMovePredictor.baitHeuristic(
+                baseProbability = weightedMove.weight / affordableWeight,
+                cheapMovePreviouslyObserved = usedCheap,
+                expensiveMoveAffordable = baitPotential,
+                cheapMoveLethal = likelyKo,
+                likelyEnemyEnergy = projectedEnergyLikely,
+                enemyHpRatio = enemyHpRatio
+            )
             val fastCountSequence = likelyHypothesis?.let { h ->
                 EnergySequenceMath.repeatedChargedCounts(
                     currentEnergy = h.energy,

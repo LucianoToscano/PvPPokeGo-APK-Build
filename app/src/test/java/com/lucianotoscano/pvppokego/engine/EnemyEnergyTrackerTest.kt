@@ -183,4 +183,58 @@ class EnemyEnergyTrackerTest {
         assertEquals(snapshot.consistencyScore, restored.consistencyScore(), .0001f)
     }
 
+    @Test
+    fun earlyConfirmationRequiresThreeEventsAndMargin() {
+        val quick = fast("QUICK2", 9, 2)
+        val slow = fast("SLOW4", 14, 4)
+        val tracker = EnemyEnergyTracker()
+        tracker.reset(listOf(WeightedMove(quick, .5f), WeightedMove(slow, .5f)))
+        repeat(2) { index ->
+            tracker.observeFastCompletion(1, index + 201L, 1f, observedIntervalMs = 1000)
+            assertEquals(null, tracker.confirmFastMoveFromEvidence())
+        }
+        assertEquals(2, tracker.hypothesisCount())
+        tracker.observeFastCompletion(1, 203L, 1f, observedIntervalMs = 1000)
+        assertEquals("QUICK2", tracker.confirmFastMoveFromEvidence()?.moveId)
+        assertEquals(1, tracker.hypothesisCount())
+    }
+
+    @Test
+    fun closeCandidatesDoNotPrematurelyLockFastMove() {
+        val first = fast("FIRST", 9, 2)
+        val second = fast("SECOND", 9, 2)
+        val tracker = EnemyEnergyTracker()
+        tracker.reset(listOf(WeightedMove(first, .50f), WeightedMove(second, .50f)))
+        repeat(5) { tracker.observeFastCompletion(1, it + 321L, 1f, observedIntervalMs = 1000) }
+        assertEquals(null, tracker.confirmFastMoveFromEvidence())
+        assertEquals(2, tracker.hypothesisCount())
+    }
+
+    @Test
+    fun captureGapPhaseReweightsButNeverDeletesTheZeroMissedHypothesis() {
+        val fast = fast("GAP", 8, 2)
+        val tracker = EnemyEnergyTracker()
+        tracker.reset(listOf(WeightedMove(fast, 1f)))
+        tracker.observeFastCompletion(2, 501L, 1f)
+        val preGapPhase = FastMovePhaseTracker().apply {
+            observeCompletion(fast, 1, 1000L, .98f, 1000L)
+        }.snapshot(1000L)
+        tracker.recoverCaptureGap(2300L, preGapPhase)
+        assertTrue(tracker.hypotheses().any { it.energy == 16 })
+        assertTrue(tracker.hypotheses().any { it.energy >= 24 })
+        assertTrue(tracker.hypotheses().all { it.energy <= 100 })
+    }
+
+    @Test
+    fun fastTurnsRangeNarrowsAfterThreeStrongObservations() {
+        val short = fast("SHORT", 9, 2)
+        val long = fast("LONG", 15, 4)
+        val tracker = EnemyEnergyTracker()
+        tracker.reset(listOf(WeightedMove(short, .5f), WeightedMove(long, .5f)))
+        assertEquals(2..4, tracker.fastTurnsRange())
+        repeat(3) { tracker.observeFastCompletion(1, 950L + it, 1f, observedIntervalMs = 1000L) }
+        assertEquals("SHORT", tracker.confirmFastMoveFromEvidence()?.moveId)
+        assertEquals(2..2, tracker.fastTurnsRange())
+    }
+
 }

@@ -208,11 +208,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        AppDiagnosticLog.initialize(this)
-        AppDiagnosticLog.record("activity", "on-create")
+        runCatching {
+            AppDiagnosticLog.initialize(this)
+            AppDiagnosticLog.record("activity", "on-create")
+        }
         settingsRepo = SettingsRepository(this)
         historyRepo = BattleHistoryRepository(this)
-        overlayGranted = Settings.canDrawOverlays(this)
+        overlayGranted = runCatching { Settings.canDrawOverlays(this) }.getOrDefault(false)
 
         if (Build.VERSION.SDK_INT >= 33) {
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)

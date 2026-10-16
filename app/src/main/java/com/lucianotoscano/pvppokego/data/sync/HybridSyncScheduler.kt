@@ -32,11 +32,11 @@ object HybridSyncScheduler {
 
     fun install(context: Context) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        if (!prefs.getBoolean("auto", true)) {
+        if (!runCatching { prefs.getBoolean("auto", true) }.getOrDefault(true)) {
             WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_WORK)
             return
         }
-        val wifiOnly = prefs.getBoolean("wifi_only", true)
+        val wifiOnly = runCatching { prefs.getBoolean("wifi_only", true) }.getOrDefault(true)
         val request = PeriodicWorkRequestBuilder<HybridSyncWorker>(1, TimeUnit.DAYS)
             .setConstraints(
                 Constraints.Builder()
@@ -52,7 +52,7 @@ object HybridSyncScheduler {
     /** Schedules a user-requested one-off refresh, even if automatic checks are disabled. */
     fun checkNow(context: Context) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val wifiOnly = prefs.getBoolean("wifi_only", true)
+        val wifiOnly = runCatching { prefs.getBoolean("wifi_only", true) }.getOrDefault(true)
         val request = OneTimeWorkRequestBuilder<HybridSyncWorker>()
             .setInputData(workDataOf("manual_check" to true))
             .setConstraints(
@@ -89,9 +89,9 @@ class HybridSyncWorker(context: Context, params: WorkerParameters) :
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val prefs = applicationContext.getSharedPreferences("hybrid_data_sync", Context.MODE_PRIVATE)
-        if (!prefs.getBoolean("auto", true) && !inputData.getBoolean("manual_check", false)) return@withContext Result.success()
+        if (!runCatching { prefs.getBoolean("auto", true) }.getOrDefault(true) && !inputData.getBoolean("manual_check", false)) return@withContext Result.success()
         val endpoint = TRUSTED_MANIFEST_URL
-        if (prefs.getBoolean("wifi_only", true)) {
+        if (runCatching { prefs.getBoolean("wifi_only", true) }.getOrDefault(true)) {
             val manager = applicationContext.getSystemService(ConnectivityManager::class.java)
             val caps = manager?.activeNetwork?.let { manager.getNetworkCapabilities(it) }
             if (caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) != true) {

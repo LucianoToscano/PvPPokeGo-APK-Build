@@ -1,6 +1,7 @@
 package com.lucianotoscano.pvppokego.engine
 
 import com.lucianotoscano.pvppokego.data.MoveDef
+import com.lucianotoscano.pvppokego.data.FastMovePhaseSnapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -108,6 +109,25 @@ class ChargedMovePredictorTest {
         assertEquals(5, window.fastMovesLikely)
         assertEquals(10, window.turnsLikely)
         assertEquals(5_000L, window.turnsLikely * EnemyEnergyTracker.TURN_MS.toLong())
+    }
+
+    @Test
+    fun phaseEvidenceShortensNextRegistrationWithoutChangingEnergyOrFastCount() {
+        val fast = fast("THREE_TURNS", 10, 3)
+        val h = h(fast, 30, 1f)
+        val baseline = ChargedMovePredictor.energyWindow(listOf(h), 50)!!
+        val reliable = FastMovePhaseSnapshot(
+            moveId = fast.moveId, moveName = fast.name,
+            moveTurns = 3, phaseTurn = 3, turnsUntilRegistration = 1,
+            nextRegistrationInMs = 500L, confidence = .94f, observedCompletions = 4
+        )
+        val shortened = ChargedMovePredictor.energyWindow(listOf(h), 50, reliable)!!
+        assertEquals(6, baseline.turnsLikely)
+        assertEquals(4, shortened.turnsLikely)
+        assertEquals(baseline.fastMovesLikely, shortened.fastMovesLikely)
+        val unreliable = reliable.copy(confidence = .40f)
+        assertEquals(baseline.turnsLikely,
+            ChargedMovePredictor.energyWindow(listOf(h), 50, unreliable)!!.turnsLikely)
     }
 
 }

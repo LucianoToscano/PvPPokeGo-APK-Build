@@ -21,30 +21,36 @@ class PvPPokeGoApp : Application() {
 
     /** Data loads await this before reading assets; disk hashing never blocks main. */
     suspend fun awaitPendingHybridActivation() {
-        pendingHybridActivation?.await()
+        runCatching { pendingHybridActivation?.await() }
     }
 
     override fun onCreate() {
         super.onCreate()
-        PokemonImageSyncWorker.schedule(this)
+        runCatching { PokemonImageSyncWorker.schedule(this) }
         // A process starts with no active battle. Pending hybrid data may be safely
         // activated now, never during an ongoing battle or capture frame.
-        val syncPrefs = getSharedPreferences("hybrid_data_sync", MODE_PRIVATE)
-        val pending = syncPrefs.getString("pending_version", null)
-        if (pending != null) {
+        val syncPrefs = runCatching { getSharedPreferences("hybrid_data_sync", MODE_PRIVATE) }.getOrNull()
+        val pending = runCatching { syncPrefs?.getString("pending_version", null) }.getOrNull()
+        if (!pending.isNullOrBlank() && syncPrefs != null) {
             pendingHybridActivation = startupScope.async {
-                val switched = runCatching {
+                // Catch inside async so awaiters (GameDataRepository) cannot fail startup.
+                val activated = runCatching {
                     HybridSnapshotStore(File(filesDir, "hybrid-data"))
-                        .activateBetweenBattles(pending, battleActive = false)
-                }.getOrNull()
-                if (switched != null) {
-                    syncPrefs.edit().remove("pending_version").remove("last_error").apply()
-                } else {
-                    syncPrefs.edit().putString("last_error", "Snapshot pendente inválido").apply()
+                        .activateBetweenBattles(pending, battleActive = false) != null
+                }.getOrDefault(false)
+                runCatching {
+                    val edit = syncPrefs.edit().remove("pending_version")
+                    if (activated) edit.remove("last_error")
+                    else edit.putString("last_error", "Snapshot pendente inválido; dados internos mantidos")
+                    edit.apply()
                 }
             }
+        } else if (syncPrefs != null &&
+            runCatching { syncPrefs.contains("pending_version") }.getOrDefault(false)) {
+            // Wrongly typed/stale pending marker must not poison every launch.
+            runCatching { syncPrefs.edit().remove("pending_version").apply() }
         }
-        HybridSyncScheduler.install(this)
+        runCatching { HybridSyncScheduler.install(this) }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
@@ -54,7 +60,10 @@ class PvPPokeGoApp : Application() {
                 description = "Captura visual e overlay do PvPPokeGo"
                 setShowBadge(false)
             }
-            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+            // Invalid system state must not prevent opening the main Activity.
+            runCatching {
+                getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
+            }
         }
     }
 

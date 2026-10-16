@@ -65,25 +65,30 @@ class HybridSnapshotStoreTest {
         } finally { root.deleteRecursively() }
     }
 
+    @Test fun `unreadable stage returns null without throwing`() {
+        val parent = Files.createTempDirectory("bad-stage-parent").toFile()
+        try {
+            val root = parent.resolve("root")
+            root.writeText("not a directory")
+            val store = HybridSnapshotStore(root)
+            val bytes = "okay".toByteArray()
+            assertFalse(store.stage("good", mapOf("data.json" to bytes),
+                listOf(HybridSnapshotStore.Entry("data.json", hash(bytes)))))
+            assertNull(store.activateBetweenBattles("missing", false))
+            assertNull(store.activeVersion())
+        } finally { parent.deleteRecursively() }
+    }
+
     @Test fun `rejects traversal duplicate names and incomplete manifests`() {
         val root = Files.createTempDirectory("hybrid-adversarial").toFile()
         try {
             val store = HybridSnapshotStore(root)
             val bytes = "data".toByteArray()
             val entry = HybridSnapshotStore.Entry("a", hash(bytes))
-            try {
-                store.stage("v1", mapOf("../bad" to bytes),
-                    listOf(HybridSnapshotStore.Entry("../bad", hash(bytes))))
-                fail("Traversal must be rejected")
-            } catch (_: IllegalArgumentException) { }
-            try {
-                store.stage("v1", emptyMap(), listOf(entry))
-                fail("Missing files must be rejected")
-            } catch (_: IllegalArgumentException) { }
-            try {
-                store.stage("v1", mapOf("a" to bytes), listOf(entry, entry))
-                fail("Duplicate names must be rejected")
-            } catch (_: IllegalArgumentException) { }
+            assertFalse(store.stage("v1", mapOf("../bad" to bytes),
+                listOf(HybridSnapshotStore.Entry("../bad", hash(bytes)))))
+            assertFalse(store.stage("v1", emptyMap(), listOf(entry)))
+            assertFalse(store.stage("v1", mapOf("a" to bytes), listOf(entry, entry)))
         } finally { root.deleteRecursively() }
     }
 

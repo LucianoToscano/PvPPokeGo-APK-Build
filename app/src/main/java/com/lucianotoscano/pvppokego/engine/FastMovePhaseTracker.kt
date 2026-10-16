@@ -53,6 +53,18 @@ internal class FastMovePhaseTracker {
         lastCompletionAtMs = nowMs
     }
 
+    /** HP evidence is only used to refine a completion already accepted by the detector. */
+    fun observeHpConfirmedCompletion(
+        candidate: MoveDef,
+        nowMs: Long,
+        damageFraction: Float?,
+        detectorConfidence: Float,
+        observedIntervalMs: Long? = null
+    ) {
+        if (damageFraction == null || !damageFraction.isFinite() || damageFraction <= 0f) return
+        observeCompletion(candidate, 1, nowMs, detectorConfidence, observedIntervalMs)
+    }
+
     fun snapshot(nowMs: Long = System.currentTimeMillis()): FastMovePhaseSnapshot? {
         val current = move ?: return null
         if (lastCompletionAtMs <= 0L) return null

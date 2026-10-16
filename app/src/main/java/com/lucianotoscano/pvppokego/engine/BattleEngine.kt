@@ -50,6 +50,7 @@ class BattleEngine(private val repo: GameDataRepository) {
 
     private val enemyStates = BattleStateStore()
     private val opponentTeamTracker = OpponentTeamTracker()
+    private val enemyChargedHistory = EnemyChargedHistory()
     // Survives a rejected OCR frame: needed to detect a real switch on recovery.
     private var lastTrustedOpponentSlot: Int? = null
     private val ownStates = BattleStateStore()
@@ -118,6 +119,8 @@ class BattleEngine(private val repo: GameDataRepository) {
     private var captureHealth = CaptureHealth.FRESH
     private var captureStatusText: String? = null
     private var captureGapStartedAtMs: Long? = null
+    private var preCaptureGapPhase: com.lucianotoscano.pvppokego.data.FastMovePhaseSnapshot? = null
+    private var lastGapRecoveryAtMs: Long = 0L
     private var localStrategyProfile: BattleStrategyProfile? = null
 
     private val incomingDamageTracker = ObservedDamageTracker()
@@ -149,7 +152,10 @@ class BattleEngine(private val repo: GameDataRepository) {
         enemyCpTracker.reset()
         tracker.reset()
         predictiveEnergy.clear()
+        enemyChargedHistory.clear()
         enemyFastPhase.reset()
+        preCaptureGapPhase = null
+        lastGapRecoveryAtMs = 0L
         lastEnemyFastEventAtMs = 0L
         lastPlayerHpVisibleAtMs = 0L
         ownTracker.reset()
@@ -308,20 +314,22 @@ class BattleEngine(private val repo: GameDataRepository) {
         val isGap = health == CaptureHealth.STALE || health == CaptureHealth.PAUSED
         if (!wasGap && isGap) {
             captureGapStartedAtMs = now
+            preCaptureGapPhase = enemyFastPhase.snapshot(now)
         } else if (wasGap && !isGap) {
             val gapMs = captureGapStartedAtMs?.let { (now - it).coerceAtLeast(0L) } ?: 0L
             ensurePredictiveEnergyInitialized()
             if (predictiveEnergy.isInitialized && gapMs > 0L) {
-                val fastestTurns = predictiveEnergy.fastTurnsRange().first.coerceAtLeast(1)
-                val fastestMs = fastestTurns * EnemyEnergyTracker.TURN_MS.toLong()
-                val possibleMissed = kotlin.math.ceil(gapMs.toDouble() / fastestMs.toDouble())
-                    .toInt()
-                    .coerceIn(0, 5)
-                predictiveEnergy.widenForPossibleMissedFast(possibleMissed)
+                predictiveEnergy.recoverCaptureGap(gapMs, preCaptureGapPhase)
+                // Start the next non-mutating projection at the resumed frame, not
+                // at the pre-gap HP reading (which would count the same gap twice).
+                lastPlayerHpVisibleAtMs = now
+                lastEnemyFastEventAtMs = 0L
+                lastGapRecoveryAtMs = now
                 syncLegacyEnemyEnergyFromPredictive()
                 saveActiveState()
             }
             captureGapStartedAtMs = null
+            preCaptureGapPhase = null
         }
         captureHealth = health
         captureStatusText = statusText
@@ -1166,13 +1174,23 @@ class BattleEngine(private val repo: GameDataRepository) {
         val observedInterval = lastEnemyFastEventAtMs
             .takeIf { it > 0L }
             ?.let { (nowMs - it).coerceAtLeast(0L) }
-        enemyFastPhase.observeCompletion(
-            candidate = f,
-            count = count,
-            nowMs = nowMs,
-            detectorConfidence = confidence,
-            observedIntervalMs = observedInterval
-        )
+        if (count == 1 && damageFraction != null && damageFraction > 0f) {
+            enemyFastPhase.observeHpConfirmedCompletion(
+                candidate = f,
+                nowMs = nowMs,
+                damageFraction = damageFraction,
+                detectorConfidence = confidence,
+                observedIntervalMs = observedInterval
+            )
+        } else {
+            enemyFastPhase.observeCompletion(
+                candidate = f,
+                count = count,
+                nowMs = nowMs,
+                detectorConfidence = confidence,
+                observedIntervalMs = observedInterval
+            )
+        }
         if (predictiveEnergy.isInitialized) {
             predictiveEnergy.observeFastCompletion(
                 count = count,
@@ -1188,29 +1206,22 @@ class BattleEngine(private val repo: GameDataRepository) {
             if (activeState?.fastMoveManual == true) {
                 predictiveEnergy.confirmFastMove(f)
             } else {
-                predictiveEnergy.fastMoveInference()?.let { inference ->
-                    val strongEnough = inference.observedEvents >= 2 &&
-                        ((inference.probability >= .72f && inference.margin >= .18f) ||
-                            inference.probability >= .88f)
-                    if (strongEnough) {
-                        val inferredFast = inference.move
-                        fast = inferredFast
-                        activeState?.fastMoveId = inferredFast.moveId
-                        if (inferredFast.moveId != f.moveId) {
-                            // Re-anchor this same observed completion to the newly identified
-                            // legal Fast Move instead of losing phase until the next event.
-                            enemyFastPhase.observeCompletion(
-                                candidate = inferredFast,
-                                count = count,
-                                nowMs = nowMs,
-                                detectorConfidence = confidence,
-                                observedIntervalMs = observedInterval
-                            )
-                        } else {
-                            enemyFastPhase.confirmMove(inferredFast)
-                        }
-                        lastAutoSource = source + "+cadencia/dano:" + inferredFast.moveId
+                predictiveEnergy.confirmFastMoveFromEvidence()?.let { inferredFast ->
+                    fast = inferredFast
+                    activeState?.fastMoveId = inferredFast.moveId
+                    if (inferredFast.moveId != f.moveId) {
+                        // Re-anchor this observed completion to the trusted legal Fast.
+                        enemyFastPhase.observeCompletion(
+                            candidate = inferredFast,
+                            count = count,
+                            nowMs = nowMs,
+                            detectorConfidence = confidence,
+                            observedIntervalMs = observedInterval
+                        )
+                    } else {
+                        enemyFastPhase.confirmMove(inferredFast)
                     }
+                    lastAutoSource = source + "+cadencia/dano:" + inferredFast.moveId
                 }
             }
             syncLegacyEnemyEnergyFromPredictive()
@@ -1451,6 +1462,10 @@ class BattleEngine(private val repo: GameDataRepository) {
             tracker.onObservedChargedMove(move)
         }
         applyChargedStatEffects(move, actorIsEnemy = true)
+        enemyChargedHistory.record(
+            opponentTeamTracker.activeSlot(), enemySpeciesId ?: enemyName,
+            move.moveId, nowMs
+        )
         recordChargedMove(move, observed = true)
         chargedPendingSinceMs = null
         lastChargedConfirmedAtMs = nowMs
@@ -1699,10 +1714,14 @@ class BattleEngine(private val repo: GameDataRepository) {
             ?.let(repo::legalChargedMoves)
             .orEmpty()
 
-    private fun weightedEnemyChargedMoves() =
-        (activeState?.speciesId ?: enemySpeciesId ?: enemyName)
-            ?.let(repo::weightedChargedMoves)
-            .orEmpty()
+    private fun weightedEnemyChargedMoves(): List<com.lucianotoscano.pvppokego.data.WeightedMove> {
+        val legal = (activeState?.speciesId ?: enemySpeciesId ?: enemyName)
+            ?.let(repo::weightedChargedMoves).orEmpty()
+        val confirmed = activeState?.observedChargedMoveIds.orEmpty().distinct()
+        // Only close the pool when two *legal* charged moves are actually confirmed.
+        val known = confirmed.filter { id -> legal.any { it.move.moveId == id } }
+        return if (known.size == 2) legal.filter { it.move.moveId in known } else legal
+    }
 
     private fun ensurePredictiveEnergyInitialized() {
         if (predictiveEnergy.isInitialized) return
@@ -1900,7 +1919,11 @@ class BattleEngine(private val repo: GameDataRepository) {
                 attackerAttackStages = enemyStages.attack,
                 defenderDefenseStages = ownStages.defense,
                 unobservedFastWindowMs = unobservedEnemyFastWindowMs(),
-                fastPhase = enemyFastPhase.snapshot()
+                fastPhase = enemyFastPhase.snapshot(),
+                observedChargedMoveIds = enemyChargedHistory.observedMoves(
+                    opponentTeamTracker.activeSlot(), enemySpeciesId ?: enemyName
+                ),
+                enemyHpRatio = lastOpponentHpRatio
             )
         } else null
 
@@ -2093,6 +2116,16 @@ class BattleEngine(private val repo: GameDataRepository) {
             battleConfidence = lastBattleConfidence,
             enemyHistory = enemyHistory,
             debugText = if (debug) buildString {
+                predictiveForecast?.let { forecast ->
+                    val phase = forecast.fastPhase
+                    val fastIdentity = predictiveEnergy.fastMoveInference()
+                    appendLine("Energia ${forecast.energyMin}-${forecast.energyMax} (~${forecast.energyLikely}) C=${(forecast.confidence * 100).toInt()}%")
+                    appendLine("Fast ${fastIdentity?.move?.name ?: "?"} ${(fastIdentity?.probability?.times(100))?.toInt() ?: 0}% | fase ${phase?.turnsUntilRegistration ?: "?"}t")
+                    if (captureHealth == CaptureHealth.STALE || captureHealth == CaptureHealth.PAUSED ||
+                        System.currentTimeMillis() - lastGapRecoveryAtMs in 0L..2_500L) {
+                        appendLine("RECUPERAÇÃO DE CAPTURA — estimativa incerta")
+                    }
+                }
                 val s = activeState
                 val os = ownActiveState
                 appendLine("Jogador: ${playerName ?: "?"} PC ${playerCp ?: "?"} | slots=${ownTeamSlots.joinToString { "#${it.slot + 1} ${it.name}/${it.cp ?: "?"}" }}")

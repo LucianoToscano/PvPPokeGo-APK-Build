@@ -17,7 +17,10 @@ class HybridSnapshotStore(private val root: File) {
     private fun isSafe(name: String) =
         name.matches(safeName) && name != "." && name != ".."
 
-    fun stage(version: String, files: Map<String, ByteArray>, expected: List<Entry>): Boolean {
+    fun stage(version: String, files: Map<String, ByteArray>, expected: List<Entry>): Boolean =
+        runCatching { stageChecked(version, files, expected) }.getOrDefault(false)
+
+    private fun stageChecked(version: String, files: Map<String, ByteArray>, expected: List<Entry>): Boolean {
         require(isSafe(version))
         require(expected.isNotEmpty() && expected.map { it.name }.toSet().size == expected.size)
         require(expected.all { isSafe(it.name) && it.sha256.matches(validSha) })
@@ -57,18 +60,26 @@ class HybridSnapshotStore(private val root: File) {
         }
     }
 
-    fun activateBetweenBattles(version: String, battleActive: Boolean): File? {
+    fun activateBetweenBattles(version: String, battleActive: Boolean): File? =
+        runCatching { activateChecked(version, battleActive) }.getOrNull()
+
+    private fun activateChecked(version: String, battleActive: Boolean): File? {
         if (battleActive || !isSafe(version)) return null
         val staged = snapshot(version) ?: return null
         root.mkdirs()
         val temp = File(root, "active-version.tmp")
         temp.writeText(version)
         try {
-            Files.move(temp.toPath(), File(root, "active-version").toPath(),
-                StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-        } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
-            Files.move(temp.toPath(), File(root, "active-version").toPath(),
-                StandardCopyOption.REPLACE_EXISTING)
+            try {
+                Files.move(temp.toPath(), File(root, "active-version").toPath(),
+                    StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+                Files.move(temp.toPath(), File(root, "active-version").toPath(),
+                    StandardCopyOption.REPLACE_EXISTING)
+            }
+        } finally {
+            // Atomic replace preserves the old marker if the move fails.
+            runCatching { temp.delete() }
         }
         return staged
     }
@@ -85,7 +96,9 @@ class HybridSnapshotStore(private val root: File) {
     }
 
     /** Re-check all persisted SHA-256 hashes before trusting an active snapshot. */
-    fun snapshot(version: String): File? {
+    fun snapshot(version: String): File? = runCatching { snapshotChecked(version) }.getOrNull()
+
+    private fun snapshotChecked(version: String): File? {
         if (!isSafe(version)) return null
         val folder = File(root, "staged-" + version)
         if (!folder.isDirectory ||
@@ -105,7 +118,7 @@ class HybridSnapshotStore(private val root: File) {
         return folder
     }
 
-    private fun File.readTextOrNull(): String? = if (isFile) runCatching { readText() }.getOrNull() else null
+    private fun File.readTextOrNull(): String? = runCatching { if (isFile) readText() else null }.getOrNull()
 
     private fun digest(bytes: ByteArray): String =
         MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }

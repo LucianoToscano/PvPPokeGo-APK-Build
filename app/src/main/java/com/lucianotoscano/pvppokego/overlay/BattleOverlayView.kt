@@ -600,12 +600,15 @@ class BattleOverlayView(
                 candidate.readyCertain && candidate.likelyKo -> "DANGER"
                 candidate.readyCertain -> "READY"
                 candidate.readyPossible -> "READY?"
+                candidate.turnsRemainingMax - candidate.turnsRemainingMin >= 5 -> "INCERTO"
                 candidate.turnsRemainingMin <= forecast.reactionTurns -> "PREPARE"
                 else -> "+" + candidate.fastMovesRemainingLikely + " FAST"
             }
             val time = when {
                 candidate.readyPossible -> "agora"
                 candidate.likelyTimeMs <= 0L -> "agora"
+                candidate.turnsRemainingMax - candidate.turnsRemainingMin >= 5 ->
+                    "${candidate.turnsRemainingMin}-${candidate.turnsRemainingMax}t"
                 else -> "~" + "%.1f".format(candidate.likelyTimeMs / 1000f) + "s"
             }
             val confidence = (candidate.confidence * 100f).toInt().coerceIn(0, 100)
@@ -615,7 +618,7 @@ class BattleOverlayView(
                 .orEmpty()
             val bait = candidate.baitProbability
                 .takeIf { it >= .20f }
-                ?.let { " • bait " + "%.0f".format(it * 100f) + "%" }
+                ?.let { " • bait? " + "%.0f".format(it * 100f) + "%" }
                 .orEmpty()
             val line = shortMoveName(candidate.move.name) + "  " + status + " • " + time +
                 sequence + bait + " • " + confidence + "%"

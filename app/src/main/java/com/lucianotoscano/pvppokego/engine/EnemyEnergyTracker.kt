@@ -2,6 +2,7 @@ package com.lucianotoscano.pvppokego.engine
 
 import com.lucianotoscano.pvppokego.data.EnemyEnergyHypothesisSnapshot
 import com.lucianotoscano.pvppokego.data.EnemyEnergySnapshot
+import com.lucianotoscano.pvppokego.data.FastMovePhaseSnapshot
 import com.lucianotoscano.pvppokego.data.MoveDef
 import com.lucianotoscano.pvppokego.data.WeightedMove
 import kotlin.math.abs
@@ -153,7 +154,8 @@ internal class EnemyEnergyTracker(
                 ?.takeIf { it > 0f }
                 ?: return@map h
             val relativeError = abs(observedPercentPerHit - expected) / expected.coerceAtLeast(1.0f)
-            val likelihood = exp(-1.75 * relativeError.toDouble())
+            val evidenceStrength = if (observedFastEvents in 1..6) 2.15 else 1.75
+            val likelihood = exp(-evidenceStrength * relativeError.toDouble())
                 .toFloat()
                 .coerceIn(DAMAGE_MIN_LIKELIHOOD, 1f)
             h.copy(weight = h.weight * likelihood)
@@ -183,6 +185,60 @@ internal class EnemyEnergyTracker(
             margin = (probability - secondProbability).coerceIn(0f, 1f),
             observedEvents = observedFastEvents
         )
+    }
+
+    /**
+     * Confirm a legal Fast Move only after independent completions discriminate it.
+     * A single HP drop or metadata prior never eliminates alternatives.
+     */
+    fun confirmFastMoveFromEvidence(
+        minimumEvents: Int = 3,
+        minimumMargin: Float = .35f
+    ): MoveDef? {
+        val inference = fastMoveInference() ?: return null
+        if (inference.observedEvents < minimumEvents ||
+            inference.margin < minimumMargin ||
+            inference.probability < .75f ||
+            consistencyScore < .60f) return null
+        confirmFastMove(inference.move)
+        return inference.move
+    }
+
+    /**
+     * Recover after losing screen frames. Preserve 0..N possible completions;
+     * use last known phase only to REWEIGHT, never assert an unseen Fast as fact.
+     * The phase must come from before the gap, not after stale screen capture.
+     */
+    fun recoverCaptureGap(gapMs: Long, preGapPhase: FastMovePhaseSnapshot?) {
+        if (hypotheses.isEmpty() || gapMs < TURN_MS.toLong()) return
+        val elapsedMs = gapMs.coerceIn(0L, MAX_GAP_RECOVERY_MOVES * 5L * TURN_MS)
+        hypotheses = hypotheses.flatMap { h ->
+            val durationMs = h.fastMove.turns.coerceAtLeast(1) * TURN_MS.toLong()
+            val maximum = (elapsedMs / durationMs + 1L).toInt().coerceIn(0, MAX_GAP_RECOVERY_MOVES)
+            val reliablePhase = preGapPhase?.takeIf {
+                it.confidence >= .60f && it.moveId == h.fastMove.moveId &&
+                    it.turnsUntilRegistration in 1..h.fastMove.turns.coerceAtLeast(1)
+            }
+            val likelyCompletions = reliablePhase?.let { phase ->
+                val firstRegistrationMs = phase.turnsUntilRegistration * TURN_MS.toLong()
+                if (elapsedMs < firstRegistrationMs) 0
+                else (1L + (elapsedMs - firstRegistrationMs) / durationMs)
+                    .toInt().coerceIn(0, maximum)
+            }
+            (0..maximum).map { extra ->
+                val decay = if (reliablePhase != null) PHASE_GAP_WEIGHT_DECAY else GAP_WEIGHT_DECAY
+                val distance = if (likelyCompletions != null) kotlin.math.abs(extra - likelyCompletions)
+                    else extra
+                h.copy(
+                    energy = (h.energy + h.fastMove.energyGain.coerceAtLeast(0) * extra).coerceAtMost(maxEnergy),
+                    completedFastMoves = h.completedFastMoves + extra,
+                    elapsedTurns = h.elapsedTurns + h.fastMove.turns * extra,
+                    weight = h.weight * decay.pow(distance)
+                )
+            }
+        }
+        consistencyScore = (consistencyScore * .97f).coerceAtLeast(.05f)
+        normalizeAndPrune()
     }
 
     /**
@@ -503,6 +559,7 @@ internal class EnemyEnergyTracker(
         private const val MIN_WEIGHT = 0.0001f
         private const val RECOVERY_WEIGHT = 0.35f
         private const val GAP_WEIGHT_DECAY = 0.58f
+        private const val PHASE_GAP_WEIGHT_DECAY = 0.72f
         private const val PROJECTION_WEIGHT_DECAY = 0.58f
         private const val DAMAGE_MIN_LIKELIHOOD = 0.05f
         private const val MIN_PROJECTION_GAP_MS = 600L

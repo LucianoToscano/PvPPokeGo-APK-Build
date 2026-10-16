@@ -12,9 +12,9 @@ import android.content.Context
 import org.json.JSONObject
 
 class SettingsRepository(context: Context) {
-    private val prefs = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+    private val prefs = DefensivePreferences(context.getSharedPreferences(FILE, Context.MODE_PRIVATE))
     private val appContext = context.applicationContext
-    private val hybridPrefs = appContext.getSharedPreferences("hybrid_data_sync", Context.MODE_PRIVATE)
+    private val hybridPrefs = DefensivePreferences(appContext.getSharedPreferences("hybrid_data_sync", Context.MODE_PRIVATE))
 
     var automaticDataUpdates: Boolean
         get() = hybridPrefs.getBoolean("auto", true)

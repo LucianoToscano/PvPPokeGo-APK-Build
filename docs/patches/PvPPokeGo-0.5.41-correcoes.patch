@@ -1,0 +1,1038 @@
+diff --git a/app/build.gradle.kts b/app/build.gradle.kts
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -32,8 +32,8 @@
+         applicationId = "com.lucianotoscano.pvppokego"
+         minSdk = 29
+         targetSdk = 36
+-        versionCode = 45
+-        versionName = "0.5.40"
++        versionCode = 46
++        versionName = "0.5.41"
+     }
+ 
+     buildFeatures {
+diff --git a/app/src/main/java/com/lucianotoscano/pvppokego/MainActivity.kt b/app/src/main/java/com/lucianotoscano/pvppokego/MainActivity.kt
+--- a/app/src/main/java/com/lucianotoscano/pvppokego/MainActivity.kt
++++ b/app/src/main/java/com/lucianotoscano/pvppokego/MainActivity.kt
+@@ -208,11 +208,13 @@
+ 
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
+-        AppDiagnosticLog.initialize(this)
+-        AppDiagnosticLog.record("activity", "on-create")
++        runCatching {
++            AppDiagnosticLog.initialize(this)
++            AppDiagnosticLog.record("activity", "on-create")
++        }
+         settingsRepo = SettingsRepository(this)
+         historyRepo = BattleHistoryRepository(this)
+-        overlayGranted = Settings.canDrawOverlays(this)
++        overlayGranted = runCatching { Settings.canDrawOverlays(this) }.getOrDefault(false)
+ 
+         if (Build.VERSION.SDK_INT >= 33) {
+             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+diff --git a/app/src/main/java/com/lucianotoscano/pvppokego/PvPPokeGoApp.kt b/app/src/main/java/com/lucianotoscano/pvppokego/PvPPokeGoApp.kt
+--- a/app/src/main/java/com/lucianotoscano/pvppokego/PvPPokeGoApp.kt
++++ b/app/src/main/java/com/lucianotoscano/pvppokego/PvPPokeGoApp.kt
+@@ -21,30 +21,36 @@
+ 
+     /** Data loads await this before reading assets; disk hashing never blocks main. */
+     suspend fun awaitPendingHybridActivation() {
+-        pendingHybridActivation?.await()
++        runCatching { pendingHybridActivation?.await() }
+     }
+ 
+     override fun onCreate() {
+         super.onCreate()
+-        PokemonImageSyncWorker.schedule(this)
++        runCatching { PokemonImageSyncWorker.schedule(this) }
+         // A process starts with no active battle. Pending hybrid data may be safely
+         // activated now, never during an ongoing battle or capture frame.
+-        val syncPrefs = getSharedPreferences("hybrid_data_sync", MODE_PRIVATE)
+-        val pending = syncPrefs.getString("pending_version", null)
+-        if (pending != null) {
++        val syncPrefs = runCatching { getSharedPreferences("hybrid_data_sync", MODE_PRIVATE) }.getOrNull()
++        val pending = runCatching { syncPrefs?.getString("pending_version", null) }.getOrNull()
++        if (!pending.isNullOrBlank() && syncPrefs != null) {
+             pendingHybridActivation = startupScope.async {
+-                val switched = runCatching {
++                // Catch inside async so awaiters (GameDataRepository) cannot fail startup.
++                val activated = runCatching {
+                     HybridSnapshotStore(File(filesDir, "hybrid-data"))
+-                        .activateBetweenBattles(pending, battleActive = false)
+-                }.getOrNull()
+-                if (switched != null) {
+-                    syncPrefs.edit().remove("pending_version").remove("last_error").apply()
+-                } else {
+-                    syncPrefs.edit().putString("last_error", "Snapshot pendente inválido").apply()
++                        .activateBetweenBattles(pending, battleActive = false) != null
++                }.getOrDefault(false)
++                runCatching {
++                    val edit = syncPrefs.edit().remove("pending_version")
++                    if (activated) edit.remove("last_error")
++                    else edit.putString("last_error", "Snapshot pendente inválido; dados internos mantidos")
++                    edit.apply()
+                 }
+             }
++        } else if (syncPrefs != null &&
++            runCatching { syncPrefs.contains("pending_version") }.getOrDefault(false)) {
++            // Wrongly typed/stale pending marker must not poison every launch.
++            runCatching { syncPrefs.edit().remove("pending_version").apply() }
+         }
+-        HybridSyncScheduler.install(this)
++        runCatching { HybridSyncScheduler.install(this) }
+         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+             val channel = NotificationChannel(
+                 CHANNEL_ID,
+@@ -54,7 +60,10 @@
+                 description = "Captura visual e overlay do PvPPokeGo"
+                 setShowBadge(false)
+             }
+-            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
++            // Invalid system state must not prevent opening the main Activity.
++            runCatching {
++                getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
++            }
+         }
+     }
+ 
+diff --git a/app/src/main/java/com/lucianotoscano/pvppokego/data/BattleHistoryRepository.kt b/app/src/main/java/com/lucianotoscano/pvppokego/data/BattleHistoryRepository.kt
+--- a/app/src/main/java/com/lucianotoscano/pvppokego/data/BattleHistoryRepository.kt
++++ b/app/src/main/java/com/lucianotoscano/pvppokego/data/BattleHistoryRepository.kt
+@@ -53,7 +53,7 @@
+ )
+ 
+ class BattleHistoryRepository(context: Context) {
+-    private val prefs = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
++    private val prefs = DefensivePreferences(context.getSharedPreferences(FILE, Context.MODE_PRIVATE))
+     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+ 
+     private fun loadRawHistory(): List<BattleHistoryEntry> = runCatching {
+@@ -64,7 +64,7 @@
+     fun loadHistory(): List<BattleHistoryEntry> {
+         // Reading history must not irreversibly rewrite records or erase boundaries.
+         // Conservative reconstruction is a display-only view of the raw segments.
+-        return BattleHistorySegmentMatcher.repair(loadRawHistory())
++        return runCatching { BattleHistorySegmentMatcher.repair(loadRawHistory()) }.getOrDefault(emptyList())
+     }
+ 
+     /**
+diff --git a/app/src/main/java/com/lucianotoscano/pvppokego/data/DefensivePreferences.kt b/app/src/main/java/com/lucianotoscano/pvppokego/data/DefensivePreferences.kt
+new file mode 100644
+--- /dev/null
++++ b/app/src/main/java/com/lucianotoscano/pvppokego/data/DefensivePreferences.kt
+@@ -0,0 +1,25 @@
++package com.lucianotoscano.pvppokego.data
++
++import android.content.SharedPreferences
++
++/** A malformed legacy preference type must not crash startup or overwrite healthy keys. */
++internal class DefensivePreferences(private val delegate: SharedPreferences) : SharedPreferences by delegate {
++    override fun getBoolean(key: String?, defValue: Boolean): Boolean =
++        runCatching { delegate.getBoolean(key, defValue) }.getOrDefault(defValue)
++
++    override fun getInt(key: String?, defValue: Int): Int =
++        runCatching { delegate.getInt(key, defValue) }.getOrDefault(defValue)
++
++    override fun getLong(key: String?, defValue: Long): Long =
++        runCatching { delegate.getLong(key, defValue) }.getOrDefault(defValue)
++
++    override fun getFloat(key: String?, defValue: Float): Float =
++        runCatching { delegate.getFloat(key, defValue) }
++            .getOrDefault(defValue).takeIf(Float::isFinite) ?: defValue
++
++    override fun getString(key: String?, defValue: String?): String? =
++        runCatching { delegate.getString(key, defValue) }.getOrDefault(defValue)
++
++    override fun getStringSet(key: String?, defValues: MutableSet<String>?): MutableSet<String>? =
++        runCatching { delegate.getStringSet(key, defValues) }.getOrDefault(defValues)
++}
+diff --git a/app/src/main/java/com/lucianotoscano/pvppokego/data/SettingsRepository.kt b/app/src/main/java/com/lucianotoscano/pvppokego/data/SettingsRepository.kt
+--- a/app/src/main/java/com/lucianotoscano/pvppokego/data/SettingsRepository.kt
++++ b/app/src/main/java/com/lucianotoscano/pvppokego/data/SettingsRepository.kt
+@@ -12,9 +12,9 @@
+ import org.json.JSONObject
+ 
+ class SettingsRepository(context: Context) {
+-    private val prefs = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
++    private val prefs = DefensivePreferences(context.getSharedPreferences(FILE, Context.MODE_PRIVATE))
+     private val appContext = context.applicationContext
+-    private val hybridPrefs = appContext.getSharedPreferences("hybrid_data_sync", Context.MODE_PRIVATE)
++    private val hybridPrefs = DefensivePreferences(appContext.getSharedPreferences("hybrid_data_sync", Context.MODE_PRIVATE))
+ 
+     var automaticDataUpdates: Boolean
+         get() = hybridPrefs.getBoolean("auto", true)
+diff --git a/app/src/main/java/com/lucianotoscano/pvppokego/data/sync/HybridSnapshotStore.kt b/app/src/main/java/com/lucianotoscano/pvppokego/data/sync/HybridSnapshotStore.kt
+--- a/app/src/main/java/com/lucianotoscano/pvppokego/data/sync/HybridSnapshotStore.kt
++++ b/app/src/main/java/com/lucianotoscano/pvppokego/data/sync/HybridSnapshotStore.kt
+@@ -17,7 +17,10 @@
+     private fun isSafe(name: String) =
+         name.matches(safeName) && name != "." && name != ".."
+ 
+-    fun stage(version: String, files: Map<String, ByteArray>, expected: List<Entry>): Boolean {
++    fun stage(version: String, files: Map<String, ByteArray>, expected: List<Entry>): Boolean =
++        runCatching { stageChecked(version, files, expected) }.getOrDefault(false)
++
++    private fun stageChecked(version: String, files: Map<String, ByteArray>, expected: List<Entry>): Boolean {
+         require(isSafe(version))
+         require(expected.isNotEmpty() && expected.map { it.name }.toSet().size == expected.size)
+         require(expected.all { isSafe(it.name) && it.sha256.matches(validSha) })
+@@ -57,18 +60,26 @@
+         }
+     }
+ 
+-    fun activateBetweenBattles(version: String, battleActive: Boolean): File? {
++    fun activateBetweenBattles(version: String, battleActive: Boolean): File? =
++        runCatching { activateChecked(version, battleActive) }.getOrNull()
++
++    private fun activateChecked(version: String, battleActive: Boolean): File? {
+         if (battleActive || !isSafe(version)) return null
+         val staged = snapshot(version) ?: return null
+         root.mkdirs()
+         val temp = File(root, "active-version.tmp")
+         temp.writeText(version)
+         try {
+-            Files.move(temp.toPath(), File(root, "active-version").toPath(),
+-                StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+-        } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+-            Files.move(temp.toPath(), File(root, "active-version").toPath(),
+-                StandardCopyOption.REPLACE_EXISTING)
++            try {
++                Files.move(temp.toPath(), File(root, "active-version").toPath(),
++                    StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
++            } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
++                Files.move(temp.toPath(), File(root, "active-version").toPath(),
++                    StandardCopyOption.REPLACE_EXISTING)
++            }
++        } finally {
++            // Atomic replace preserves the old marker if the move fails.
++            runCatching { temp.delete() }
+         }
+         return staged
+     }
+@@ -85,7 +96,9 @@
+     }
+ 
+     /** Re-check all persisted SHA-256 hashes before trusting an active snapshot. */
+-    fun snapshot(version: String): File? {
++    fun snapshot(version: String): File? = runCatching { snapshotChecked(version) }.getOrNull()
++
++    private fun snapshotChecked(version: String): File? {
+         if (!isSafe(version)) return null
+         val folder = File(root, "staged-" + version)
+         if (!folder.isDirectory ||
+@@ -105,7 +118,7 @@
+         return folder
+     }
+ 
+-    private fun File.readTextOrNull(): String? = if (isFile) runCatching { readText() }.getOrNull() else null
++    private fun File.readTextOrNull(): String? = runCatching { if (isFile) readText() else null }.getOrNull()
+ 
+     private fun digest(bytes: ByteArray): String =
+         MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+diff --git a/app/src/main/java/com/lucianotoscano/pvppokego/data/sync/HybridSyncScheduler.kt b/app/src/main/java/com/lucianotoscano/pvppokego/data/sync/HybridSyncScheduler.kt
+--- a/app/src/main/java/com/lucianotoscano/pvppokego/data/sync/HybridSyncScheduler.kt
++++ b/app/src/main/java/com/lucianotoscano/pvppokego/data/sync/HybridSyncScheduler.kt
+@@ -32,11 +32,11 @@
+ 
+     fun install(context: Context) {
+         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+-        if (!prefs.getBoolean("auto", true)) {
++        if (!runCatching { prefs.getBoolean("auto", true) }.getOrDefault(true)) {
+             WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_WORK)
+             return
+         }
+-        val wifiOnly = prefs.getBoolean("wifi_only", true)
++        val wifiOnly = runCatching { prefs.getBoolean("wifi_only", true) }.getOrDefault(true)
+         val request = PeriodicWorkRequestBuilder<HybridSyncWorker>(1, TimeUnit.DAYS)
+             .setConstraints(
+                 Constraints.Builder()
+@@ -52,7 +52,7 @@
+     /** Schedules a user-requested one-off refresh, even if automatic checks are disabled. */
+     fun checkNow(context: Context) {
+         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+-        val wifiOnly = prefs.getBoolean("wifi_only", true)
++        val wifiOnly = runCatching { prefs.getBoolean("wifi_only", true) }.getOrDefault(true)
+         val request = OneTimeWorkRequestBuilder<HybridSyncWorker>()
+             .setInputData(workDataOf("manual_check" to true))
+             .setConstraints(
+@@ -89,9 +89,9 @@
+ 
+     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
+         val prefs = applicationContext.getSharedPreferences("hybrid_data_sync", Context.MODE_PRIVATE)
+-        if (!prefs.getBoolean("auto", true) && !inputData.getBoolean("manual_check", false)) return@withContext Result.success()
++        if (!runCatching { prefs.getBoolean("auto", true) }.getOrDefault(true) && !inputData.getBoolean("manual_check", false)) return@withContext Result.success()
+         val endpoint = TRUSTED_MANIFEST_URL
+-        if (prefs.getBoolean("wifi_only", true)) {
++        if (runCatching { prefs.getBoolean("wifi_only", true) }.getOrDefault(true)) {
+             val manager = applicationContext.getSystemService(ConnectivityManager::class.java)
+             val caps = manager?.activeNetwork?.let { manager.getNetworkCapabilities(it) }
+             if (caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) != true) {
+diff --git a/app/src/main/java/com/lucianotoscano/pvppokego/engine/BattleEngine.kt b/app/src/main/java/com/lucianotoscano/pvppokego/engine/BattleEngine.kt
+--- a/app/src/main/java/com/lucianotoscano/pvppokego/engine/BattleEngine.kt
++++ b/app/src/main/java/com/lucianotoscano/pvppokego/engine/BattleEngine.kt
+@@ -50,6 +50,7 @@
+ 
+     private val enemyStates = BattleStateStore()
+     private val opponentTeamTracker = OpponentTeamTracker()
++    private val enemyChargedHistory = EnemyChargedHistory()
+     // Survives a rejected OCR frame: needed to detect a real switch on recovery.
+     private var lastTrustedOpponentSlot: Int? = null
+     private val ownStates = BattleStateStore()
+@@ -118,6 +119,8 @@
+     private var captureHealth = CaptureHealth.FRESH
+     private var captureStatusText: String? = null
+     private var captureGapStartedAtMs: Long? = null
++    private var preCaptureGapPhase: com.lucianotoscano.pvppokego.data.FastMovePhaseSnapshot? = null
++    private var lastGapRecoveryAtMs: Long = 0L
+     private var localStrategyProfile: BattleStrategyProfile? = null
+ 
+     private val incomingDamageTracker = ObservedDamageTracker()
+@@ -149,7 +152,10 @@
+         enemyCpTracker.reset()
+         tracker.reset()
+         predictiveEnergy.clear()
++        enemyChargedHistory.clear()
+         enemyFastPhase.reset()
++        preCaptureGapPhase = null
++        lastGapRecoveryAtMs = 0L
+         lastEnemyFastEventAtMs = 0L
+         lastPlayerHpVisibleAtMs = 0L
+         ownTracker.reset()
+@@ -308,20 +314,22 @@
+         val isGap = health == CaptureHealth.STALE || health == CaptureHealth.PAUSED
+         if (!wasGap && isGap) {
+             captureGapStartedAtMs = now
++            preCaptureGapPhase = enemyFastPhase.snapshot(now)
+         } else if (wasGap && !isGap) {
+             val gapMs = captureGapStartedAtMs?.let { (now - it).coerceAtLeast(0L) } ?: 0L
+             ensurePredictiveEnergyInitialized()
+             if (predictiveEnergy.isInitialized && gapMs > 0L) {
+-                val fastestTurns = predictiveEnergy.fastTurnsRange().first.coerceAtLeast(1)
+-                val fastestMs = fastestTurns * EnemyEnergyTracker.TURN_MS.toLong()
+-                val possibleMissed = kotlin.math.ceil(gapMs.toDouble() / fastestMs.toDouble())
+-                    .toInt()
+-                    .coerceIn(0, 5)
+-                predictiveEnergy.widenForPossibleMissedFast(possibleMissed)
++                predictiveEnergy.recoverCaptureGap(gapMs, preCaptureGapPhase)
++                // Start the next non-mutating projection at the resumed frame, not
++                // at the pre-gap HP reading (which would count the same gap twice).
++                lastPlayerHpVisibleAtMs = now
++                lastEnemyFastEventAtMs = 0L
++                lastGapRecoveryAtMs = now
+                 syncLegacyEnemyEnergyFromPredictive()
+                 saveActiveState()
+             }
+             captureGapStartedAtMs = null
++            preCaptureGapPhase = null
+         }
+         captureHealth = health
+         captureStatusText = statusText
+@@ -1166,13 +1174,23 @@
+         val observedInterval = lastEnemyFastEventAtMs
+             .takeIf { it > 0L }
+             ?.let { (nowMs - it).coerceAtLeast(0L) }
+-        enemyFastPhase.observeCompletion(
+-            candidate = f,
+-            count = count,
+-            nowMs = nowMs,
+-            detectorConfidence = confidence,
+-            observedIntervalMs = observedInterval
+-        )
++        if (count == 1 && damageFraction != null && damageFraction > 0f) {
++            enemyFastPhase.observeHpConfirmedCompletion(
++                candidate = f,
++                nowMs = nowMs,
++                damageFraction = damageFraction,
++                detectorConfidence = confidence,
++                observedIntervalMs = observedInterval
++            )
++        } else {
++            enemyFastPhase.observeCompletion(
++                candidate = f,
++                count = count,
++                nowMs = nowMs,
++                detectorConfidence = confidence,
++                observedIntervalMs = observedInterval
++            )
++        }
+         if (predictiveEnergy.isInitialized) {
+             predictiveEnergy.observeFastCompletion(
+                 count = count,
+@@ -1188,29 +1206,22 @@
+             if (activeState?.fastMoveManual == true) {
+                 predictiveEnergy.confirmFastMove(f)
+             } else {
+-                predictiveEnergy.fastMoveInference()?.let { inference ->
+-                    val strongEnough = inference.observedEvents >= 2 &&
+-                        ((inference.probability >= .72f && inference.margin >= .18f) ||
+-                            inference.probability >= .88f)
+-                    if (strongEnough) {
+-                        val inferredFast = inference.move
+-                        fast = inferredFast
+-                        activeState?.fastMoveId = inferredFast.moveId
+-                        if (inferredFast.moveId != f.moveId) {
+-                            // Re-anchor this same observed completion to the newly identified
+-                            // legal Fast Move instead of losing phase until the next event.
+-                            enemyFastPhase.observeCompletion(
+-                                candidate = inferredFast,
+-                                count = count,
+-                                nowMs = nowMs,
+-                                detectorConfidence = confidence,
+-                                observedIntervalMs = observedInterval
+-                            )
+-                        } else {
+-                            enemyFastPhase.confirmMove(inferredFast)
+-                        }
+-                        lastAutoSource = source + "+cadencia/dano:" + inferredFast.moveId
++                predictiveEnergy.confirmFastMoveFromEvidence()?.let { inferredFast ->
++                    fast = inferredFast
++                    activeState?.fastMoveId = inferredFast.moveId
++                    if (inferredFast.moveId != f.moveId) {
++                        // Re-anchor this observed completion to the trusted legal Fast.
++                        enemyFastPhase.observeCompletion(
++                            candidate = inferredFast,
++                            count = count,
++                            nowMs = nowMs,
++                            detectorConfidence = confidence,
++                            observedIntervalMs = observedInterval
++                        )
++                    } else {
++                        enemyFastPhase.confirmMove(inferredFast)
+                     }
++                    lastAutoSource = source + "+cadencia/dano:" + inferredFast.moveId
+                 }
+             }
+             syncLegacyEnemyEnergyFromPredictive()
+@@ -1451,6 +1462,10 @@
+             tracker.onObservedChargedMove(move)
+         }
+         applyChargedStatEffects(move, actorIsEnemy = true)
++        enemyChargedHistory.record(
++            opponentTeamTracker.activeSlot(), enemySpeciesId ?: enemyName,
++            move.moveId, nowMs
++        )
+         recordChargedMove(move, observed = true)
+         chargedPendingSinceMs = null
+         lastChargedConfirmedAtMs = nowMs
+@@ -1699,10 +1714,14 @@
+             ?.let(repo::legalChargedMoves)
+             .orEmpty()
+ 
+-    private fun weightedEnemyChargedMoves() =
+-        (activeState?.speciesId ?: enemySpeciesId ?: enemyName)
+-            ?.let(repo::weightedChargedMoves)
+-            .orEmpty()
++    private fun weightedEnemyChargedMoves(): List<com.lucianotoscano.pvppokego.data.WeightedMove> {
++        val legal = (activeState?.speciesId ?: enemySpeciesId ?: enemyName)
++            ?.let(repo::weightedChargedMoves).orEmpty()
++        val confirmed = activeState?.observedChargedMoveIds.orEmpty().distinct()
++        // Only close the pool when two *legal* charged moves are actually confirmed.
++        val known = confirmed.filter { id -> legal.any { it.move.moveId == id } }
++        return if (known.size == 2) legal.filter { it.move.moveId in known } else legal
++    }
+ 
+     private fun ensurePredictiveEnergyInitialized() {
+         if (predictiveEnergy.isInitialized) return
+@@ -1900,7 +1919,11 @@
+                 attackerAttackStages = enemyStages.attack,
+                 defenderDefenseStages = ownStages.defense,
+                 unobservedFastWindowMs = unobservedEnemyFastWindowMs(),
+-                fastPhase = enemyFastPhase.snapshot()
++                fastPhase = enemyFastPhase.snapshot(),
++                observedChargedMoveIds = enemyChargedHistory.observedMoves(
++                    opponentTeamTracker.activeSlot(), enemySpeciesId ?: enemyName
++                ),
++                enemyHpRatio = lastOpponentHpRatio
+             )
+         } else null
+ 
+@@ -2093,6 +2116,16 @@
+             battleConfidence = lastBattleConfidence,
+             enemyHistory = enemyHistory,
+             debugText = if (debug) buildString {
++                predictiveForecast?.let { forecast ->
++                    val phase = forecast.fastPhase
++                    val fastIdentity = predictiveEnergy.fastMoveInference()
++                    appendLine("Energia ${forecast.energyMin}-${forecast.energyMax} (~${forecast.energyLikely}) C=${(forecast.confidence * 100).toInt()}%")
++                    appendLine("Fast ${fastIdentity?.move?.name ?: "?"} ${(fastIdentity?.probability?.times(100))?.toInt() ?: 0}% | fase ${phase?.turnsUntilRegistration ?: "?"}t")
++                    if (captureHealth == CaptureHealth.STALE || captureHealth == CaptureHealth.PAUSED ||
++                        System.currentTimeMillis() - lastGapRecoveryAtMs in 0L..2_500L) {
++                        appendLine("RECUPERAÇÃO DE CAPTURA — estimativa incerta")
++                    }
++                }
+                 val s = activeState
+                 val os = ownActiveState
+                 appendLine("Jogador: ${playerName ?: "?"} PC ${playerCp ?: "?"} | slots=${ownTeamSlots.joinToString { "#${it.slot + 1} ${it.name}/${it.cp ?: "?"}" }}")
+diff --git a/app/src/main/java/com/lucianotoscano/pvppokego/engine/ChargedMovePredictor.kt b/app/src/main/java/com/lucianotoscano/pvppokego/engine/ChargedMovePredictor.kt
+--- a/app/src/main/java/com/lucianotoscano/pvppokego/engine/ChargedMovePredictor.kt
++++ b/app/src/main/java/com/lucianotoscano/pvppokego/engine/ChargedMovePredictor.kt
+@@ -35,7 +35,8 @@
+      */
+     internal fun energyWindow(
+         hypotheses: List<EnemyEnergyTracker.Hypothesis>,
+-        energyCost: Int
++        energyCost: Int,
++        phase: FastMovePhaseSnapshot? = null
+     ): EnergyWindow? {
+         if (hypotheses.isEmpty() || energyCost <= 0) return null
+         val perHypothesis = hypotheses.map { h ->
+@@ -44,7 +45,14 @@
+             val fastNeeded = if (missing == 0) 0 else {
+                 ceil(missing.toDouble() / gain.toDouble()).toInt()
+             }
+-            val turns = fastNeeded * h.fastMove.turns.coerceAtLeast(1)
++            val moveTurns = h.fastMove.turns.coerceAtLeast(1)
++            val trustworthyPhase = phase?.takeIf {
++                it.confidence >= .75f && it.moveId == h.fastMove.moveId &&
++                    it.turnsUntilRegistration in 1..moveTurns
++            }
++            val turns = if (fastNeeded > 0 && trustworthyPhase != null) {
++                (fastNeeded - 1) * moveTurns + trustworthyPhase.turnsUntilRegistration
++            } else fastNeeded * moveTurns
+             Triple(h, fastNeeded, turns)
+         }
+         val fastValues = perHypothesis.map { it.second to it.first.weight }
+@@ -78,7 +86,9 @@
+         defenderDefenseStages: StatStageRange = StatStageRange(),
+         /** Time since the player HP bar was last readable. Projection is non-mutating. */
+         unobservedFastWindowMs: Long = 0L,
+-        fastPhase: FastMovePhaseSnapshot? = null
++        fastPhase: FastMovePhaseSnapshot? = null,
++        observedChargedMoveIds: List<String> = emptyList(),
++        enemyHpRatio: Float? = null
+     ): EnemyEnergyForecast? {
+         val hypotheses = energyTracker.projectedHypotheses(unobservedFastWindowMs)
+         if (hypotheses.isEmpty() || chargedMoves.isEmpty()) return null
+@@ -106,7 +116,7 @@
+         val candidates = chargedMoves.mapNotNull candidate@ { weightedMove ->
+             val move = weightedMove.move
+             val cost = move.chargedCost.takeIf { it > 0 } ?: return@candidate null
+-            val window = energyWindow(hypotheses, cost) ?: return@candidate null
++            val window = energyWindow(hypotheses, cost, fastPhase) ?: return@candidate null
+             val fastMin = window.fastMovesMin
+             val fastMax = window.fastMovesMax
+             val fastLikely = window.fastMovesLikely
+@@ -178,9 +188,18 @@
+                 .sumOf { it.weight.toDouble() }
+                 .toFloat()
+                 .takeIf { it > 0f } ?: 1f
+-            val baitProbability = if (baitPotential) {
+-                (weightedMove.weight / affordableWeight).coerceIn(0f, .95f)
+-            } else 0f
++            // Prior is NOT a calibrated probability of player behaviour.
++            // Repeated observed cheap throws only increases bait *heuristic* when a
++            // stronger move is affordable and the opponent's exact move pool is uncertain.
++            val usedCheap = observedChargedMoveIds.count { it == move.moveId }
++            val baitProbability = EnemyMovePredictor.baitHeuristic(
++                baseProbability = weightedMove.weight / affordableWeight,
++                cheapMovePreviouslyObserved = usedCheap,
++                expensiveMoveAffordable = baitPotential,
++                cheapMoveLethal = likelyKo,
++                likelyEnemyEnergy = projectedEnergyLikely,
++                enemyHpRatio = enemyHpRatio
++            )
+             val fastCountSequence = likelyHypothesis?.let { h ->
+                 EnergySequenceMath.repeatedChargedCounts(
+                     currentEnergy = h.energy,
+diff --git a/app/src/main/java/com/lucianotoscano/pvppokego/engine/EnemyChargedHistory.kt b/app/src/main/java/com/lucianotoscano/pvppokego/engine/EnemyChargedHistory.kt
+new file mode 100644
+--- /dev/null
++++ b/app/src/main/java/com/lucianotoscano/pvppokego/engine/EnemyChargedHistory.kt
+@@ -0,0 +1,22 @@
++package com.lucianotoscano.pvppokego.engine
++import java.util.ArrayDeque
++
++/** In-memory observations for the current match, never shared between opponents or games. */
++internal class EnemyChargedHistory(private val maxEvents: Int = 12) {
++    data class Event(val opponentSlot: Int, val speciesId: String, val moveId: String, val timestampMs: Long)
++    private val events = ArrayDeque<Event>()
++    fun clear() = events.clear()
++    fun record(opponentSlot: Int?, speciesId: String?, moveId: String, timestampMs: Long) {
++        if (opponentSlot == null || speciesId.isNullOrBlank() || moveId.isBlank()) return
++        if (events.lastOrNull { it.opponentSlot == opponentSlot && it.speciesId == speciesId && it.moveId == moveId }?.let {
++            it.opponentSlot == opponentSlot && it.moveId == moveId &&
++                timestampMs - it.timestampMs in 0..600L
++        } == true) return
++        if (events.size >= maxEvents) events.removeFirst()
++        events.addLast(Event(opponentSlot, speciesId, moveId, timestampMs))
++    }
++    fun observedMoves(opponentSlot: Int?, speciesId: String?): List<String> =
++        if (opponentSlot == null || speciesId.isNullOrBlank()) emptyList()
++        else events.filter { it.opponentSlot == opponentSlot && it.speciesId == speciesId }
++            .map { it.moveId }
++}
+diff --git a/app/src/main/java/com/lucianotoscano/pvppokego/engine/EnemyEnergyTracker.kt b/app/src/main/java/com/lucianotoscano/pvppokego/engine/EnemyEnergyTracker.kt
+--- a/app/src/main/java/com/lucianotoscano/pvppokego/engine/EnemyEnergyTracker.kt
++++ b/app/src/main/java/com/lucianotoscano/pvppokego/engine/EnemyEnergyTracker.kt
+@@ -2,6 +2,7 @@
+ 
+ import com.lucianotoscano.pvppokego.data.EnemyEnergyHypothesisSnapshot
+ import com.lucianotoscano.pvppokego.data.EnemyEnergySnapshot
++import com.lucianotoscano.pvppokego.data.FastMovePhaseSnapshot
+ import com.lucianotoscano.pvppokego.data.MoveDef
+ import com.lucianotoscano.pvppokego.data.WeightedMove
+ import kotlin.math.abs
+@@ -153,7 +154,8 @@
+                 ?.takeIf { it > 0f }
+                 ?: return@map h
+             val relativeError = abs(observedPercentPerHit - expected) / expected.coerceAtLeast(1.0f)
+-            val likelihood = exp(-1.75 * relativeError.toDouble())
++            val evidenceStrength = if (observedFastEvents in 1..6) 2.15 else 1.75
++            val likelihood = exp(-evidenceStrength * relativeError.toDouble())
+                 .toFloat()
+                 .coerceIn(DAMAGE_MIN_LIKELIHOOD, 1f)
+             h.copy(weight = h.weight * likelihood)
+@@ -183,6 +185,60 @@
+             margin = (probability - secondProbability).coerceIn(0f, 1f),
+             observedEvents = observedFastEvents
+         )
++    }
++
++    /**
++     * Confirm a legal Fast Move only after independent completions discriminate it.
++     * A single HP drop or metadata prior never eliminates alternatives.
++     */
++    fun confirmFastMoveFromEvidence(
++        minimumEvents: Int = 3,
++        minimumMargin: Float = .35f
++    ): MoveDef? {
++        val inference = fastMoveInference() ?: return null
++        if (inference.observedEvents < minimumEvents ||
++            inference.margin < minimumMargin ||
++            inference.probability < .75f ||
++            consistencyScore < .60f) return null
++        confirmFastMove(inference.move)
++        return inference.move
++    }
++
++    /**
++     * Recover after losing screen frames. Preserve 0..N possible completions;
++     * use last known phase only to REWEIGHT, never assert an unseen Fast as fact.
++     * The phase must come from before the gap, not after stale screen capture.
++     */
++    fun recoverCaptureGap(gapMs: Long, preGapPhase: FastMovePhaseSnapshot?) {
++        if (hypotheses.isEmpty() || gapMs < TURN_MS.toLong()) return
++        val elapsedMs = gapMs.coerceIn(0L, MAX_GAP_RECOVERY_MOVES * 5L * TURN_MS)
++        hypotheses = hypotheses.flatMap { h ->
++            val durationMs = h.fastMove.turns.coerceAtLeast(1) * TURN_MS.toLong()
++            val maximum = (elapsedMs / durationMs + 1L).toInt().coerceIn(0, MAX_GAP_RECOVERY_MOVES)
++            val reliablePhase = preGapPhase?.takeIf {
++                it.confidence >= .60f && it.moveId == h.fastMove.moveId &&
++                    it.turnsUntilRegistration in 1..h.fastMove.turns.coerceAtLeast(1)
++            }
++            val likelyCompletions = reliablePhase?.let { phase ->
++                val firstRegistrationMs = phase.turnsUntilRegistration * TURN_MS.toLong()
++                if (elapsedMs < firstRegistrationMs) 0
++                else (1L + (elapsedMs - firstRegistrationMs) / durationMs)
++                    .toInt().coerceIn(0, maximum)
++            }
++            (0..maximum).map { extra ->
++                val decay = if (reliablePhase != null) PHASE_GAP_WEIGHT_DECAY else GAP_WEIGHT_DECAY
++                val distance = if (likelyCompletions != null) kotlin.math.abs(extra - likelyCompletions)
++                    else extra
++                h.copy(
++                    energy = (h.energy + h.fastMove.energyGain.coerceAtLeast(0) * extra).coerceAtMost(maxEnergy),
++                    completedFastMoves = h.completedFastMoves + extra,
++                    elapsedTurns = h.elapsedTurns + h.fastMove.turns * extra,
++                    weight = h.weight * decay.pow(distance)
++                )
++            }
++        }
++        consistencyScore = (consistencyScore * .97f).coerceAtLeast(.05f)
++        normalizeAndPrune()
+     }
+ 
+     /**
+@@ -503,6 +559,7 @@
+         private const val MIN_WEIGHT = 0.0001f
+         private const val RECOVERY_WEIGHT = 0.35f
+         private const val GAP_WEIGHT_DECAY = 0.58f
++        private const val PHASE_GAP_WEIGHT_DECAY = 0.72f
+         private const val PROJECTION_WEIGHT_DECAY = 0.58f
+         private const val DAMAGE_MIN_LIKELIHOOD = 0.05f
+         private const val MIN_PROJECTION_GAP_MS = 600L
+diff --git a/app/src/main/java/com/lucianotoscano/pvppokego/engine/EnemyMovePredictor.kt b/app/src/main/java/com/lucianotoscano/pvppokego/engine/EnemyMovePredictor.kt
+new file mode 100644
+--- /dev/null
++++ b/app/src/main/java/com/lucianotoscano/pvppokego/engine/EnemyMovePredictor.kt
+@@ -0,0 +1,35 @@
++package com.lucianotoscano.pvppokego.engine
++
++/**
++ * Deterministic guardrails for tactical heuristics. No player behaviour is certain.
++ * All damage and energy inputs must come from the established trackers, not screen taps.
++ */
++internal object EnemyMovePredictor {
++    /** Bait means a cheap non-lethal move used to induce a shield. */
++    fun baitHeuristic(
++        baseProbability: Float,
++        cheapMovePreviouslyObserved: Int,
++        expensiveMoveAffordable: Boolean,
++        cheapMoveLethal: Boolean,
++        likelyEnemyEnergy: Int,
++        enemyHpRatio: Float?
++    ): Float {
++        if (!expensiveMoveAffordable || cheapMoveLethal) return 0f
++        val historyAdjustment = when {
++            cheapMovePreviouslyObserved >= 3 -> .24f
++            cheapMovePreviouslyObserved == 2 -> .20f
++            cheapMovePreviouslyObserved == 1 -> .12f
++            else -> 0f
++        }
++        val highEnergyPenalty = if (likelyEnemyEnergy >= 85) .15f else 0f
++        val criticalHpPenalty = if (enemyHpRatio != null && enemyHpRatio <= .15f) .15f else 0f
++        // Bounded heuristic, NEVER display as 100% certainty.
++        return (baseProbability.coerceIn(0f, 1f) + historyAdjustment - highEnergyPenalty - criticalHpPenalty)
++            .coerceIn(0f, .85f)
++    }
++
++    /** Impossible to infer an exact throw/catch window without both animation phases. */
++    fun possibleOpponentThrowBoundary(enemyFastTurns: Int, turnsSinceEnemyCompletion: Int): Boolean =
++        enemyFastTurns in 1..5 && turnsSinceEnemyCompletion >= 0 &&
++            turnsSinceEnemyCompletion % enemyFastTurns == 0
++}
+diff --git a/app/src/main/java/com/lucianotoscano/pvppokego/engine/FastMovePhaseTracker.kt b/app/src/main/java/com/lucianotoscano/pvppokego/engine/FastMovePhaseTracker.kt
+--- a/app/src/main/java/com/lucianotoscano/pvppokego/engine/FastMovePhaseTracker.kt
++++ b/app/src/main/java/com/lucianotoscano/pvppokego/engine/FastMovePhaseTracker.kt
+@@ -53,6 +53,18 @@
+         lastCompletionAtMs = nowMs
+     }
+ 
++    /** HP evidence is only used to refine a completion already accepted by the detector. */
++    fun observeHpConfirmedCompletion(
++        candidate: MoveDef,
++        nowMs: Long,
++        damageFraction: Float?,
++        detectorConfidence: Float,
++        observedIntervalMs: Long? = null
++    ) {
++        if (damageFraction == null || !damageFraction.isFinite() || damageFraction <= 0f) return
++        observeCompletion(candidate, 1, nowMs, detectorConfidence, observedIntervalMs)
++    }
++
+     fun snapshot(nowMs: Long = System.currentTimeMillis()): FastMovePhaseSnapshot? {
+         val current = move ?: return null
+         if (lastCompletionAtMs <= 0L) return null
+diff --git a/app/src/main/java/com/lucianotoscano/pvppokego/engine/ShieldDecisionEngine.kt b/app/src/main/java/com/lucianotoscano/pvppokego/engine/ShieldDecisionEngine.kt
+--- a/app/src/main/java/com/lucianotoscano/pvppokego/engine/ShieldDecisionEngine.kt
++++ b/app/src/main/java/com/lucianotoscano/pvppokego/engine/ShieldDecisionEngine.kt
+@@ -32,6 +32,9 @@
+         val lethalLikely = threat.likelyKo || (hpPercent != null && damage != null &&
+             damage.averagePercent >= hpPercent - 1f)
+         val baitProbability = candidates.maxOfOrNull { it.baitProbability } ?: 0f
++        val phaseHint = f.fastPhase?.takeIf {
++            it.confidence >= .75f && it.turnsUntilRegistration <= 1
++        } != null
+ 
+         if (shieldsKnown && shieldsRemaining <= 0) {
+             return ShieldDecisionForecast(
+@@ -47,7 +50,8 @@
+                 ShieldAction.SHIELD,
+                 threat.move.name,
+                 confidence = (.84f + threat.confidence * .15f).coerceAtMost(.99f),
+-                reason = "dano provável alcança o HP atual",
++                reason = if (phaseHint) "dano letal provável; fase do Fast próxima do registro"
++                    else "dano provável alcança o HP atual",
+                 baitProbability = baitProbability
+             )
+         }
+@@ -56,7 +60,8 @@
+                 ShieldAction.SHIELD,
+                 threat.move.name,
+                 confidence = (.68f + threat.confidence * .20f).coerceAtMost(.92f),
+-                reason = "faixa de dano contém KO",
++                reason = if (phaseHint) "faixa de dano contém KO; fase do Fast próxima do registro"
++                    else "faixa de dano contém KO",
+                 baitProbability = baitProbability
+             )
+         }
+diff --git a/app/src/main/java/com/lucianotoscano/pvppokego/overlay/BattleOverlayView.kt b/app/src/main/java/com/lucianotoscano/pvppokego/overlay/BattleOverlayView.kt
+--- a/app/src/main/java/com/lucianotoscano/pvppokego/overlay/BattleOverlayView.kt
++++ b/app/src/main/java/com/lucianotoscano/pvppokego/overlay/BattleOverlayView.kt
+@@ -600,12 +600,15 @@
+                 candidate.readyCertain && candidate.likelyKo -> "DANGER"
+                 candidate.readyCertain -> "READY"
+                 candidate.readyPossible -> "READY?"
++                candidate.turnsRemainingMax - candidate.turnsRemainingMin >= 5 -> "INCERTO"
+                 candidate.turnsRemainingMin <= forecast.reactionTurns -> "PREPARE"
+                 else -> "+" + candidate.fastMovesRemainingLikely + " FAST"
+             }
+             val time = when {
+                 candidate.readyPossible -> "agora"
+                 candidate.likelyTimeMs <= 0L -> "agora"
++                candidate.turnsRemainingMax - candidate.turnsRemainingMin >= 5 ->
++                    "${candidate.turnsRemainingMin}-${candidate.turnsRemainingMax}t"
+                 else -> "~" + "%.1f".format(candidate.likelyTimeMs / 1000f) + "s"
+             }
+             val confidence = (candidate.confidence * 100f).toInt().coerceIn(0, 100)
+@@ -615,7 +618,7 @@
+                 .orEmpty()
+             val bait = candidate.baitProbability
+                 .takeIf { it >= .20f }
+-                ?.let { " • bait " + "%.0f".format(it * 100f) + "%" }
++                ?.let { " • bait? " + "%.0f".format(it * 100f) + "%" }
+                 .orEmpty()
+             val line = shortMoveName(candidate.move.name) + "  " + status + " • " + time +
+                 sequence + bait + " • " + confidence + "%"
+diff --git a/app/src/test/java/com/lucianotoscano/pvppokego/data/DefensivePreferencesTest.kt b/app/src/test/java/com/lucianotoscano/pvppokego/data/DefensivePreferencesTest.kt
+new file mode 100644
+--- /dev/null
++++ b/app/src/test/java/com/lucianotoscano/pvppokego/data/DefensivePreferencesTest.kt
+@@ -0,0 +1,28 @@
++package com.lucianotoscano.pvppokego.data
++
++import android.content.SharedPreferences
++import org.junit.Assert.*
++import org.junit.Test
++import java.lang.reflect.Proxy
++
++class DefensivePreferencesTest {
++    @Test fun badStoredTypesFallBackWithoutMutatingOtherEntries() {
++        val preferences = Proxy.newProxyInstance(
++            SharedPreferences::class.java.classLoader,
++            arrayOf(SharedPreferences::class.java)
++        ) { _, method, args ->
++            when (method.name) {
++                "getBoolean", "getInt", "getLong", "getFloat", "getString", "getStringSet" ->
++                    throw ClassCastException("bad legacy type")
++                "contains" -> false
++                else -> throw UnsupportedOperationException(method.name)
++            }
++        } as SharedPreferences
++        val safe = DefensivePreferences(preferences)
++        assertTrue(safe.getBoolean("auto", true))
++        assertEquals(1500, safe.getInt("league", 1500))
++        assertEquals(0L, safe.getLong("last", 0L))
++        assertEquals(.8f, safe.getFloat("scale", .8f), .0001f)
++        assertEquals(null, safe.getString("pending_version", null))
++    }
++}
+diff --git a/app/src/test/java/com/lucianotoscano/pvppokego/data/sync/HybridSnapshotStoreTest.kt b/app/src/test/java/com/lucianotoscano/pvppokego/data/sync/HybridSnapshotStoreTest.kt
+--- a/app/src/test/java/com/lucianotoscano/pvppokego/data/sync/HybridSnapshotStoreTest.kt
++++ b/app/src/test/java/com/lucianotoscano/pvppokego/data/sync/HybridSnapshotStoreTest.kt
+@@ -65,25 +65,30 @@
+         } finally { root.deleteRecursively() }
+     }
+ 
++    @Test fun `unreadable stage returns null without throwing`() {
++        val parent = Files.createTempDirectory("bad-stage-parent").toFile()
++        try {
++            val root = parent.resolve("root")
++            root.writeText("not a directory")
++            val store = HybridSnapshotStore(root)
++            val bytes = "okay".toByteArray()
++            assertFalse(store.stage("good", mapOf("data.json" to bytes),
++                listOf(HybridSnapshotStore.Entry("data.json", hash(bytes)))))
++            assertNull(store.activateBetweenBattles("missing", false))
++            assertNull(store.activeVersion())
++        } finally { parent.deleteRecursively() }
++    }
++
+     @Test fun `rejects traversal duplicate names and incomplete manifests`() {
+         val root = Files.createTempDirectory("hybrid-adversarial").toFile()
+         try {
+             val store = HybridSnapshotStore(root)
+             val bytes = "data".toByteArray()
+             val entry = HybridSnapshotStore.Entry("a", hash(bytes))
+-            try {
+-                store.stage("v1", mapOf("../bad" to bytes),
+-                    listOf(HybridSnapshotStore.Entry("../bad", hash(bytes))))
+-                fail("Traversal must be rejected")
+-            } catch (_: IllegalArgumentException) { }
+-            try {
+-                store.stage("v1", emptyMap(), listOf(entry))
+-                fail("Missing files must be rejected")
+-            } catch (_: IllegalArgumentException) { }
+-            try {
+-                store.stage("v1", mapOf("a" to bytes), listOf(entry, entry))
+-                fail("Duplicate names must be rejected")
+-            } catch (_: IllegalArgumentException) { }
++            assertFalse(store.stage("v1", mapOf("../bad" to bytes),
++                listOf(HybridSnapshotStore.Entry("../bad", hash(bytes)))))
++            assertFalse(store.stage("v1", emptyMap(), listOf(entry)))
++            assertFalse(store.stage("v1", mapOf("a" to bytes), listOf(entry, entry)))
+         } finally { root.deleteRecursively() }
+     }
+ 
+diff --git a/app/src/test/java/com/lucianotoscano/pvppokego/engine/ChargedMovePredictorTest.kt b/app/src/test/java/com/lucianotoscano/pvppokego/engine/ChargedMovePredictorTest.kt
+--- a/app/src/test/java/com/lucianotoscano/pvppokego/engine/ChargedMovePredictorTest.kt
++++ b/app/src/test/java/com/lucianotoscano/pvppokego/engine/ChargedMovePredictorTest.kt
+@@ -1,6 +1,7 @@
+ package com.lucianotoscano.pvppokego.engine
+ 
+ import com.lucianotoscano.pvppokego.data.MoveDef
++import com.lucianotoscano.pvppokego.data.FastMovePhaseSnapshot
+ import org.junit.Assert.assertEquals
+ import org.junit.Assert.assertFalse
+ import org.junit.Assert.assertTrue
+@@ -110,4 +111,23 @@
+         assertEquals(5_000L, window.turnsLikely * EnemyEnergyTracker.TURN_MS.toLong())
+     }
+ 
++    @Test
++    fun phaseEvidenceShortensNextRegistrationWithoutChangingEnergyOrFastCount() {
++        val fast = fast("THREE_TURNS", 10, 3)
++        val h = h(fast, 30, 1f)
++        val baseline = ChargedMovePredictor.energyWindow(listOf(h), 50)!!
++        val reliable = FastMovePhaseSnapshot(
++            moveId = fast.moveId, moveName = fast.name,
++            moveTurns = 3, phaseTurn = 3, turnsUntilRegistration = 1,
++            nextRegistrationInMs = 500L, confidence = .94f, observedCompletions = 4
++        )
++        val shortened = ChargedMovePredictor.energyWindow(listOf(h), 50, reliable)!!
++        assertEquals(6, baseline.turnsLikely)
++        assertEquals(4, shortened.turnsLikely)
++        assertEquals(baseline.fastMovesLikely, shortened.fastMovesLikely)
++        val unreliable = reliable.copy(confidence = .40f)
++        assertEquals(baseline.turnsLikely,
++            ChargedMovePredictor.energyWindow(listOf(h), 50, unreliable)!!.turnsLikely)
++    }
++
+ }
+diff --git a/app/src/test/java/com/lucianotoscano/pvppokego/engine/EnemyChargedHistoryTest.kt b/app/src/test/java/com/lucianotoscano/pvppokego/engine/EnemyChargedHistoryTest.kt
+new file mode 100644
+--- /dev/null
++++ b/app/src/test/java/com/lucianotoscano/pvppokego/engine/EnemyChargedHistoryTest.kt
+@@ -0,0 +1,17 @@
++package com.lucianotoscano.pvppokego.engine
++
++import org.junit.Assert.*
++import org.junit.Test
++
++class EnemyChargedHistoryTest {
++    @Test fun remembersMovesPerSlotAndDoesNotConfuseIdenticalSpecies() {
++        val h = EnemyChargedHistory(5)
++        h.record(0, "A", "BAIT", 1000L)
++        h.record(1, "A", "NUKE", 1500L)
++        h.record(0, "A", "BAIT", 1501L)
++        assertEquals(listOf("BAIT"), h.observedMoves(0, "A"))
++        assertEquals(listOf("NUKE"), h.observedMoves(1, "A"))
++        h.clear()
++        assertTrue(h.observedMoves(0, "A").isEmpty())
++    }
++}
+diff --git a/app/src/test/java/com/lucianotoscano/pvppokego/engine/EnemyEnergyTrackerTest.kt b/app/src/test/java/com/lucianotoscano/pvppokego/engine/EnemyEnergyTrackerTest.kt
+--- a/app/src/test/java/com/lucianotoscano/pvppokego/engine/EnemyEnergyTrackerTest.kt
++++ b/app/src/test/java/com/lucianotoscano/pvppokego/engine/EnemyEnergyTrackerTest.kt
+@@ -183,4 +183,58 @@
+         assertEquals(snapshot.consistencyScore, restored.consistencyScore(), .0001f)
+     }
+ 
++    @Test
++    fun earlyConfirmationRequiresThreeEventsAndMargin() {
++        val quick = fast("QUICK2", 9, 2)
++        val slow = fast("SLOW4", 14, 4)
++        val tracker = EnemyEnergyTracker()
++        tracker.reset(listOf(WeightedMove(quick, .5f), WeightedMove(slow, .5f)))
++        repeat(2) { index ->
++            tracker.observeFastCompletion(1, index + 201L, 1f, observedIntervalMs = 1000)
++            assertEquals(null, tracker.confirmFastMoveFromEvidence())
++        }
++        assertEquals(2, tracker.hypothesisCount())
++        tracker.observeFastCompletion(1, 203L, 1f, observedIntervalMs = 1000)
++        assertEquals("QUICK2", tracker.confirmFastMoveFromEvidence()?.moveId)
++        assertEquals(1, tracker.hypothesisCount())
++    }
++
++    @Test
++    fun closeCandidatesDoNotPrematurelyLockFastMove() {
++        val first = fast("FIRST", 9, 2)
++        val second = fast("SECOND", 9, 2)
++        val tracker = EnemyEnergyTracker()
++        tracker.reset(listOf(WeightedMove(first, .50f), WeightedMove(second, .50f)))
++        repeat(5) { tracker.observeFastCompletion(1, it + 321L, 1f, observedIntervalMs = 1000) }
++        assertEquals(null, tracker.confirmFastMoveFromEvidence())
++        assertEquals(2, tracker.hypothesisCount())
++    }
++
++    @Test
++    fun captureGapPhaseReweightsButNeverDeletesTheZeroMissedHypothesis() {
++        val fast = fast("GAP", 8, 2)
++        val tracker = EnemyEnergyTracker()
++        tracker.reset(listOf(WeightedMove(fast, 1f)))
++        tracker.observeFastCompletion(2, 501L, 1f)
++        val preGapPhase = FastMovePhaseTracker().apply {
++            observeCompletion(fast, 1, 1000L, .98f, 1000L)
++        }.snapshot(1000L)
++        tracker.recoverCaptureGap(2300L, preGapPhase)
++        assertTrue(tracker.hypotheses().any { it.energy == 16 })
++        assertTrue(tracker.hypotheses().any { it.energy >= 24 })
++        assertTrue(tracker.hypotheses().all { it.energy <= 100 })
++    }
++
++    @Test
++    fun fastTurnsRangeNarrowsAfterThreeStrongObservations() {
++        val short = fast("SHORT", 9, 2)
++        val long = fast("LONG", 15, 4)
++        val tracker = EnemyEnergyTracker()
++        tracker.reset(listOf(WeightedMove(short, .5f), WeightedMove(long, .5f)))
++        assertEquals(2..4, tracker.fastTurnsRange())
++        repeat(3) { tracker.observeFastCompletion(1, 950L + it, 1f, observedIntervalMs = 1000L) }
++        assertEquals("SHORT", tracker.confirmFastMoveFromEvidence()?.moveId)
++        assertEquals(2..2, tracker.fastTurnsRange())
++    }
++
+ }
+diff --git a/app/src/test/java/com/lucianotoscano/pvppokego/engine/EnemyMovePredictorTest.kt b/app/src/test/java/com/lucianotoscano/pvppokego/engine/EnemyMovePredictorTest.kt
+new file mode 100644
+--- /dev/null
++++ b/app/src/test/java/com/lucianotoscano/pvppokego/engine/EnemyMovePredictorTest.kt
+@@ -0,0 +1,24 @@
++package com.lucianotoscano.pvppokego.engine
++
++import org.junit.Assert.*
++import org.junit.Test
++
++class EnemyMovePredictorTest {
++    @Test fun observedCheapMovesIncreaseHeuristicWithoutClaimingCertainty() {
++        val base = EnemyMovePredictor.baitHeuristic(.30f, 0, true, false, 60, .6f)
++        val observed = EnemyMovePredictor.baitHeuristic(.30f, 2, true, false, 60, .6f)
++        assertTrue(observed > base)
++        assertTrue(observed < 1f)
++    }
++    @Test fun lethalCheapMoveIsNotADeceptiveBait() {
++        assertEquals(0f, EnemyMovePredictor.baitHeuristic(.8f, 3, true, true, 55, .5f), 0f)
++    }
++    @Test fun noExpensiveAffordableMeansNoBaitInference() {
++        assertEquals(0f, EnemyMovePredictor.baitHeuristic(.5f, 2, false, false, 40, .9f), 0f)
++    }
++    @Test fun criticalHpAndNearCapReduceBaitHeuristic() {
++        val initial = EnemyMovePredictor.baitHeuristic(.50f, 2, true, false, 65, .8f)
++        val critical = EnemyMovePredictor.baitHeuristic(.50f, 2, true, false, 90, .10f)
++        assertTrue(initial > critical)
++    }
++}
+diff --git a/docs/QA_PREDICTION_STARTUP_0.5.41.md b/docs/QA_PREDICTION_STARTUP_0.5.41.md
+new file mode 100644
+--- /dev/null
++++ b/docs/QA_PREDICTION_STARTUP_0.5.41.md
+@@ -0,0 +1,27 @@
++# PvPPokeGo 0.5.41 QA — previsão e tolerância a dados persistidos
++
++Base: fonte verificável da 0.5.40, sem fusão de diretórios históricos.
++
++## Escopo de código
++- Correção de falhas recuperáveis na leitura de preferências, histórico e snapshots Hybrid; startup não confia em valores tipados ou arquivos antigos.
++- Confirmação antecipada de Fast Move apenas após múltiplas evidências coerentes; múltiplas hipóteses permanecem durante ambiguidade.
++- Recuperação do intervalo sem captura com informações da fase e sem promover hipóteses a certezas.
++- Histórico de Charged por adversário e heurística de bait conservadora, nunca probabilidade calibrada ou alerta absoluto.
++- Debug indica janelas imprecisas e recuperação sem perturbar posições aprovadas do HUD.
++- Proteção adicional ao registrar canal de notificação do Application.
++- `standard` mantém serviço de acessibilidade desativado; a aplicação não interage com o processo do jogo nem emite cliques.
++
++## Testes locais
++- 34 testes Kotlin de mecanismos independentes concluídos sem falhas.
++- 2 testes Python para o feed Hybrid concluídos sem falhas.
++- Build Android: verificar no CI; Kotlin/JVM isolado não é equivalente a integração Android.
++
++## Itens não homologados sem telefone
++- Abertura com SharedPreferences corrompido de forma física (dados de teste)
++- Replays de batalha com câmera/captura real, teste de rotação, memória, passos de arrasto
++- Assinatura release permanente (APK de QA usa assinatura de debug)
++
++## Previsibilidade
++- Mínimo 3 eventos de Fast, posterior >=0.75, margem >=0.35, consistência >=0.60.
++- Gap decays 0.58 geral / 0.72 quando fase >=0.60 é confiável.
++- Nunca exibir '100% bait' ou 'não escude' com base em hipótese energética.

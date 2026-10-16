@@ -53,7 +53,7 @@ data class BattleStrategyProfile(
 )
 
 class BattleHistoryRepository(context: Context) {
-    private val prefs = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+    private val prefs = DefensivePreferences(context.getSharedPreferences(FILE, Context.MODE_PRIVATE))
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     private fun loadRawHistory(): List<BattleHistoryEntry> = runCatching {
@@ -64,7 +64,7 @@ class BattleHistoryRepository(context: Context) {
     fun loadHistory(): List<BattleHistoryEntry> {
         // Reading history must not irreversibly rewrite records or erase boundaries.
         // Conservative reconstruction is a display-only view of the raw segments.
-        return BattleHistorySegmentMatcher.repair(loadRawHistory())
+        return runCatching { BattleHistorySegmentMatcher.repair(loadRawHistory()) }.getOrDefault(emptyList())
     }
 
     /**

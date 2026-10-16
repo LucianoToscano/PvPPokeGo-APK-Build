@@ -32,6 +32,9 @@ internal object ShieldDecisionEngine {
         val lethalLikely = threat.likelyKo || (hpPercent != null && damage != null &&
             damage.averagePercent >= hpPercent - 1f)
         val baitProbability = candidates.maxOfOrNull { it.baitProbability } ?: 0f
+        val phaseHint = f.fastPhase?.takeIf {
+            it.confidence >= .75f && it.turnsUntilRegistration <= 1
+        } != null
 
         if (shieldsKnown && shieldsRemaining <= 0) {
             return ShieldDecisionForecast(
@@ -47,7 +50,8 @@ internal object ShieldDecisionEngine {
                 ShieldAction.SHIELD,
                 threat.move.name,
                 confidence = (.84f + threat.confidence * .15f).coerceAtMost(.99f),
-                reason = "dano provável alcança o HP atual",
+                reason = if (phaseHint) "dano letal provável; fase do Fast próxima do registro"
+                    else "dano provável alcança o HP atual",
                 baitProbability = baitProbability
             )
         }
@@ -56,7 +60,8 @@ internal object ShieldDecisionEngine {
                 ShieldAction.SHIELD,
                 threat.move.name,
                 confidence = (.68f + threat.confidence * .20f).coerceAtMost(.92f),
-                reason = "faixa de dano contém KO",
+                reason = if (phaseHint) "faixa de dano contém KO; fase do Fast próxima do registro"
+                    else "faixa de dano contém KO",
                 baitProbability = baitProbability
             )
         }
