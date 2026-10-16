@@ -27,6 +27,7 @@ import java.text.Normalizer
  * Enemy and own energy are preserved per Pokemon through switches.
  */
 class BattleEngine(private val repo: GameDataRepository) {
+    private val identityFusion = IdentityFusion(repo)
     data class DetectionChanges(val playerChanged: Boolean, val enemyChanged: Boolean)
     data class DamageObservation(
         /** Actor that launched the Charged Move: VOCÊ or INIMIGO. */
@@ -48,6 +49,9 @@ class BattleEngine(private val repo: GameDataRepository) {
     )
 
     private val enemyStates = BattleStateStore()
+    private val opponentTeamTracker = OpponentTeamTracker()
+    // Survives a rejected OCR frame: needed to detect a real switch on recovery.
+    private var lastTrustedOpponentSlot: Int? = null
     private val ownStates = BattleStateStore()
 
     private var playerName: String? = null
@@ -76,23 +80,6 @@ class BattleEngine(private val repo: GameDataRepository) {
     private var ownFast: MoveDef? = null
     private var ownCharge1: MoveDef? = null
     private var ownCharge2: MoveDef? = null
-
-    private data class OwnTeamSlot(
-        val slot: Int,
-        var name: String,
-        var cp: Int?,
-        var speciesId: String? = null,
-        var dex: Int? = null,
-        var identityConfidence: Float = 0f
-    )
-
-    private data class TeamIdentityCandidate(
-        val name: String,
-        val cp: Int?,
-        val confidence: Float,
-        val speciesId: String?,
-        val dex: Int?
-    )
 
     private val ownTeam = linkedMapOf<String, Int?>()
     private val ownTeamSlots = mutableListOf<OwnTeamSlot>()
@@ -217,6 +204,8 @@ class BattleEngine(private val repo: GameDataRepository) {
         pendingOutgoingChargedHpBefore = null
         pendingIncomingChargedDamage = null
         pendingOutgoingChargedDamage = null
+        opponentTeamTracker.clear()
+        lastTrustedOpponentSlot = null
         enemyStates.clearBattle()
         ownStates.clearBattle()
     }
@@ -357,6 +346,8 @@ class BattleEngine(private val repo: GameDataRepository) {
         val oldPlayerSpeciesId = playerSpeciesId
         val oldEnemy = enemyName
         val oldEnemySpeciesId = enemySpeciesId
+        var switchedOpponentSlot = false
+        var untrustedOpponentFrame = false
 
         d.player?.takeIf { selectedManualTeam == null || manualSlotForPlayer(it) != null }?.let { detected ->
             val ocrCanonical = repo.canonicalPokemonName(detected.name) ?: detected.name
@@ -413,8 +404,42 @@ class BattleEngine(private val repo: GameDataRepository) {
                 normalize(speciesId ?: canonical),
                 detected.cp
             )
-            if (!samePokemonIdentity(enemyName, enemySpeciesId, canonical, speciesId)) {
-                onEnemyChanged(canonical, speciesId)
+            val previousSlot = opponentTeamTracker.activeSlot() ?: lastTrustedOpponentSlot
+            val observedSlot = opponentTeamTracker.observe(
+                canonical, speciesId, stableCp,
+                confidence = maxOf(detected.confidence, detected.visualConfidence ?: 0f)
+            )
+            if (observedSlot == null) {
+                // Never allocate an untracked "#unknown" combat state, nor expose the
+                // previous opponent's energy/HP as belonging to a rejected identity.
+                // Low-confidence frames retain their last trusted slot; ambiguous
+                // duplicate/fourth identities make activeSlot() null until resolved.
+                if (opponentTeamTracker.activeSlot() == null) {
+                    untrustedOpponentFrame = true
+                    saveActiveState()
+                    activeState = null
+                    enemyName = null
+                    enemySpeciesId = null
+                    enemyCp = null
+                    lastOpponentHpRatio = null
+                    pendingOutgoingChargedDamage = null
+                    pendingOutgoingChargedHpBefore = null
+                    enemyChargedCycle.reset()
+                    fast = null
+                    charge1 = null
+                    charge2 = null
+                    enemyFastPhase.reset()
+                    predictiveEnergy.clear()
+                    tracker.reset()
+                }
+                return@let
+            }
+            val switchedSlot = previousSlot != null && previousSlot != observedSlot
+            lastTrustedOpponentSlot = observedSlot
+            switchedOpponentSlot = switchedSlot
+            if (activeState == null ||
+                !samePokemonIdentity(enemyName, enemySpeciesId, canonical, speciesId) || switchedSlot) {
+                onEnemyChanged(canonical, speciesId, observedSlot)
                 enemyCp = stableCp
             } else {
                 enemyName = canonical
@@ -425,8 +450,9 @@ class BattleEngine(private val repo: GameDataRepository) {
 
         val playerChanged = oldPlayer != null &&
             !samePokemonIdentity(oldPlayer, oldPlayerSpeciesId, playerName, playerSpeciesId)
-        val enemyChanged = oldEnemy != null &&
-            !samePokemonIdentity(oldEnemy, oldEnemySpeciesId, enemyName, enemySpeciesId)
+        val enemyChanged = !untrustedOpponentFrame && oldEnemy != null &&
+            (!samePokemonIdentity(oldEnemy, oldEnemySpeciesId, enemyName, enemySpeciesId) ||
+                switchedOpponentSlot)
         val now = System.currentTimeMillis()
         if (playerChanged) {
             reserveSlotVisible.fill(null)
@@ -523,38 +549,8 @@ class BattleEngine(private val repo: GameDataRepository) {
         rebindOwnActiveStateToStableSlot()
     }
 
-    private fun resolveTeamIdentityCandidate(pokemon: DetectedPokemon): TeamIdentityCandidate? {
-        val ocrCanonical = repo.canonicalPokemonName(pokemon.name) ?: pokemon.name
-        val ocrDef = repo.pokemon(ocrCanonical)
-        val visualDef = if (
-            (pokemon.visualConfidence ?: 0f) >= IdentityThresholds.TEAM_VISUAL_MIN_CONFIDENCE
-        ) {
-            repo.pokemonForVisualIdentity(
-                pokemon.visualSpeciesId,
-                pokemon.visualDex ?: 0
-            )
-        } else {
-            null
-        }
-
-        // The OCR detector has already rejected strong cross-dex conflicts. Here the
-        // visual identity is used to preserve the exact regional/form speciesId.
-        val resolved = when {
-            visualDef == null -> ocrDef
-            ocrDef == null -> visualDef
-            visualDef.dex <= 0 || ocrDef.dex <= 0 || visualDef.dex == ocrDef.dex -> visualDef
-            else -> ocrDef
-        }
-        val name = resolved?.speciesName ?: ocrCanonical
-        if (name.isBlank()) return null
-        return TeamIdentityCandidate(
-            name = name,
-            cp = pokemon.cp,
-            confidence = pokemon.confidence,
-            speciesId = resolved?.speciesId ?: pokemon.visualSpeciesId,
-            dex = resolved?.dex?.takeIf { it > 0 } ?: pokemon.visualDex
-        )
-    }
+    private fun resolveTeamIdentityCandidate(pokemon: DetectedPokemon): TeamIdentityCandidate? =
+        identityFusion.resolveTeamIdentityCandidate(pokemon)
 
     fun onReserveHpRatios(first: Float?, second: Float?) {
         listOf(first, second).forEachIndexed { index, value ->
@@ -757,12 +753,11 @@ class BattleEngine(private val repo: GameDataRepository) {
     }
 
     // Do not stop team OCR after collecting three low-confidence guesses.
-    fun needsOwnTeamScan(): Boolean =
-        selectedManualTeam == null && (ownTeamSlots.size < 3 || ownTeamSlots.any {
-            it.cp == null ||
-                it.speciesId.isNullOrBlank() ||
-                it.identityConfidence < IdentityThresholds.MIN_STABLE_TEAM_CONFIDENCE
-        })
+    fun needsOwnTeamScan(): Boolean = TeamAndReserveManager.needsOwnTeamScan(
+        manualSelected = selectedManualTeam != null,
+        slots = ownTeamSlots,
+        minimumConfidence = IdentityThresholds.MIN_STABLE_TEAM_CONFIDENCE
+    )
     internal fun battleCorrespondenceContext(
         inactiveForMs: Long,
         sessionAgeMs: Long
@@ -861,37 +856,25 @@ class BattleEngine(private val repo: GameDataRepository) {
     fun activeEnemyName(): String? = enemyName
     fun latestPlayerHpRatio(): Float? = lastHpRatio
     fun latestOpponentHpRatio(): Float? = lastOpponentHpRatio
+    /** Immutable battle-only snapshot; diagnostic callers must not mutate game state. */
+    fun opponentSlotsSnapshot(): List<OpponentTeamTracker.Slot> = opponentTeamTracker.slots()
     fun currentFastDurationMs(): Long {
         ensurePredictiveEnergyInitialized()
         val manualOrOnlyHypothesis =
             activeState?.fastMoveManual == true || predictiveEnergy.hypothesisCount() <= 1
-        return if (manualOrOnlyHypothesis) {
-            effectiveEnemyFastMove()?.cooldown?.toLong()?.coerceIn(500L, 3_500L) ?: 1_000L
-        } else {
-            (predictiveEnergy.likelyFastTurns() * EnemyEnergyTracker.TURN_MS)
-                .toLong()
-                .coerceIn(500L, 3_500L)
-        }
+        return EnergyAndFastMoveCoordinator.fastDurationMs(
+            manualOrOnlyHypothesis = manualOrOnlyHypothesis,
+            currentFast = effectiveEnemyFastMove(),
+            likelyFastTurns = predictiveEnergy.likelyFastTurns(),
+            turnMs = EnemyEnergyTracker.TURN_MS
+        )
     }
-    fun currentOwnFastDurationMs(): Long = ownFast?.cooldown?.toLong()?.coerceIn(500L, 3_500L) ?: 1_000L
+    fun currentOwnFastDurationMs(): Long =
+        EnergyAndFastMoveCoordinator.ownFastDurationMs(ownFast)
 
     private fun samePokemonIdentity(
-        aName: String?,
-        aSpeciesId: String?,
-        bName: String?,
-        bSpeciesId: String?
-    ): Boolean {
-        if (!aSpeciesId.isNullOrBlank() && !bSpeciesId.isNullOrBlank()) {
-            return normalize(aSpeciesId) == normalize(bSpeciesId)
-        }
-        if (aName.isNullOrBlank() || bName.isNullOrBlank()) return aName == bName
-        val ad = aSpeciesId?.let(repo::pokemon) ?: repo.pokemon(aName)
-        val bd = bSpeciesId?.let(repo::pokemon) ?: repo.pokemon(bName)
-        if (ad != null && bd != null) {
-            return normalize(ad.speciesId) == normalize(bd.speciesId)
-        }
-        return aName.equals(bName, ignoreCase = true)
-    }
+        aName: String?, aSpeciesId: String?, bName: String?, bSpeciesId: String?
+    ): Boolean = identityFusion.samePokemonIdentity(aName, aSpeciesId, bName, bSpeciesId)
 
     private fun slotDefinition(slot: OwnTeamSlot) =
         slot.speciesId?.let(repo::pokemon) ?: repo.pokemon(slot.name)
@@ -1045,7 +1028,7 @@ class BattleEngine(private val repo: GameDataRepository) {
         saveOwnActiveState()
     }
 
-    private fun onEnemyChanged(name: String, speciesId: String? = null) {
+    private fun onEnemyChanged(name: String, speciesId: String? = null, slot: Int? = null) {
         saveActiveState()
         resetStages(activeState)
         pendingIncomingChargedDamage = null
@@ -1059,9 +1042,12 @@ class BattleEngine(private val repo: GameDataRepository) {
         enemyChargedCycle.reset()
         ignoreFastUntilMs = 0L
         val lookup = enemySpeciesId ?: name
-        val key = normalize(lookup)
+        val key = normalize(lookup) + "#" + (slot?.toString() ?: "unknown")
         activeState = enemyStates.getOrCreate(key, name, enemySpeciesId)
         val saved = activeState!!
+        // Do not display the previous opponent's HP on a switch.
+        lastOpponentHpRatio = saved.lastHpRatio ?: opponentTeamTracker.slots()
+            .getOrNull(slot ?: -1)?.hpRatio
         val likely = repo.likelyMoveset(lookup)
         fast = repo.move(saved.fastMoveId) ?: likely.first ?: repo.possibleFastMoves(lookup).firstOrNull()
         resolveChargedPair(lookup, saved.chargedMove1Id, saved.chargedMove2Id, likely.second, likely.third).also { (c1, c2) ->
@@ -1246,7 +1232,13 @@ class BattleEngine(private val repo: GameDataRepository) {
     fun onOwnFastDetected(count: Int, confidence: Float, source: String, opponentHpRatio: Float?) {
         lastDetectorConfidence = maxOf(lastDetectorConfidence, confidence)
         lastOwnAutoSource = source
-        lastOpponentHpRatio = opponentHpRatio
+        opponentHpRatio?.takeIf {
+            opponentTeamTracker.activeSlot() != null && it.isFinite() && it in 0f..1f
+        }?.let {
+            lastOpponentHpRatio = it
+            opponentTeamTracker.updateHp(it)
+            activeState?.lastHpRatio = it
+        }
         if (count <= 0) return
         val f = ownFast ?: return
         ownTracker.onFastMove(f, count)
@@ -1266,7 +1258,13 @@ class BattleEngine(private val repo: GameDataRepository) {
                 if (value <= .01f) state.fainted = true
             }
         }
-        opponentHpRatio?.let { lastOpponentHpRatio = it.coerceIn(0f, 1f) }
+        opponentHpRatio?.takeIf {
+            opponentTeamTracker.activeSlot() != null && it.isFinite() && it in 0f..1f
+        }?.let {
+            lastOpponentHpRatio = it
+            opponentTeamTracker.updateHp(it, nowMs)
+            activeState?.lastHpRatio = it
+        }
 
         val outcomes = mutableListOf<DamageObservation>()
         processChargedOutcome(
@@ -1621,11 +1619,8 @@ class BattleEngine(private val repo: GameDataRepository) {
         return BattleTextResult(newPrompt, false, false)
     }
 
-    private fun findMoveMention(text: String, candidates: List<MoveDef>): MoveDef? = candidates
-        .distinctBy { it.moveId }
-        .map { it to normalizedMoveNames(it) }
-        .firstOrNull { (_, names) -> names.any { n -> n.length >= 4 && text.contains(n) } }
-        ?.first
+    private fun findMoveMention(text: String, candidates: List<MoveDef>): MoveDef? =
+        ChargedMoveCoordinator.findMoveMention(text, candidates, ::normalizedMoveNames)
 
     fun maybeConfirmPendingCharged(nowMs: Long = System.currentTimeMillis()): Boolean {
         val since = chargedPendingSinceMs ?: return false
@@ -1984,18 +1979,27 @@ class BattleEngine(private val repo: GameDataRepository) {
             switchSeconds = switchSeconds(ownSwitchReadyAtMs)
         )
 
-        val enemyHistory = enemyStates.all()
-            .sortedByDescending { it.lastSeenAtMs }
-            .take(3)
-            .map { s ->
-                val e = if (s.energyUncertain || s.minEnergy != s.maxEnergy) "${s.minEnergy}-${s.maxEnergy}E" else "${s.estimatedEnergy}E"
-                val seen = s.lastChargedMoveId?.let(repo::move)?.name
-                buildString {
-                    append(s.speciesName)
-                    append(": ${s.fastMoveCount}F • $e")
-                    if (!seen.isNullOrBlank()) append(" • $seen")
+        val enemyHistory = opponentTeamTracker.slots().map { slot ->
+            if (slot.name == null) {
+                "#${slot.index + 1} ? • aguardando"
+            } else {
+                val lookupKey = normalize(slot.speciesId ?: slot.name) + "#" + slot.index
+                val saved = enemyStates.find(lookupKey)
+                val energy = saved?.let {
+                    if (it.energyUncertain || it.minEnergy != it.maxEnergy)
+                        "${it.minEnergy}-${it.maxEnergy}E"
+                    else "${it.estimatedEnergy}E"
+                } ?: "?E"
+                val hp = slot.hpRatio?.let { "${(it * 100).toInt()}%" } ?: "?HP"
+                val cp = slot.cp?.let { " PC$it" } ?: ""
+                val marker = when {
+                    slot.fainted -> " ✕"
+                    slot.active -> " ▶"
+                    else -> ""
                 }
+                "#${slot.index + 1} ${slot.name.take(11)}$cp • $hp $energy$marker"
             }
+        }
 
         return BattleUiState(
             playerName = playerName,
@@ -2160,30 +2164,8 @@ class BattleEngine(private val repo: GameDataRepository) {
         if (forecasts.isEmpty()) return null
         if (forecasts.size == 1) return forecasts.first().second
 
-        val minDamage = forecasts.minOf { it.second.minPercent }
-        val maxDamage = forecasts.maxOf { it.second.maxPercent }
-        val avgDamage = forecasts.maxOf { it.second.averagePercent }
-        val currentHpPercent = lastHpRatio?.times(100f)
-        val names = forecasts.map { repo.localizedMoveName(it.first) }.distinct()
-        val allObserved = forecasts.all {
-            it.second.confidence != DamageForecastConfidence.MODEL
-        }
-        val stableObserved = forecasts.all {
-            it.second.confidence == DamageForecastConfidence.OBSERVED_STABLE
-        }
-        return DamageForecast(
-            moveName = names.joinToString(" / ").take(50),
-            averagePercent = avgDamage,
-            minPercent = minDamage,
-            maxPercent = maxDamage,
-            projectedRemainingPercent = currentHpPercent?.let { (it - avgDamage).coerceIn(0f, 100f) },
-            source = if (allObserved) "dano observado • golpes possíveis" else "modelo PvPoke • golpes possíveis",
-            confidence = when {
-                stableObserved -> DamageForecastConfidence.OBSERVED_STABLE
-                allObserved -> DamageForecastConfidence.OBSERVED_ESTIMATED
-                else -> DamageForecastConfidence.MODEL
-            }
-        )
+        return AdviceAndForecastHelper.combine(forecasts, lastHpRatio, repo::localizedMoveName)
+
     }
 
     private fun enemyEnergyConfidence(): EnergyConfidence = when {

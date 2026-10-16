@@ -1,0 +1,91 @@
+name: Publish verified PvPPokeGo 0.5.30 QA APK and editable source
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ secrets.PVPPOKEGO_RELEASE_TOKEN }}
+      GH_REPO: LucianoToscano/PvPPokeGo-APK-Build
+      QA_RUN: "38815466466"
+      QA_COMMIT: d838a44a3bf6ded5110e82589f2961cc205f14af
+      QA_TAG: qa-v0.5.30-38815466466
+    steps:
+      - name: Verify exact immutable successful build
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::error::Add a repository secret named PVPPOKEGO_RELEASE_TOKEN with GitHub Releases write permission; no token or key may be committed."
+            exit 1
+          fi
+          RUN_STATUS="$(gh api "repos/$GH_REPO/actions/runs/$QA_RUN" --jq '.conclusion')"
+          RUN_SHA="$(gh api "repos/$GH_REPO/actions/runs/$QA_RUN" --jq '.head_sha')"
+          test "$RUN_STATUS" = success
+          test "$RUN_SHA" = "$QA_COMMIT"
+
+      - name: Fetch verified APK, checksums and editable project
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa/source qa/apk
+          gh run download "$QA_RUN" -R "$GH_REPO" \
+            --name PvPPokeGo-0.5.30-Hybrid-QA-debug -D qa/apk
+          gh run download "$QA_RUN" -R "$GH_REPO" \
+            --name PvPPokeGo-0.5.30-Hybrid-FONTE-EDITAVEL -D qa/source
+          (
+            cd qa/apk
+            sed 's#  delivery/#  #' SHA256SUMS.txt | sha256sum --check -
+            unzip -t PvPPokeGo-0.5.30-Hybrid-QA-debug.apk >/dev/null
+            grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true' signature-verification.txt
+          )
+          (
+            cd qa/source
+            sha256sum --check PvPPokeGo-0.5.30-Hybrid-FONTE-EDITAVEL.zip.sha256
+            unzip -t PvPPokeGo-0.5.30-Hybrid-FONTE-EDITAVEL.zip >/dev/null
+            unzip -Z1 PvPPokeGo-0.5.30-Hybrid-FONTE-EDITAVEL.zip |
+              grep -q 'gradle/wrapper/gradle-wrapper.jar'
+          )
+          cat > QA_RELEASE_NOTES.txt <<EOF
+          PvPPokeGo 0.5.30 Hybrid QA — TEST BUILD, NOT PRODUCTION.
+
+          Verified successful CI: https://github.com/$GH_REPO/actions/runs/$QA_RUN
+          Source commit: $QA_COMMIT
+          APK is signed with Android debug QA signing, not an owner production keystore.
+          Never remove an installed differently signed build without backing up user settings.
+
+          Includes: editable Android project ZIP with Gradle wrapper, Kotlin source,
+          unit tests, Pokémon icon assets and bundled offline datasets; SHA-256 and
+          APK Signature Scheme v2 verification report.
+
+          Unresolved external checks: PvP live battle/OCR/HUD on a physical Samsung;
+          real network-switch testing; signed remote manifest and owner-supplied
+          permanent production signing key.
+          Source is also tracked in the public preview branch and the full canonical
+          development record is in the private PvPPokeGo repository.
+          EOF
+
+      - name: Create immutable public GitHub prerelease
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$QA_TAG" -R "$GH_REPO" >/dev/null 2>&1; then
+            echo "Immutable QA tag already exists; no overwrite."
+            exit 0
+          fi
+          gh release create "$QA_TAG" -R "$GH_REPO" \
+            --target "$QA_COMMIT" \
+            --title "PvPPokeGo 0.5.30 Hybrid — QA debug / editable source" \
+            --prerelease \
+            --notes-file QA_RELEASE_NOTES.txt \
+            qa/apk/PvPPokeGo-0.5.30-Hybrid-QA-debug.apk \
+            qa/apk/SHA256SUMS.txt \
+            qa/apk/signature-verification.txt \
+            qa/source/PvPPokeGo-0.5.30-Hybrid-FONTE-EDITAVEL.zip \
+            qa/source/PvPPokeGo-0.5.30-Hybrid-FONTE-EDITAVEL.zip.sha256

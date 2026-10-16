@@ -1,6 +1,8 @@
 package com.lucianotoscano.pvppokego.data
 
 import android.content.Context
+import com.lucianotoscano.pvppokego.PvPPokeGoApp
+import com.lucianotoscano.pvppokego.data.sync.HybridSnapshotStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -41,7 +43,38 @@ class GameDataRepository(private val context: Context) {
     @Volatile var currentLeagueCp: Int = 1500
         private set
 
+    private val hybridStore by lazy { HybridSnapshotStore(File(context.filesDir, "hybrid-data")) }
+    private var selectedSnapshot: File? = null
+
+    private fun readSnapshotAsset(name: String): String {
+        val fromSnapshot = selectedSnapshot?.resolve(name)
+        return if (fromSnapshot?.isFile == true) fromSnapshot.readText()
+        else context.assets.open(name).bufferedReader().use { it.readText() }
+    }
+
     suspend fun load(leagueCp: Int = 1500) = withContext(Dispatchers.IO) {
+        // The only activation point is process startup; wait on IO before reading data.
+        (context.applicationContext as? PvPPokeGoApp)?.awaitPendingHybridActivation()
+        // The store re-checks SHA-256 before we trust any staged snapshot.
+        selectedSnapshot = hybridStore.activeVersion()?.let(hybridStore::snapshot)
+        if (selectedSnapshot != null) {
+            // Validate the *whole active dataset* before loading any of its indexes;
+            // never mix one corrupt remote asset with a locally cached counterpart.
+            val isCompatible = runCatching {
+                val master = json.decodeFromString<GameMaster>(readSnapshotAsset("gamemaster.json"))
+                require(master.pokemon.size > 100 && master.moves.size > 100)
+                val ranks = json.decodeFromString<List<RankingEntry>>(
+                    readSnapshotAsset("rankings-$leagueCp.json"))
+                require(ranks.size > 100)
+                val cpms = json.parseToJsonElement(readSnapshotAsset("pvpoke_cpms.json"))
+                    .jsonObject.getValue("cpms").jsonArray
+                require(cpms.size >= 100)
+            }.isSuccess
+            if (!isCompatible) {
+                hybridStore.disableActiveSnapshot()
+                selectedSnapshot = null
+            }
+        }
         currentLeagueCp = leagueCp
         legalFastCache.clear()
         legalChargedCache.clear()
@@ -50,7 +83,7 @@ class GameDataRepository(private val context: Context) {
         battleStatsCache.clear()
         attackRangeCache.clear()
         val gmText = runCatching {
-            context.assets.open("gamemaster.json").bufferedReader().use { it.readText() }
+            readSnapshotAsset("gamemaster.json")
         }.getOrElse {
             runCatching {
                 fetchWithCache(
@@ -61,6 +94,14 @@ class GameDataRepository(private val context: Context) {
             }.getOrElse { "{\"pokemon\":[],\"moves\":[]}" }
         }
         gameMaster = runCatching { json.decodeFromString<GameMaster>(gmText) }.getOrNull()
+        if (selectedSnapshot != null && (gameMaster?.pokemon.isNullOrEmpty() ||
+                gameMaster?.moves.isNullOrEmpty())) {
+            hybridStore.disableActiveSnapshot()
+            selectedSnapshot = null
+            gameMaster = runCatching {
+                json.decodeFromString<GameMaster>(readSnapshotAsset("gamemaster.json"))
+            }.getOrNull()
+        }
         movesById = gameMaster?.moves?.associateBy { normalizeId(it.moveId) }.orEmpty()
         uniquePokemon = gameMaster?.pokemon
             ?.map { p ->
@@ -78,7 +119,7 @@ class GameDataRepository(private val context: Context) {
             .groupBy { it.dex }
 
         val rankingText = runCatching {
-            context.assets.open("rankings-$leagueCp.json").bufferedReader().use { it.readText() }
+            readSnapshotAsset("rankings-$leagueCp.json")
         }.getOrElse {
             fetchWithCache(
                 url = "$RANKINGS_PREFIX$leagueCp.json",
@@ -94,8 +135,8 @@ class GameDataRepository(private val context: Context) {
         }.getOrDefault(emptyMap())
 
         cpMultipliers = runCatching {
-            context.assets.open("pvpoke_cpms.json").bufferedReader().use { reader ->
-                json.parseToJsonElement(reader.readText())
+            readSnapshotAsset("pvpoke_cpms.json").let { text ->
+                json.parseToJsonElement(text)
                     .jsonObject["cpms"]
                     ?.jsonArray
                     ?.mapNotNull { it.jsonPrimitive.contentOrNull?.toDoubleOrNull() }
@@ -284,7 +325,7 @@ class GameDataRepository(private val context: Context) {
     }
 
     fun offlineSnapshotMetadata(): String? = runCatching {
-        context.assets.open("pvpoke_snapshot.json").bufferedReader().use { it.readText() }
+        readSnapshotAsset("pvpoke_snapshot.json")
     }.getOrNull()
 
     fun offlineSnapshotVersion(): String? = offlineSnapshotMetadata()?.let { raw ->

@@ -78,9 +78,13 @@ class ScreenCapture(
                 val rowPadding = rowStride - pixelStride * width
                 val paddedWidth = width + rowPadding / pixelStride
                 val padded = Bitmap.createBitmap(paddedWidth, height, Bitmap.Config.ARGB_8888)
-                padded.copyPixelsFromBuffer(buffer)
-                val cropped = Bitmap.createBitmap(padded, 0, 0, width, height)
-                padded.recycle()
+                val cropped = try {
+                    padded.copyPixelsFromBuffer(buffer)
+                    Bitmap.createBitmap(padded, 0, 0, width, height)
+                } finally {
+                    // Also recycle after crop/copy failures (e.g. memory pressure).
+                    if (!padded.isRecycled) padded.recycle()
+                }
 
                 val old = synchronized(bitmapLock) {
                     latestTimestampMs.set(System.currentTimeMillis())

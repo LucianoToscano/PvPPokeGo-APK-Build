@@ -1,24 +1,24 @@
-# PvPPokeGo — public APK build mirror
+# PvPPokeGo — Android (ImageDB + Hybrid QA 0.5.40, fonte editável)
 
-This repository is a **build-only, public snapshot** of PvPPokeGo **0.5.29 Standard**, exported from the private canonical repository at commit `cb00b81607706df99fcd9837dd27fc6e4fc4c4bb`.
+Esta pasta é a base **0.5.38 ImageDB** (versionCode 43), com trabalho incremental de reconciliação na revisão **0.5.40, versionCode 44**, ainda **sem build Android homologado**. O APK 0.5.38 já existente é a única compilação confirmada anteriormente e **não inclui as alterações 0.5.40**. Não confundir fonte editável com APK pronto.
 
-- The original project remains private and is **not automatically synchronized**.
-- No private repository history, release keystore or signing passwords are included.
-- The GitHub Actions workflow assembles **PvPPokeGo-0.5.29-QA-debug.apk** using the debug signing key for testing. It is not a permanent production release signature.
-- Source code is publicly readable. The app's pre-existing development credits are preserved.
-- Third-party data and imagery are fetched by the workflow, and relevant notices are in `THIRD_PARTY_NOTICES.md`.
-- APK output is stored in the workflow's **Artifacts**, under *Actions*.
+Pacote `com.lucianotoscano.pvppokego`; uso externo, somente leitura/overlay. Flavor `standard` não tem AccessibilityService. Nunca modificar, automatizar toques ou injetar no Pokémon GO.
 
-## Build
+**A 0.5.30 Hybrid é histórico para análise, NÃO a raiz compilável.** Não copiar código de diretórios `ARQUIVO_HISTORICO_*` ou `ARQUIVO_0.5.10_*` para esta raiz.
 
-Go to **Actions → Build PvPPokeGo 0.5.29 Standard APK → Run workflow**, or use the automatically triggered build on the initial commit. Download the APK from the workflow artifacts after all tests pass.
+Relatório e pendências em `docs/AUDITORIA_COMPARATIVA_0.5.40_2026-10-16.md`; checklist em `docs/QA_CHECKLIST_0.5.40.md`. Todos os assets/posições de HUD/identidade de imagem da base 0.5.38 preservados.
 
-This build mirror is isolated from the original repository. Fixes must be made in the private canonical project and explicitly copied here after review.
+## Compilar
 
-The first build is triggered by commits to `main`. If no run appears, use the **Run workflow** control in the Actions tab.
+Exige Android SDK 36, JDK 17 e acesso à distribuição Gradle 8.11.1. Comandos:
 
-2026-10-07: compact reserve-card HUD and exact user-provided transparent launcher, source branch release/0.5.29.
+```bash
+./gradlew :app:testStandardDebugUnitTest
+./gradlew :app:assembleStandardDebug
+```
 
-0.5.29 visual patch: old 0.5.17 reserve/switch-matchup icons and normal move HUD restored; predictive diagnostics kept in debug mode. Official transparent launcher retained.
+**Status atual:** tentados, mas o ambiente não conseguiu acessar services.gradle.org (UnknownHostException); o funcionamento integrado e a APK 0.5.40 não estão certificados. Execute e inspecione testes em seu CI/Android Studio antes de instalar.
 
-0.5.29: ally team recognition regains 0.5.17 text+CP fallback and wider screen scan with confidence checks. Original 0.5.17 HUD visual remains intact.
+
+## Correções históricas 0.5.40 QA
+Leia `docs/AUDITORIA_E_CORRECOES_0.5.40_2026-10-15.md`. Não incluir pastas ARQUIVO_*. Fonte 0.5.38/39 ImageDB; 0.5.30 usada apenas como referência.

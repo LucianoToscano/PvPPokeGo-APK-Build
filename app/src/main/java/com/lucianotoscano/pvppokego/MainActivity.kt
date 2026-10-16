@@ -20,6 +20,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.lucianotoscano.pvppokego.capture.AccessibilityScreenCapture
 import com.lucianotoscano.pvppokego.data.AppDiagnosticLog
+import com.lucianotoscano.pvppokego.data.BattleDiagnosticState
 import com.lucianotoscano.pvppokego.data.BattleHistoryRepository
 import com.lucianotoscano.pvppokego.data.SettingsRepository
 import com.lucianotoscano.pvppokego.overlay.BattleOverlayService
@@ -67,6 +68,8 @@ class MainActivity : ComponentActivity() {
                             zip.closeEntry()
                         }
                         entry("settings.json", settingsRepo.exportBackupJson())
+                        entry("hybrid_sync.txt", settingsRepo.hybridDataStatus())
+                        entry("opponent-slots-and-confidence.json", BattleDiagnosticState.export())
                         entry("battle_history.json", historyRepo.exportJson())
                         entry("runtime-events.log", AppDiagnosticLog.exportRuntimeEvents())
                         entry("logcat-app.txt", AppDiagnosticLog.exportOwnLogcat())

@@ -77,6 +77,9 @@ fun SettingsScreen(
     val context = LocalContext.current
     val teamStore = remember(context) { TeamSetupRepository(context) }
     val trainerStore = remember(context) { TrainerPreferencesRepository(context) }
+    var hybridAutomatic by remember { mutableStateOf(repository.automaticDataUpdates) }
+    var hybridWifiOnly by remember { mutableStateOf(repository.wifiOnlyDataUpdates) }
+    var hybridStatus by remember { mutableStateOf(repository.hybridDataStatus()) }
     var imageAuto by remember { mutableStateOf(repository.pokemonImagesAutoUpdate) }
     var imageWifi by remember { mutableStateOf(repository.pokemonImagesWifiOnly) }
     var imageImportStatus by remember { mutableStateOf("") }
@@ -97,6 +100,7 @@ fun SettingsScreen(
         }
     }
 
+    var enemyThreeSlots by remember { mutableStateOf(repository.showEnemyHistory) }
     var overlay by remember { mutableStateOf(repository.overlayEnabled) }
     var auto by remember { mutableStateOf(repository.autoRecognition) }
     var assist by remember { mutableStateOf(repository.battleAssistEnabled) }
@@ -401,6 +405,14 @@ fun SettingsScreen(
                     moves = it
                     repository.showEnemyMoves = it
                 }
+                Toggle("HUD compacto: 3 adversários identificados", enemyThreeSlots) { enabled ->
+                    enemyThreeSlots = enabled
+                    repository.showEnemyHistory = enabled
+                }
+                Text(
+                    "Os três slots complementam o HUD clássico e não alteram o painel do oponente ativo.",
+                    style = MaterialTheme.typography.bodySmall
+                )
                 Toggle("Pontos de carregamento", counter) {
                     counter = it
                     repository.showChargedCounter = it
@@ -483,6 +495,35 @@ fun SettingsScreen(
                     valueRange = .3f..1f,
                     steps = 6
                 )
+
+                SectionTitle("Banco híbrido — sincronização segura")
+                Text(
+                    "Os dados são validados por SHA-256. Uma versão pendente entra em vigor " +
+                        "somente na próxima abertura do app, nunca durante a batalha.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Toggle("Atualização automática diária", hybridAutomatic) { enabled ->
+                    hybridAutomatic = enabled
+                    repository.automaticDataUpdates = enabled
+                    hybridStatus = repository.hybridDataStatus()
+                }
+                Toggle("Atualizar apenas por Wi-Fi", hybridWifiOnly) { enabled ->
+                    hybridWifiOnly = enabled
+                    repository.wifiOnlyDataUpdates = enabled
+                    hybridStatus = repository.hybridDataStatus()
+                }
+                Text(hybridStatus, style = MaterialTheme.typography.bodySmall)
+                OutlinedButton(
+                    onClick = {
+                        repository.checkHybridUpdatesNow()
+                        hybridStatus = "Verificação solicitada (sujeita à rede e ao Android).\n" +
+                            repository.hybridDataStatus()
+                    }, modifier = Modifier.fillMaxWidth()
+                ) { Text("Verificar agora") }
+                OutlinedButton(
+                    onClick = { hybridStatus = repository.hybridDataStatus() },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Atualizar status (sem baixar)") }
 
                 SectionTitle("Backup e diagnóstico")
                 Text("Backup de configurações e posições", style = MaterialTheme.typography.titleMedium)

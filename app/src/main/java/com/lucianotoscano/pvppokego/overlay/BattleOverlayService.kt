@@ -35,6 +35,7 @@ import com.lucianotoscano.pvppokego.capture.ScreenCapture
 import com.lucianotoscano.pvppokego.capture.ScreenFrameRecorder
 import com.lucianotoscano.pvppokego.data.BattleLeagueMode
 import com.lucianotoscano.pvppokego.data.AppDiagnosticLog
+import com.lucianotoscano.pvppokego.data.BattleDiagnosticState
 import com.lucianotoscano.pvppokego.data.BattleHistoryRecorder
 import com.lucianotoscano.pvppokego.data.BattleUiState
 import com.lucianotoscano.pvppokego.data.CaptureHealth
@@ -192,6 +193,7 @@ class BattleOverlayService : Service(), BattleOverlayView.Callbacks {
                 lastRecordedAdviceKey = null
                 lastReserveDiagnosticKey = null
                 engine?.resetBattle()
+                BattleDiagnosticState.clear()
                 syncSelectedTeamForCurrentLeague()
                 frameDetector?.reset()
                 battleActive = false
@@ -528,10 +530,20 @@ class BattleOverlayService : Service(), BattleOverlayView.Callbacks {
                     val dx = event.rawX - downX; val dy = event.rawY - downY
                     if (!settingsRepo.layoutLocked && (abs(dx) >= touchSlop || abs(dy) >= touchSlop)) dragging = true
                     if (dragging) {
-                        val maxX = (resources.displayMetrics.widthPixels - params.width).coerceAtLeast(0)
-                        val maxY = (resources.displayMetrics.heightPixels - params.height).coerceAtLeast(0)
-                        params.x = (startX + dx).toInt().coerceIn(0, maxX)
-                        params.y = (startY + dy).toInt().coerceIn(-params.height / 2, maxY)
+                        val metrics = resources.displayMetrics
+                        val insets = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                            windowManager?.currentWindowMetrics?.windowInsets?.getInsets(
+                                android.view.WindowInsets.Type.systemBars()
+                            )
+                        } else null
+                        val location = OverlayDragBounds.clamp(
+                            (startX + dx).toInt(), (startY + dy).toInt(),
+                            metrics.widthPixels, metrics.heightPixels, params.width, params.height,
+                            insets?.left ?: 0, insets?.top ?: 0,
+                            insets?.right ?: 0, insets?.bottom ?: 0
+                        )
+                        params.x = location.x
+                        params.y = location.y
                         runCatching { windowManager?.updateViewLayout(view, params) }
                     }
                     true
@@ -1177,6 +1189,7 @@ class BattleOverlayService : Service(), BattleOverlayView.Callbacks {
         lastReserveDiagnosticKey = null
         lastHistoryStateAtMs = 0L
         engine?.resetBattle()
+        BattleDiagnosticState.clear()
         syncSelectedTeamForCurrentLeague()
         frameDetector?.reset()
         presenceTracker.reset()
@@ -1601,6 +1614,13 @@ class BattleOverlayService : Service(), BattleOverlayView.Callbacks {
 
                                 val before = e?.uiState()
                                 val changes = if (!holdIdentityMutation) e?.onDetection(d) else null
+                                if (!holdIdentityMutation) e?.let { current ->
+                                    BattleDiagnosticState.update(
+                                        current.opponentSlotsSnapshot(),
+                                        d.player?.confidence, d.opponent?.confidence,
+                                        d.player?.visualConfidence, d.opponent?.visualConfidence
+                                    )
+                                }
                                 val after = e?.uiState()
                                 after?.opponentName?.takeIf { it.isNotBlank() }?.let { opponent ->
                                     val key = normalizedBattleText(opponent).replace(Regex("[^a-z0-9]+"), "")
@@ -2213,6 +2233,7 @@ class BattleOverlayService : Service(), BattleOverlayView.Callbacks {
         projection = null
         AccessibilityScreenCapture.clearLatest()
         settingsRepo.overlayServiceRunning = false
+        BattleDiagnosticState.clear()
         scope.cancel()
         super.onDestroy()
     }

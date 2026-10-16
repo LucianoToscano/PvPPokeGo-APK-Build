@@ -1,12 +1,50 @@
 package com.lucianotoscano.pvppokego.data
 
 import com.lucianotoscano.pvppokego.BuildConfig
+import com.lucianotoscano.pvppokego.data.sync.HybridSyncScheduler
+import com.lucianotoscano.pvppokego.data.sync.HybridSnapshotStore
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 import android.content.Context
 import org.json.JSONObject
 
 class SettingsRepository(context: Context) {
     private val prefs = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+    private val appContext = context.applicationContext
+    private val hybridPrefs = appContext.getSharedPreferences("hybrid_data_sync", Context.MODE_PRIVATE)
+
+    var automaticDataUpdates: Boolean
+        get() = hybridPrefs.getBoolean("auto", true)
+        set(v) = HybridSyncScheduler.configure(appContext, v, wifiOnlyDataUpdates)
+
+    var wifiOnlyDataUpdates: Boolean
+        get() = hybridPrefs.getBoolean("wifi_only", true)
+        set(v) = HybridSyncScheduler.configure(appContext, automaticDataUpdates, v)
+
+    fun checkHybridUpdatesNow() = HybridSyncScheduler.checkNow(appContext)
+
+    /** Reads local state only. Refreshing this text never downloads anything. */
+    fun hybridDataStatus(): String {
+        val store = HybridSnapshotStore(File(appContext.filesDir, "hybrid-data"))
+        val active = store.activeVersionHint() ?: "interna do APK"
+        val pending = hybridPrefs.getString("pending_version", null)
+        val lastSuccess = hybridPrefs.getLong("last_success_ms", 0L)
+        val lastError = hybridPrefs.getString("last_error", null)
+        val format = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+        val formattedDate = if (lastSuccess > 0L) format.format(Date(lastSuccess)) else "Ainda não disponível"
+        return buildString {
+            appendLine("Snapshot ativo (marcador current): $active")
+            appendLine("Snapshot pendente (pending): ${pending ?: "nenhum"}")
+            appendLine("Última sincronização: $formattedDate")
+            appendLine("Último erro: ${lastError?.takeIf(String::isNotBlank) ?: "nenhum"}")
+            appendLine("Automático diário: ${if (automaticDataUpdates) "sim" else "não"}")
+            appendLine("Apenas Wi-Fi: ${if (wifiOnlyDataUpdates) "sim" else "não"}")
+            append("Próxima verificação: ${if (automaticDataUpdates) "agendada pelo Android (horário variável)" else "desativada"}")
+        }
+    }
 
     var pokemonImagesAutoUpdate: Boolean
         get() = prefs.getBoolean("pokemon_images_auto_update", true)
