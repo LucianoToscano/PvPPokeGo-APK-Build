@@ -123,22 +123,7 @@ jobs:
           APK_CONTENTS="$(unzip -Z1 "$APK")"
           grep -Fq 'assets/gamemaster.json' <<< "$APK_CONTENTS"
           grep -Fq 'assets/pokemon_icon_atlas.png' <<< "$APK_CONTENTS"
-          ! grep -Eq '(^|/)(mapping.txt|.*\\.jks|.*\\.java|.*\\.kt)
-          (cd delivery && sha256sum *.apk > SHA256SUMS.txt)
-          printf 'source=LucianoToscano/PvPPokeGo-APK-Build\nsource_commit=%s\nvariant=standardRelease\nversionName=0.5.41-amigos\nversionCode=47\nR8=true\nresource_shrinking=true\ncertificate_sha256=%s\nsigning=%s\n' "$GITHUB_SHA" "$CERT" "$SIGNING_KIND" > delivery/BUILD_PROVENANCE.txt
-          if [[ "$SIGNING_KIND" == "temporary-new-install-only" ]]; then
-            printf 'ATENCAO: assinatura temporaria nesta compilacao. Precisa desinstalar qualquer PvPPokeGo com assinatura diferente antes de instalar. Futuras versoes nao atualizarao automaticamente esta compilacao. Dados locais poderao ser perdidos na desinstalacao.\n' > delivery/INSTALLATION_NOTICE.txt
-          else
-            printf 'Assinado com keystore permanente configurada no CI. Confirmar compatibilidade com o APK instalado antes de atualizar.\n' > delivery/INSTALLATION_NOTICE.txt
-          fi
-      - name: Upload APK protegido e comprovantes - SEM FONTE
-        uses: actions/upload-artifact@v4
-        with:
-          name: PvPPokeGo-0.5.41-Amigos-protegido
-          path: delivery/
-          if-no-files-found: error
-          retention-days: 30
- <<< "$APK_CONTENTS"
+          ! grep -Eq '(^|/)(mapping.txt|.*\\.jks|.*\\.java|.*\\.kt)$' <<< "$APK_CONTENTS"
           echo "CHECKPOINT: APK contents verified"
           (cd delivery && sha256sum *.apk > SHA256SUMS.txt)
           printf 'source=LucianoToscano/PvPPokeGo-APK-Build\nsource_commit=%s\nvariant=standardRelease\nversionName=0.5.41-amigos\nversionCode=47\nR8=true\nresource_shrinking=true\ncertificate_sha256=%s\nsigning=%s\n' "$GITHUB_SHA" "$CERT" "$SIGNING_KIND" > delivery/BUILD_PROVENANCE.txt
