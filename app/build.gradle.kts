@@ -32,8 +32,8 @@ android {
         applicationId = "com.lucianotoscano.pvppokego"
         minSdk = 29
         targetSdk = 36
-        versionCode = 46
-        versionName = "0.5.41"
+        versionCode = 47
+        versionName = "0.5.41-amigos"
     }
 
     buildFeatures {
@@ -75,7 +75,9 @@ android {
         // PvPPokeGo on the device and launcher/icon/cache cannot point to an older app.
         debug { }
         release {
-            isMinifyEnabled = false
+            isDebuggable = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             if (hasPermanentReleaseSigning) {
                 signingConfig = signingConfigs.getByName("permanentRelease")
