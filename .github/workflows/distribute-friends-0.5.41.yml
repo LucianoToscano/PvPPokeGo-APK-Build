@@ -106,7 +106,8 @@ jobs:
           "$TOOLS/apksigner" sign --ks "$KEYSTORE" --ks-key-alias "$KEY_ALIAS" --ks-pass "pass:$STORE_PASS" --key-pass "pass:$KEY_PASS" --out "$APK" "$RUNNER_TEMP/aligned.apk"
           "$TOOLS/apksigner" verify --verbose --print-certs "$APK" > "$RUNNER_TEMP/apk-verify.txt"
           echo "CHECKPOINT: apksigner verify completed"
-          grep -Fq 'Verified using v2 scheme (APK Signature Scheme v2): true' "$RUNNER_TEMP/apk-verify.txt"
+          sed -n '1,22p' "$RUNNER_TEMP/apk-verify.txt"
+          grep -Eq 'Verified using v(2|3) scheme.*: true' "$RUNNER_TEMP/apk-verify.txt" || { echo "::error::Assinatura APK v2/v3 nao verificada"; exit 1; }
           CERT="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/apk-verify.txt" | head -1 | tr '[:lower:]' '[:upper:]')"
           test -n "$CERT"
           if [[ "$SIGNING_KIND" == "configured-permanent-keystore" && -n "$EXPECTED_CERT_SHA256" ]]; then
